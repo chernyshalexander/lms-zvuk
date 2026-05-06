@@ -27,18 +27,33 @@ sub getNextTrack {
 	my ($id) = $url =~ m{zvuk://(\d+)};
 
 	if (!$id) {
+		$log->error("Invalid Zvuk URL: $url");
 		$errorCb->('Invalid Zvuk ID');
 		return;
 	}
 
 	my $client = $song->master();
-	$log->debug("Resolving Zvuk stream for track ID: $id, player: " . ($client ? $client->id : 'unknown'));
+	$log->info("Resolving Zvuk stream for track ID: $id, player: " . ($client ? $client->id : 'unknown'));
 
 	_getAPIHandler($client)->getStream(sub {
 		my $data = shift;
 
-		if (!$data || $data->{error} || !$data->{mediaContents} || !@{$data->{mediaContents}}) {
-			$log->warn("Failed to get stream for track $id: " . ($data ? $data->{error} || 'no media content' : 'no response'));
+		$log->debug("getStream response for track $id: " . (ref $data ? "Got response" : "Error: $data"));
+
+		if (!$data) {
+			$log->error("getStream: No response for track $id");
+			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
+			return;
+		}
+
+		if ($data->{error}) {
+			$log->error("getStream API error for track $id: $data->{error}");
+			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
+			return;
+		}
+
+		if (!$data->{mediaContents} || !@{$data->{mediaContents}}) {
+			$log->error("getStream: No mediaContents for track $id");
 			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
 			return;
 		}

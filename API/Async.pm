@@ -71,40 +71,60 @@ sub _graphql {
 	my $http = Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $response = shift;
-			my $result = eval { decode_json($response->content) };
+			$log->debug("GraphQL response received for $operationName, status: " . $response->code);
+
+			my $content = $response->content;
+			if (!$content || length($content) == 0) {
+				$log->error("GraphQL: Empty response content for $operationName");
+				$cb->({ error => 'empty_response' });
+				return;
+			}
+
+			my $result = eval { decode_json($content) };
 
 			if ($@) {
-				$log->error("Failed to parse GraphQL response: $@");
-				$cb->({ error => 'parse_error' });
+				$log->error("GraphQL: Failed to parse JSON response for $operationName: $@");
+				$log->error("GraphQL: Response content (first 500 chars): " . substr($content, 0, 500));
+				$cb->({ error => 'parse_error', details => $@ });
 				return;
 			}
 
 			if ($result->{errors}) {
-				$log->error("GraphQL errors for $operationName: " . encode_json($result->{errors}));
-				$log->debug("Variables: " . encode_json($variables));
+				$log->error("GraphQL API errors for $operationName: " . encode_json($result->{errors}));
+				$log->debug("GraphQL Variables: " . encode_json($variables));
 				$cb->({ error => 'api_error', details => $result->{errors} });
 				return;
 			}
 
 			my $data = $result->{data};
+			if (!$data) {
+				$log->warn("GraphQL: No data in response for $operationName");
+				$log->debug("GraphQL: Full response: " . encode_json($result));
+				$cb->({ error => 'no_data' });
+				return;
+			}
+
 			if ($cacheKey && $data) {
 				my $cacheTTL = $ttl || _getCacheTTL($operationName);
 				$cache->set($cacheKey, $data, $cacheTTL);
-				$log->debug("Cached $operationName for ${cacheTTL}s");
+				$log->debug("GraphQL: Cached $operationName for ${cacheTTL}s");
 			}
+			$log->info("GraphQL success: $operationName");
 			$cb->($data);
 		},
 		sub {
 			my ($http, $error) = @_;
-			$log->warn("GraphQL request failed for $operationName: $error");
-			$cb->({ error => $error });
+			$log->error("GraphQL HTTP request failed for $operationName: $error");
+			$cb->({ error => 'http_error', details => $error });
 		},
 		{
 			timeout => 15,
 		}
 	);
 
-	$log->debug("GraphQL Request: $operationName (cache: " . ($cacheKey ? 'enabled' : 'disabled') . ")") if $log->is_debug;
+	$log->info("GraphQL Request: $operationName (userId: $self->{userId}, cache: " . ($cacheKey ? 'enabled' : 'disabled') . ")");
+	$log->debug("GraphQL URL: " . Plugins::Zvuk::API::GRAPHQL_URL);
+	$log->debug("GraphQL Token: " . substr($token, 0, 8) . "..." . substr($token, -4));
 
 	$http->post(
 		Plugins::Zvuk::API::GRAPHQL_URL,

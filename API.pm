@@ -56,8 +56,18 @@ sub getUserdata {
 # Return the token for a given userId
 sub getToken {
     my ($class, $userId) = @_;
-    my $data = $class->getUserdata($userId) || return;
-    return $data->{token};
+    my $data = $class->getUserdata($userId);
+    if (!$data) {
+        $log->error("No account data found for userId: $userId");
+        return;
+    }
+    my $token = $data->{token};
+    if (!$token) {
+        $log->error("No token found in account data for userId: $userId");
+        return;
+    }
+    $log->debug("Token found for userId: $userId (" . substr($token, 0, 8) . "...)");
+    return $token;
 }
 
 # Return the configured quality preference
