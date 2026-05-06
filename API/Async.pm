@@ -124,7 +124,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getCollection|getUserPlaylists|getPersonalWave)$/;
-	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(quickSearch|getSearch|getTracks)$/;
+	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
 
@@ -153,12 +153,14 @@ sub getProfile {
 	);
 }
 
-# Quick search (getSearch)
+# Quick search (getSearch) - limited results
 sub search {
 	my ($self, $cb, $args) = @_;
 
 	my $query = $args->{query};
 	my $limit = $args->{limit} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+
+	$log->info("Zvuk search: query='$query', limit=$limit (using quickSearch)");
 
 	my $gql = <<'GRAPHQL';
 query getSearch($query: String, $first: Int) {
@@ -183,7 +185,11 @@ query getSearch($query: String, $first: Int) {
 }
 GRAPHQL
 
-	$self->_graphql($cb, 'getSearch', $gql, { query => $query, first => $limit });
+	$self->_graphql(sub {
+		my $data = shift;
+		$log->debug("quickSearch response: " . (ref $data ? "Got hash with " . (scalar(@{$data->{quickSearch}{content} || []}) . " items") : "Error: $data"));
+		$cb->($data);
+	}, 'getSearch', $gql, { query => $query, first => $limit });
 }
 
 # Get stream URL for tracks
@@ -383,6 +389,104 @@ query getPersonalWave($first: PositiveInt! = 30) {
 GRAPHQL
 
 	$self->_graphql($cb, 'getPersonalWave', $gql, { first => $first });
+}
+
+# Full categorized search - Tracks
+sub searchTracks {
+	my ($self, $cb, $args) = @_;
+
+	my $query  = $args->{query};
+	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+	my $offset = $args->{offset} || 0;
+
+	$log->info("searchTracks: query='$query', limit=$limit, offset=$offset");
+
+	my $gql = <<'GRAPHQL';
+query searchTracks($query: String, $first: Int, $offset: Int) {
+  searchTracks(query: $query, first: $first, offset: $offset) {
+    total
+    items {
+      id title duration availability artistTemplate
+      release { title image { src } }
+    }
+  }
+}
+GRAPHQL
+
+	$self->_graphql($cb, 'searchTracks', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Full categorized search - Artists
+sub searchArtists {
+	my ($self, $cb, $args) = @_;
+
+	my $query  = $args->{query};
+	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+	my $offset = $args->{offset} || 0;
+
+	$log->info("searchArtists: query='$query', limit=$limit, offset=$offset");
+
+	my $gql = <<'GRAPHQL';
+query searchArtists($query: String, $first: Int, $offset: Int) {
+  searchArtists(query: $query, first: $first, offset: $offset) {
+    total
+    items {
+      id title image { src }
+    }
+  }
+}
+GRAPHQL
+
+	$self->_graphql($cb, 'searchArtists', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Full categorized search - Releases (Albums)
+sub searchReleases {
+	my ($self, $cb, $args) = @_;
+
+	my $query  = $args->{query};
+	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+	my $offset = $args->{offset} || 0;
+
+	$log->info("searchReleases: query='$query', limit=$limit, offset=$offset");
+
+	my $gql = <<'GRAPHQL';
+query searchReleases($query: String, $first: Int, $offset: Int) {
+  searchReleases(query: $query, first: $first, offset: $offset) {
+    total
+    items {
+      id title type date artistTemplate
+      image { src }
+    }
+  }
+}
+GRAPHQL
+
+	$self->_graphql($cb, 'searchReleases', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Full categorized search - Playlists
+sub searchPlaylists {
+	my ($self, $cb, $args) = @_;
+
+	my $query  = $args->{query};
+	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+	my $offset = $args->{offset} || 0;
+
+	$log->info("searchPlaylists: query='$query', limit=$limit, offset=$offset");
+
+	my $gql = <<'GRAPHQL';
+query searchPlaylists($query: String, $first: Int, $offset: Int) {
+  searchPlaylists(query: $query, first: $first, offset: $offset) {
+    total
+    items {
+      id title image { src }
+    }
+  }
+}
+GRAPHQL
+
+	$self->_graphql($cb, 'searchPlaylists', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }
 
 1;
