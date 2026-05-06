@@ -35,12 +35,10 @@ sub initPlugin {
 	}
 
 	$class->SUPER::initPlugin(
-		feed     => \&handleFeed,
-		tag      => 'zvuk',
-		menu     => 'apps',
-		icon     => 'plugins/Zvuk/html/images/logo.png',
-		jiveIcon => 'plugins/Zvuk/html/images/logo.png',
-		weight   => 10,
+		feed   => \&handleFeed,
+		tag    => 'zvuk',
+		menu   => 'apps',
+		weight => 10,
 	);
 
 	# Initialize API clients for all accounts at startup
