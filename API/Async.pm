@@ -68,6 +68,8 @@ sub _graphql {
 		variables     => $variables || {},
 	};
 
+	$log->debug("GraphQL Body: " . encode_json($body));
+
 	my $http = Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $response = shift;
@@ -411,102 +413,143 @@ GRAPHQL
 	$self->_graphql($cb, 'getPersonalWave', $gql, { first => $first });
 }
 
-# Full categorized search - Tracks
+# Full search with cursor-based pagination (all types at once)
+sub getSearchAll {
+	my ($self, $cb, $args) = @_;
+
+	my $query = $args->{query};
+	my $limit = $args->{limit} || Plugins::Zvuk::API::DEFAULT_LIMIT;
+	my $trackCursor = $args->{trackCursor};
+	my $artistsCursor = $args->{artistsCursor};
+	my $releasesCursor = $args->{releasesCursor};
+	my $playlistsCursor = $args->{playlistsCursor};
+
+	$log->info("getSearchAll: query='$query', limit=$limit");
+
+	my $gql = <<'GRAPHQL';
+query getSearchAll(
+	$query: String,
+	$limit: Int,
+	$trackCursor: Cursor,
+	$artistsCursor: Cursor,
+	$releasesCursor: Cursor,
+	$playlistsCursor: Cursor,
+	$tracks: Boolean,
+	$artists: Boolean,
+	$releases: Boolean,
+	$playlists: Boolean
+) {
+	search(query: $query) {
+		tracks(limit: $limit, cursor: $trackCursor) @include(if: $tracks) {
+			page { total next cursor }
+			items {
+				id title duration availability artistTemplate
+				release { title image { src } }
+			}
+		}
+		artists(limit: $limit, cursor: $artistsCursor) @include(if: $artists) {
+			page { total next cursor }
+			items {
+				id title image { src }
+			}
+		}
+		releases(limit: $limit, cursor: $releasesCursor) @include(if: $releases) {
+			page { total next cursor }
+			items {
+				id title type date artistTemplate
+				image { src }
+			}
+		}
+		playlists(limit: $limit, cursor: $playlistsCursor) @include(if: $playlists) {
+			page { total next cursor }
+			items {
+				id title image { src }
+			}
+		}
+	}
+}
+GRAPHQL
+
+	$self->_graphql($cb, 'getSearchAll', $gql, {
+		query => $query,
+		limit => $limit,
+		trackCursor => $trackCursor,
+		artistsCursor => $artistsCursor,
+		releasesCursor => $releasesCursor,
+		playlistsCursor => $playlistsCursor,
+		tracks => 1,
+		artists => 1,
+		releases => 1,
+		playlists => 1,
+	}, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Categorized search - Tracks (wrapper around getSearchAll)
 sub searchTracks {
 	my ($self, $cb, $args) = @_;
-
-	my $query  = $args->{query};
-	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-	my $offset = $args->{offset} || 0;
-
-	$log->info("searchTracks: query='$query', limit=$limit, offset=$offset");
-
-	my $gql = <<'GRAPHQL';
-query searchTracks($query: String, $first: Int, $offset: Int) {
-  searchTracks(query: $query, first: $first, offset: $offset) {
-    total
-    items {
-      id title duration availability artistTemplate
-      release { title image { src } }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'searchTracks', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	my $query = $args->{query};
+	my $cursor = $args->{cursor};
+	$log->info("searchTracks: query='$query', cursor=$cursor");
+	return $self->getSearchAll($cb, {
+		query => $query,
+		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
+		trackCursor => $cursor,
+		artists => 0,
+		releases => 0,
+		playlists => 0,
+		tracks => 1,
+	});
 }
 
-# Full categorized search - Artists
+# Categorized search - Artists (wrapper around getSearchAll)
 sub searchArtists {
 	my ($self, $cb, $args) = @_;
-
-	my $query  = $args->{query};
-	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-	my $offset = $args->{offset} || 0;
-
-	$log->info("searchArtists: query='$query', limit=$limit, offset=$offset");
-
-	my $gql = <<'GRAPHQL';
-query searchArtists($query: String, $first: Int, $offset: Int) {
-  searchArtists(query: $query, first: $first, offset: $offset) {
-    total
-    items {
-      id title image { src }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'searchArtists', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	my $query = $args->{query};
+	my $cursor = $args->{cursor};
+	$log->info("searchArtists: query='$query', cursor=$cursor");
+	return $self->getSearchAll($cb, {
+		query => $query,
+		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
+		artistsCursor => $cursor,
+		tracks => 0,
+		releases => 0,
+		playlists => 0,
+		artists => 1,
+	});
 }
 
-# Full categorized search - Releases (Albums)
+# Categorized search - Releases/Albums (wrapper around getSearchAll)
 sub searchReleases {
 	my ($self, $cb, $args) = @_;
-
-	my $query  = $args->{query};
-	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-	my $offset = $args->{offset} || 0;
-
-	$log->info("searchReleases: query='$query', limit=$limit, offset=$offset");
-
-	my $gql = <<'GRAPHQL';
-query searchReleases($query: String, $first: Int, $offset: Int) {
-  searchReleases(query: $query, first: $first, offset: $offset) {
-    total
-    items {
-      id title type date artistTemplate
-      image { src }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'searchReleases', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	my $query = $args->{query};
+	my $cursor = $args->{cursor};
+	$log->info("searchReleases: query='$query', cursor=$cursor");
+	return $self->getSearchAll($cb, {
+		query => $query,
+		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
+		releasesCursor => $cursor,
+		tracks => 0,
+		artists => 0,
+		playlists => 0,
+		releases => 1,
+	});
 }
 
-# Full categorized search - Playlists
+# Categorized search - Playlists (wrapper around getSearchAll)
 sub searchPlaylists {
 	my ($self, $cb, $args) = @_;
-
-	my $query  = $args->{query};
-	my $limit  = $args->{first} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-	my $offset = $args->{offset} || 0;
-
-	$log->info("searchPlaylists: query='$query', limit=$limit, offset=$offset");
-
-	my $gql = <<'GRAPHQL';
-query searchPlaylists($query: String, $first: Int, $offset: Int) {
-  searchPlaylists(query: $query, first: $first, offset: $offset) {
-    total
-    items {
-      id title image { src }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'searchPlaylists', $gql, { query => $query, first => $limit, offset => $offset }, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	my $query = $args->{query};
+	my $cursor = $args->{cursor};
+	$log->info("searchPlaylists: query='$query', cursor=$cursor");
+	return $self->getSearchAll($cb, {
+		query => $query,
+		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
+		playlistsCursor => $cursor,
+		tracks => 0,
+		artists => 0,
+		releases => 0,
+		playlists => 1,
+	});
 }
 
 1;

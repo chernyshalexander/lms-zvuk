@@ -259,9 +259,9 @@ sub searchTracks {
 
 	my $query = $args->{search} || return $cb->([]);
 	$api ||= _get_api_client($client);
-	my $offset = $args->{offset} || 0;
+	my $cursor = $args->{cursor};
 
-	$log->info("Searching Zvuk tracks for: $query (offset: $offset)");
+	$log->info("Searching Zvuk tracks for: $query (cursor: " . ($cursor || 'null') . ")");
 
 	$api->searchTracks(sub {
 		my $data = shift;
@@ -272,24 +272,40 @@ sub searchTracks {
 			return;
 		}
 
-		my $tracks = $data->{searchTracks}{items} || [];
-		my $total = $data->{searchTracks}{total} || 0;
+		my $searchData = $data->{search};
+		if (!$searchData) {
+			$log->error("Track search: no search data in response");
+			$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_API'), type => 'text' }]);
+			return;
+		}
 
-		$log->info("Track search results: $total total, " . scalar(@$tracks) . " in this batch");
+		my $tracks = $searchData->{tracks};
+		if (!$tracks) {
+			$log->error("Track search: no tracks in response");
+			$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_API'), type => 'text' }]);
+			return;
+		}
 
-		my @items = map { _renderTrack($_, $client) } @$tracks;
+		my $items = $tracks->{items} || [];
+		my $page = $tracks->{page} || {};
+		my $total = $page->{total} || 0;
+		my $nextCursor = $page->{next};
 
-		if ($offset + scalar(@$tracks) < $total) {
-			push @items, {
+		$log->info("Track search results: $total total, " . scalar(@$items) . " in this batch");
+
+		my @uiItems = map { _renderTrack($_, $client) } @$items;
+
+		if ($nextCursor) {
+			push @uiItems, {
 				name => cstring($client, 'NEXT_PAGE'),
 				type => 'link',
 				url  => \&searchTracks,
-				passthrough => [$api, { search => $args->{search}, offset => $offset + 50 }],
+				passthrough => [$api, { search => $args->{search}, cursor => $nextCursor }],
 			};
 		}
 
-		$cb->({ items => \@items });
-	}, { query => $query, offset => $offset });
+		$cb->({ items => \@uiItems });
+	}, { query => $query, cursor => $cursor });
 }
 
 # Categorized search - Artists only
@@ -298,9 +314,9 @@ sub searchArtists {
 
 	my $query = $args->{search} || return $cb->([]);
 	$api ||= _get_api_client($client);
-	my $offset = $args->{offset} || 0;
+	my $cursor = $args->{cursor};
 
-	$log->info("Searching Zvuk artists for: $query (offset: $offset)");
+	$log->info("Searching Zvuk artists for: $query (cursor: " . ($cursor || 'null') . ")");
 
 	$api->searchArtists(sub {
 		my $data = shift;
@@ -311,24 +327,34 @@ sub searchArtists {
 			return;
 		}
 
-		my $artists = $data->{searchArtists}{items} || [];
-		my $total = $data->{searchArtists}{total} || 0;
+		my $searchData = $data->{search};
+		my $artists = $searchData->{artists};
+		if (!$artists) {
+			$log->error("Artist search: no artists in response");
+			$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_API'), type => 'text' }]);
+			return;
+		}
 
-		$log->info("Artist search results: $total total, " . scalar(@$artists) . " in this batch");
+		my $items = $artists->{items} || [];
+		my $page = $artists->{page} || {};
+		my $total = $page->{total} || 0;
+		my $nextCursor = $page->{next};
 
-		my @items = map { _renderArtist($_, $client, $api) } @$artists;
+		$log->info("Artist search results: $total total, " . scalar(@$items) . " in this batch");
 
-		if ($offset + scalar(@$artists) < $total) {
-			push @items, {
+		my @uiItems = map { _renderArtist($_, $client, $api) } @$items;
+
+		if ($nextCursor) {
+			push @uiItems, {
 				name => cstring($client, 'NEXT_PAGE'),
 				type => 'link',
 				url  => \&searchArtists,
-				passthrough => [$api, { search => $args->{search}, offset => $offset + 50 }],
+				passthrough => [$api, { search => $args->{search}, cursor => $nextCursor }],
 			};
 		}
 
-		$cb->({ items => \@items });
-	}, { query => $query, offset => $offset });
+		$cb->({ items => \@uiItems });
+	}, { query => $query, cursor => $cursor });
 }
 
 # Categorized search - Albums/Releases only
@@ -337,9 +363,9 @@ sub searchAlbums {
 
 	my $query = $args->{search} || return $cb->([]);
 	$api ||= _get_api_client($client);
-	my $offset = $args->{offset} || 0;
+	my $cursor = $args->{cursor};
 
-	$log->info("Searching Zvuk albums for: $query (offset: $offset)");
+	$log->info("Searching Zvuk albums for: $query (cursor: " . ($cursor || 'null') . ")");
 
 	$api->searchReleases(sub {
 		my $data = shift;
@@ -350,24 +376,34 @@ sub searchAlbums {
 			return;
 		}
 
-		my $albums = $data->{searchReleases}{items} || [];
-		my $total = $data->{searchReleases}{total} || 0;
+		my $searchData = $data->{search};
+		my $releases = $searchData->{releases};
+		if (!$releases) {
+			$log->error("Album search: no releases in response");
+			$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_API'), type => 'text' }]);
+			return;
+		}
 
-		$log->info("Album search results: $total total, " . scalar(@$albums) . " in this batch");
+		my $items = $releases->{items} || [];
+		my $page = $releases->{page} || {};
+		my $total = $page->{total} || 0;
+		my $nextCursor = $page->{next};
 
-		my @items = map { _renderAlbum($_, $client, $api) } @$albums;
+		$log->info("Album search results: $total total, " . scalar(@$items) . " in this batch");
 
-		if ($offset + scalar(@$albums) < $total) {
-			push @items, {
+		my @uiItems = map { _renderAlbum($_, $client, $api) } @$items;
+
+		if ($nextCursor) {
+			push @uiItems, {
 				name => cstring($client, 'NEXT_PAGE'),
 				type => 'link',
 				url  => \&searchAlbums,
-				passthrough => [$api, { search => $args->{search}, offset => $offset + 50 }],
+				passthrough => [$api, { search => $args->{search}, cursor => $nextCursor }],
 			};
 		}
 
-		$cb->({ items => \@items });
-	}, { query => $query, offset => $offset });
+		$cb->({ items => \@uiItems });
+	}, { query => $query, cursor => $cursor });
 }
 
 # Categorized search - Playlists only
@@ -376,9 +412,9 @@ sub searchPlaylists {
 
 	my $query = $args->{search} || return $cb->([]);
 	$api ||= _get_api_client($client);
-	my $offset = $args->{offset} || 0;
+	my $cursor = $args->{cursor};
 
-	$log->info("Searching Zvuk playlists for: $query (offset: $offset)");
+	$log->info("Searching Zvuk playlists for: $query (cursor: " . ($cursor || 'null') . ")");
 
 	$api->searchPlaylists(sub {
 		my $data = shift;
@@ -389,24 +425,34 @@ sub searchPlaylists {
 			return;
 		}
 
-		my $playlists = $data->{searchPlaylists}{items} || [];
-		my $total = $data->{searchPlaylists}{total} || 0;
+		my $searchData = $data->{search};
+		my $playlists = $searchData->{playlists};
+		if (!$playlists) {
+			$log->error("Playlist search: no playlists in response");
+			$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_API'), type => 'text' }]);
+			return;
+		}
 
-		$log->info("Playlist search results: $total total, " . scalar(@$playlists) . " in this batch");
+		my $items = $playlists->{items} || [];
+		my $page = $playlists->{page} || {};
+		my $total = $page->{total} || 0;
+		my $nextCursor = $page->{next};
 
-		my @items = map { _renderPlaylist($_, $client, $api) } @$playlists;
+		$log->info("Playlist search results: $total total, " . scalar(@$items) . " in this batch");
 
-		if ($offset + scalar(@$playlists) < $total) {
-			push @items, {
+		my @uiItems = map { _renderPlaylist($_, $client, $api) } @$items;
+
+		if ($nextCursor) {
+			push @uiItems, {
 				name => cstring($client, 'NEXT_PAGE'),
 				type => 'link',
 				url  => \&searchPlaylists,
-				passthrough => [$api, { search => $args->{search}, offset => $offset + 50 }],
+				passthrough => [$api, { search => $args->{search}, cursor => $nextCursor }],
 			};
 		}
 
-		$cb->({ items => \@items });
-	}, { query => $query, offset => $offset });
+		$cb->({ items => \@uiItems });
+	}, { query => $query, cursor => $cursor });
 }
 
 sub handleCollection {
