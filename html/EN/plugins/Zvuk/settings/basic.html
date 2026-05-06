@@ -1,0 +1,46 @@
+[% PROCESS settings/header.html %]
+
+[% IF accounts.size > 0 %]
+	[% WRAPPER setting title="PLUGIN_ZVUK_ACCOUNTS" %]
+		<table style="width:100%; border-collapse:collapse;">
+			<thead>
+				<tr style="border-bottom:1px solid #ddd;">
+					<th style="text-align:left; padding:6px 8px;">[% "PLUGIN_ZVUK_ACCOUNT_NAME" | string %]</th>
+					<th style="padding:6px 8px;"></th>
+				</tr>
+			</thead>
+			<tbody>
+			[% FOREACH acc = accounts %]
+				<tr style="border-bottom:1px solid #eee;">
+					<td style="padding:6px 8px;">
+						<b>[% acc.name | html %]</b>
+					</td>
+					<td style="padding:6px 8px; text-align:right;">
+						<input type="submit" name="delete_[% acc.userId | html %]" 
+							value="[% 'PLUGIN_ZVUK_DELETE_ACCOUNT' | string %]" 
+							class="stdbutton"
+							onclick="return confirm('[% 'PLUGIN_ZVUK_DELETE_CONFIRM' | string %]');">
+					</td>
+				</tr>
+			[% END %]
+			</tbody>
+		</table>
+	[% END %]
+[% END %]
+
+[% WRAPPER setting title="PLUGIN_ZVUK_ADD_ACCOUNT" desc="PLUGIN_ZVUK_ADD_ACCOUNT_DESC" %]
+	<div class="prefDesc">
+		<input type="password" name="new_account_token" id="new_account_token" value="" class="stdedit" size="40"
+			placeholder="[% 'PLUGIN_ZVUK_TOKEN_PLACEHOLDER' | string %]">
+	</div>
+[% END %]
+
+[% WRAPPER setting title="PLUGIN_ZVUK_QUALITY" desc="PLUGIN_ZVUK_QUALITY_DESC" %]
+	<select name="pref_quality" id="pref_quality" class="stdedit">
+		<option value="mid" [% IF prefs.quality == 'mid' %]selected[% END %]>[% "PLUGIN_ZVUK_QUALITY_MID" | string %]</option>
+		<option value="high" [% IF prefs.quality == 'high' || !prefs.quality %]selected[% END %]>[% "PLUGIN_ZVUK_QUALITY_HIGH" | string %]</option>
+		<option value="flac" [% IF prefs.quality == 'flac' %]selected[% END %]>[% "PLUGIN_ZVUK_QUALITY_FLAC" | string %]</option>
+	</select>
+[% END %]
+
+[% PROCESS settings/footer.html %]

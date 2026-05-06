@@ -1,0 +1,127 @@
+PLUGIN_ZVUK
+	EN	Zvuk Music
+	RU	Zvuk Music
+
+PLUGIN_ZVUK_DESC
+	EN	Zvuk (zvuk.com) music streaming plugin for Lyrion Music Server
+	RU	Плагин потокового воспроизведения Zvuk (zvuk.com) для Lyrion Music Server
+
+PLUGIN_ZVUK_NO_ACCOUNTS
+	EN	Please configure your Zvuk token in the plugin settings
+	RU	Настройте токен Zvuk в параметрах плагина
+
+PLUGIN_ZVUK_REQUIRES_CREDENTIALS
+	EN	A Zvuk account token is required. Please visit the settings page.
+	RU	Требуется токен учётной записи Zvuk. Перейдите на страницу параметров.
+
+PLUGIN_ZVUK_ACCOUNTS
+	EN	Configured Accounts
+	RU	Настроенные учётные записи
+
+PLUGIN_ZVUK_ACCOUNT_NAME
+	EN	Account
+	RU	Учётная запись
+
+PLUGIN_ZVUK_ADD_ACCOUNT
+	EN	Add Account
+	RU	Добавить учётную запись
+
+PLUGIN_ZVUK_ADD_ACCOUNT_DESC
+	EN	Enter your Zvuk API token (32-character hex string from zvuk.com cookies: auth= field)
+	RU	Введите токен Zvuk (32-символьная шестнадцатеричная строка из cookies zvuk.com: поле auth=)
+
+PLUGIN_ZVUK_TOKEN_PLACEHOLDER
+	EN	Paste your Zvuk token here
+	RU	Вставьте ваш токен Zvuk здесь
+
+PLUGIN_ZVUK_DELETE_ACCOUNT
+	EN	Remove
+	RU	Удалить
+
+PLUGIN_ZVUK_DELETE_CONFIRM
+	EN	Remove this Zvuk account?
+	RU	Удалить эту учётную запись Zvuk?
+
+PLUGIN_ZVUK_AUTH_FAILED
+	EN	Token validation failed. Please check the token and try again.
+	RU	Ошибка валидации токена. Проверьте токен и повторите попытку.
+
+PLUGIN_ZVUK_QUALITY
+	EN	Streaming Quality
+	RU	Качество потока
+
+PLUGIN_ZVUK_QUALITY_DESC
+	EN	Select the audio quality for streaming. High requires a Zvuk subscription.
+	RU	Выберите качество аудио для потока. Высокое требует подписку Zvuk.
+
+PLUGIN_ZVUK_QUALITY_MID
+	EN	Medium (MP3 ~192 kbps)
+	RU	Среднее (MP3 ~192 кбит/с)
+
+PLUGIN_ZVUK_QUALITY_HIGH
+	EN	High (MP3 320 kbps, requires subscription)
+	RU	Высокое (MP3 320 кбит/с, требуется подписка)
+
+PLUGIN_ZVUK_QUALITY_FLAC
+	EN	Lossless (FLAC, requires subscription)
+	RU	Без потерь (FLAC, требуется подписка)
+
+PLUGIN_ZVUK_MY_MUSIC
+	EN	My Music
+	RU	Моя Музыка
+
+PLUGIN_ZVUK_COLLECTION
+	EN	Saved Tracks
+	RU	Сохранённые треки
+
+PLUGIN_ZVUK_PLAYLISTS
+	EN	Playlists
+	RU	Плейлисты
+
+PLUGIN_ZVUK_WAVE
+	EN	Personal Wave (Radio)
+	RU	Личная Волна (Радио)
+
+PLUGIN_ZVUK_SEARCH
+	EN	Search
+	RU	Поиск
+
+PLUGIN_ZVUK_SEARCH_TRACKS
+	EN	Tracks
+	RU	Треки
+
+PLUGIN_ZVUK_SEARCH_ALBUMS
+	EN	Albums
+	RU	Альбомы
+
+PLUGIN_ZVUK_SEARCH_ARTISTS
+	EN	Artists
+	RU	Артисты
+
+PLUGIN_ZVUK_SEARCH_PLAYLISTS
+	EN	Playlists
+	RU	Плейлисты
+
+PLUGIN_ZVUK_ERROR_STREAM
+	EN	Could not get stream URL for this track
+	RU	Не удалось получить URL потока для этого трека
+
+PLUGIN_ZVUK_ERROR_API
+	EN	Zvuk API error
+	RU	Ошибка API Zvuk
+
+PLUGIN_ZVUK_SELECT_ACCOUNT
+	EN	Switch Account
+	RU	Переключить учётную запись
+
+PLUGIN_ZVUK_TOP_TRACKS
+	EN	Top Tracks
+	RU	Популярные треки
+
+PLUGIN_ZVUK_ALBUMS
+	EN	Albums
+	RU	Альбомы
+
+PLUGIN_ZVUK_LOAD_MORE_WAVE
+	EN	Load More Recommendations
+	RU	Загрузить ещё рекомендации
