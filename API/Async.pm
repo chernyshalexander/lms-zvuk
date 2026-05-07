@@ -34,24 +34,32 @@ sub new {
 	return $self;
 }
 
-# Base GraphQL request helper with caching
 sub _graphql {
-	my ($self, $cb, $operationName, $query, $variables, $params) = @_;
-	$params ||= {};
+	my ($self, $cb, $operationName, $query, $variables, $opts) = @_;
+	$opts ||= {};
 
-	my $noCache = $params->{nocache} || 0;
-	my $ttl = $params->{ttl};
-
+	my $userId = $self->{userId};
+	my $ttl    = $opts->{ttl} // _getCacheTTL($operationName);
+	
+	# Create a unique cache key based on user, operation and variables
 	my $cacheKey;
-	unless ($noCache) {
-		$cacheKey = "zvuk_gql:" . $self->{userId} . ":$operationName:" . md5_hex(encode_json($variables || {}));
+	if ($ttl > 0) {
+		my $vars_json = $variables ? encode_json($variables) : '';
+		$cacheKey = "zvuk_gql:${userId}:${operationName}:" . md5_hex($vars_json);
+		
 		if (my $cached = $cache->get($cacheKey)) {
-			$log->debug("Cache hit for $operationName");
-			return $cb->($cached);
+			$log->debug("Cache hit for $operationName ($userId)");
+			$cb->($cached);
+			return;
 		}
 	}
 
-	my $token = Plugins::Zvuk::API->getToken($self->{userId});
+	my $token = Plugins::Zvuk::API->getToken($userId);
+	if (!$token) {
+		$log->error("No token available for GraphQL request: $operationName");
+		$cb->({ error => 'No token' });
+		return;
+	}
 
 	my $deviceId = $prefs->get('device_id');
 	if (!$deviceId) {
@@ -68,65 +76,54 @@ sub _graphql {
 		variables     => $variables || {},
 	};
 
-	$log->debug("GraphQL Body: " . encode_json($body));
+	$log->info("GraphQL Request: $operationName (userId: $userId, cache: " . ($cacheKey ? "TTL=$ttl" : 'off') . ")");
 
 	my $http = Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $response = shift;
-			$log->debug("GraphQL response received for $operationName, status: " . $response->code);
-
 			my $content = $response->content;
+
 			if (!$content || length($content) == 0) {
-				$log->error("GraphQL: Empty response content for $operationName");
+				$log->error("GraphQL: Empty response for $operationName");
 				$cb->({ error => 'empty_response' });
 				return;
 			}
 
 			my $result = eval { decode_json($content) };
-
-			if ($@) {
-				$log->error("GraphQL: Failed to parse JSON response for $operationName: $@");
-				$log->error("GraphQL: Response content (first 500 chars): " . substr($content, 0, 500));
-				$cb->({ error => 'parse_error', details => $@ });
+			if ($@ || !$result) {
+				$log->error("GraphQL: JSON parse error for $operationName: $@");
+				$cb->({ error => 'parse_error' });
 				return;
 			}
 
 			if ($result->{errors}) {
-				$log->error("GraphQL API errors for $operationName: " . encode_json($result->{errors}));
-				$log->debug("GraphQL Variables: " . encode_json($variables));
-				$cb->({ error => 'api_error', details => $result->{errors} });
+				my $msg = $result->{errors}->[0]->{message} || 'Unknown API error';
+				$log->error("GraphQL API error ($operationName): $msg");
+				$cb->({ error => $msg });
 				return;
 			}
 
 			my $data = $result->{data};
 			if (!$data) {
 				$log->warn("GraphQL: No data in response for $operationName");
-				$log->debug("GraphQL: Full response: " . encode_json($result));
 				$cb->({ error => 'no_data' });
 				return;
 			}
 
 			if ($cacheKey && $data) {
-				my $cacheTTL = $ttl || _getCacheTTL($operationName);
-				$cache->set($cacheKey, $data, $cacheTTL);
-				$log->debug("GraphQL: Cached $operationName for ${cacheTTL}s");
+				$cache->set($cacheKey, $data, $ttl);
+				$log->debug("GraphQL: Cached $operationName for ${ttl}s");
 			}
-			$log->info("GraphQL success: $operationName");
+
 			$cb->($data);
 		},
 		sub {
 			my ($http, $error) = @_;
-			$log->error("GraphQL HTTP request failed for $operationName: $error");
+			$log->error("GraphQL HTTP error ($operationName): $error");
 			$cb->({ error => 'http_error', details => $error });
 		},
-		{
-			timeout => 15,
-		}
+		{ timeout => 15 }
 	);
-
-	$log->info("GraphQL Request: $operationName (userId: $self->{userId}, cache: " . ($cacheKey ? 'enabled' : 'disabled') . ")");
-	$log->debug("GraphQL URL: " . Plugins::Zvuk::API::GRAPHQL_URL);
-	$log->debug("GraphQL Token: " . substr($token, 0, 8) . "..." . substr($token, -4));
 
 	$http->post(
 		Plugins::Zvuk::API::GRAPHQL_URL,
@@ -145,8 +142,9 @@ sub _graphql {
 sub _getCacheTTL {
 	my ($operationName) = @_;
 
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getCollection|getUserPlaylists|getPersonalWave)$/;
-	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks)$/;
+	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists)$/;
+	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
 
@@ -156,7 +154,6 @@ sub _getCacheTTL {
 sub getProfile {
 	my ($class, $cb, $token) = @_;
 
-	# This is a GET request to a tiny API
 	my $http = Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
 			my $response = shift;
@@ -175,381 +172,336 @@ sub getProfile {
 	);
 }
 
-# Quick search (getSearch) - limited results
+# Search implementation
 sub search {
 	my ($self, $cb, $args) = @_;
 
 	my $query = $args->{query};
-	my $limit = $args->{limit} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-
-	$log->info("Zvuk search: query='$query', limit=$limit (using quickSearch)");
-
-	my $gql = <<'GRAPHQL';
-query getSearch($query: String, $first: Int) {
-  quickSearch(query: $query, limit: $first) {
-    content {
-      __typename
-      ... on Track {
-        id title artistTemplate duration availability
-        release { title image { src } }
-      }
-      ... on Artist {
-        id title image { src }
-      }
-      ... on Release {
-        id title artistTemplate image { src }
-      }
-      ... on Playlist {
-        id title image { src }
-      }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql(sub {
-		my $data = shift;
-		$log->debug("quickSearch response: " . (ref $data ? "Got hash with " . (scalar(@{$data->{quickSearch}{content} || []}) . " items") : "Error: $data"));
-		$cb->($data);
-	}, 'getSearch', $gql, { query => $query, first => $limit });
-}
-
-# Get stream URL for tracks
-sub getStream {
-	my ($self, $cb, $ids) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getStream($ids: [ID!]!) {
-  mediaContents(ids: $ids) {
-    __typename
-    ... on Track {
-      stream {
-        expire
-        expireDelta
-        high
-        mid
-        flac
-        flacdrm
-      }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getStream', $gql, { ids => $ids });
-}
-
-# Get full track data
-sub getTracks {
-	my ($self, $cb, $ids) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getTracks($ids: [ID!]!) {
-  getTracks(ids: $ids) {
-    id title duration availability artistTemplate
-    release { id title image { src } }
-    artists { id title }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getTracks', $gql, { ids => $ids });
-}
-
-# Get album info with tracks
-sub getAlbum {
-	my ($self, $cb, $id) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getAlbum($ids: [ID!]!) {
-  getReleases(ids: $ids, withTracks: true) {
-    id title artistTemplate image { src }
-    tracks {
-      id title duration availability artistTemplate
-      release { title image { src } }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getAlbum', $gql, { ids => [$id] });
-}
-
-# Get artist top tracks
-sub getArtist {
-	my ($self, $cb, $id) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getArtist($ids: [ID!]!) {
-  getArtists(ids: $ids) {
-    id title image { src }
-    topTracks {
-      id title duration availability artistTemplate
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getArtist', $gql, { ids => [$id] });
-}
-
-# Get artist albums/releases
-sub getArtistAlbums {
-	my ($self, $cb, $id) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getArtistReleases($ids: [ID!]!) {
-  getArtists(ids: $ids) {
-    releases(limit: 50) {
-      id title type date artistTemplate
-      image { src }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getArtistReleases', $gql, { ids => [$id] }, { ttl => 86400 });
-}
-
-# Get full playlist (all info except paginated tracks)
-sub getPlaylist {
-	my ($self, $cb, $id) = @_;
-
-	my $gql = <<'GRAPHQL';
-query getPlaylist($ids: [ID!]!) {
-  playlists(ids: $ids) {
-    id title image { src } description
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getPlaylist', $gql, { ids => [$id] });
-}
-
-# Get paginated playlist tracks
-sub getPlaylistTracks {
-	my ($self, $cb, $id, $limit, $offset) = @_;
-	$limit ||= Plugins::Zvuk::API::DEFAULT_LIMIT;
-	$offset ||= 0;
-
-	my $gql = <<'GRAPHQL';
-query getPlaylistTracks($id: ID!, $limit: Int, $offset: Int) {
-  playlistTracks(id: $id, limit: $limit, offset: $offset) {
-    items {
-      id title duration availability artistTemplate
-      release { title image { src } }
-    }
-    total
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getPlaylistTracks', $gql, { id => $id, limit => $limit, offset => $offset }, { nocache => 1 });
-}
-
-# Get user collection (My Music tracks)
-sub getCollection {
-	my ($self, $cb, $args) = @_;
-
-	my $limit = $args->{limit} || 30;
-	my $after = $args->{after} || "";
-
-	my $gql = <<'GRAPHQL';
-query getPaginatedCollection($first: Int, $after: String) {
-  paginatedCollection {
-    tracks(pagination: {first: $first, after: $after}) {
-      items {
-        id title duration availability artistTemplate
-        release { title image { src } }
-      }
-      page { endCursor }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getPaginatedCollection', $gql, { first => $limit, after => $after });
-}
-
-# Get user playlists
-sub getUserPlaylists {
-	my ($self, $cb, $args) = @_;
-
-	my $limit = $args->{limit} || 30;
-	my $after = $args->{after} || "";
-
-	my $gql = <<'GRAPHQL';
-query getUserPlaylists($limit: Int = 30, $after: String = null) {
-  paginatedCollection {
-    playlists(pagination: {first: $limit, after: $after}) {
-      items {
-        id title
-        image { src }
-      }
-      page { endCursor }
-    }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getUserPlaylists', $gql, { limit => $limit, after => $after });
-}
-
-# Get personal wave tracks
-sub getPersonalWave {
-	my ($self, $cb, $args) = @_;
-
-	my $first = $args->{first} || 30;
-
-	my $gql = <<'GRAPHQL';
-query getPersonalWave($first: PositiveInt! = 30) {
-  personalWaveContent(first: $first) {
-    id title duration availability artistTemplate
-    release { title image { src } }
-  }
-}
-GRAPHQL
-
-	$self->_graphql($cb, 'getPersonalWave', $gql, { first => $first });
-}
-
-# Full search with cursor-based pagination (all types at once)
-sub getSearchAll {
-	my ($self, $cb, $args) = @_;
-
-	my $query = $args->{query};
-	my $limit = $args->{limit} || Plugins::Zvuk::API::DEFAULT_LIMIT;
-	my $trackCursor = $args->{trackCursor};
-	my $artistsCursor = $args->{artistsCursor};
+	my $limit = int($args->{limit} || 20);
+	
+	my $trackCursor    = $args->{trackCursor};
+	my $artistsCursor  = $args->{artistsCursor};
 	my $releasesCursor = $args->{releasesCursor};
 	my $playlistsCursor = $args->{playlistsCursor};
 
-	$log->info("getSearchAll: query='$query', limit=$limit");
+	my $gql = q{
+		query search(
+			$query: String
+			$limit: Int = 20
+			$tracks: Boolean = true
+			$trackCursor: Cursor = null
+			$artists: Boolean = true
+			$artistsCursor: Cursor = null
+			$releases: Boolean = true
+			$releasesCursor: Cursor = null
+			$playlists: Boolean = true
+			$playlistsCursor: Cursor = null
+		) {
+			search(query: $query) {
+				tracks(limit: $limit, cursor: $trackCursor) @include(if: $tracks) {
+					items {
+						id title duration availability artistTemplate
+						release { title image { src } }
+					}
+					page { total next }
+				}
+				artists(limit: $limit, cursor: $artistsCursor) @include(if: $artists) {
+					items { id title image { src } }
+					page { total next }
+				}
+				releases(limit: $limit, cursor: $releasesCursor) @include(if: $releases) {
+					items { id title type date artistTemplate image { src } }
+					page { total next }
+				}
+				playlists(limit: $limit, cursor: $playlistsCursor) @include(if: $playlists) {
+					items { id title image { src } }
+					page { total next }
+				}
+			}
+		}
+	};
 
-	my $gql = <<'GRAPHQL';
-query getSearchAll(
-	$query: String,
-	$limit: Int,
-	$trackCursor: Cursor,
-	$artistsCursor: Cursor,
-	$releasesCursor: Cursor,
-	$playlistsCursor: Cursor,
-	$tracks: Boolean,
-	$artists: Boolean,
-	$releases: Boolean,
-	$playlists: Boolean
-) {
-	search(query: $query) {
-		tracks(limit: $limit, cursor: $trackCursor) @include(if: $tracks) {
-			page { total next cursor }
-			items {
+	my $vars = {
+		query => $query,
+		limit => $limit,
+		tracks => defined($args->{tracks}) ? ($args->{tracks} ? \1 : \0) : \1,
+		artists => defined($args->{artists}) ? ($args->{artists} ? \1 : \0) : \1,
+		releases => defined($args->{releases}) ? ($args->{releases} ? \1 : \0) : \1,
+		playlists => defined($args->{playlists}) ? ($args->{playlists} ? \1 : \0) : \1,
+	};
+	
+	$vars->{trackCursor} = $trackCursor if $trackCursor;
+	$vars->{artistsCursor} = $artistsCursor if $artistsCursor;
+	$vars->{releasesCursor} = $releasesCursor if $releasesCursor;
+	$vars->{playlistsCursor} = $playlistsCursor if $playlistsCursor;
+
+	$self->_graphql($cb, 'search', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Get tracks by IDs
+sub getTracks {
+	my ($self, $cb, $ids) = @_;
+
+	my $gql = q{
+		query getTracks($ids: [ID!]!) {
+			mediaContents(ids: $ids) {
+				... on Track {
+					id title duration availability artistTemplate
+					release { id title image { src } }
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		$cb->($data->{mediaContents});
+	}, 'getTracks', $gql, { ids => $ids });
+}
+
+# Get stream URL using Tiny API (direct links, more reliable than GraphQL)
+sub getStream {
+	my ($self, $cb, $id, $quality) = @_;
+	$quality ||= 'high';
+
+	my $token = Plugins::Zvuk::API->getToken($self->{userId});
+	
+	my $http = Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $response = shift;
+			my $result = eval { decode_json($response->content) };
+			if ($result && $result->{result}) {
+				$cb->($result->{result});
+			} else {
+				$cb->({ error => 'no_stream' });
+			}
+		},
+		sub {
+			$cb->({ error => $_[1] });
+		}
+	);
+
+	$http->get(
+		Plugins::Zvuk::API::TINY_API_URL . "/track/stream?id=$id&quality=$quality",
+		'x-auth-token' => $token,
+		'user-agent'   => Plugins::Zvuk::API::USER_AGENT
+	);
+}
+
+# Get album tracks
+sub getAlbumTracks {
+	my ($self, $cb, $id) = @_;
+
+	my $gql = q{
+		query getAlbumTracks($id: ID!) {
+			releases(ids: [$id]) {
+				id title
+				tracks {
+					id title duration availability artistTemplate
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		my $album = $data->{releases}->[0];
+		$cb->($album ? $album->{tracks} : []);
+	}, 'getAlbumTracks', $gql, { id => $id });
+}
+
+# Get artist top tracks
+sub getArtistTracks {
+	my ($self, $cb, $id) = @_;
+
+	my $gql = q{
+		query getArtistTracks($id: ID!) {
+			artists(ids: [$id]) {
+				id title
+				topTracks {
+					id title duration availability artistTemplate
+					release { title image { src } }
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		my $artist = $data->{artists}->[0];
+		$cb->($artist ? $artist->{topTracks} : []);
+	}, 'getArtistTracks', $gql, { id => $id });
+}
+
+# Get artist albums
+sub getArtistAlbums {
+	my ($self, $cb, $id) = @_;
+
+	my $gql = q{
+		query getArtistAlbums($id: ID!) {
+			artists(ids: [$id]) {
+				id title
+				releases {
+					id title type date artistTemplate image { src }
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		my $artist = $data->{artists}->[0];
+		$cb->($artist ? $artist->{releases} : []);
+	}, 'getArtistAlbums', $gql, { id => $id });
+}
+
+# Get playlist tracks
+sub getPlaylistTracks {
+	my ($self, $cb, $id) = @_;
+
+	my $gql = q{
+		query getPlaylistTracks($id: ID!, $limit: Int = 100, $offset: Int = 0) {
+			playlistTracks(id: $id, limit: $limit, offset: $offset) {
 				id title duration availability artistTemplate
 				release { title image { src } }
 			}
 		}
-		artists(limit: $limit, cursor: $artistsCursor) @include(if: $artists) {
-			page { total next cursor }
-			items {
-				id title image { src }
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		$cb->($data->{playlistTracks} || []);
+	}, 'getPlaylistTracks', $gql, { id => $id });
+}
+
+# Get personalized wave
+sub getPersonalWave {
+	my ($self, $cb) = @_;
+
+	my $gql = q{
+		query getPersonalWave($contentInput: PersonalWaveContentInput, $first: PositiveInt! = 2, $options: PersonalWaveOptions, $waveInput: WaveInput, $waveSrc: MagicSource) {
+			personalWaveContent(
+				contentInput: $contentInput
+				first: $first
+				options: $options
+				waveInput: $waveInput
+				waveSrc: $waveSrc
+			) {
+				...PlayerTrackData
 			}
 		}
-		releases(limit: $limit, cursor: $releasesCursor) @include(if: $releases) {
-			page { total next cursor }
-			items {
-				id title type date artistTemplate
-				image { src }
+
+		fragment PlayerTrackData on Track {
+			id
+			title
+			lyrics
+			hasFlac
+			duration
+			explicit
+			availability
+			artistTemplate
+			childParam
+			mark
+			artists {
+				id
+				title
+				image {
+					src
+					palette
+				}
+				mark
+			}
+			release {
+				id
+				title
+				image {
+					src
+					palette
+				}
+			}
+			zchan
+			__typename
+		}
+	};
+
+	my $vars = {
+		waveSrc => "AMAZME",
+		first   => 20,
+		options => {
+			popular => undef,
+			mood    => "energy:0.5,fun:0.5",
+		},
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		$cb->($data->{personalWaveContent} || []);
+	}, 'getPersonalWave', $gql, $vars, { ttl => 0 });
+}
+
+# Get user collection (favorite tracks)
+sub getCollection {
+	my ($self, $cb) = @_;
+
+	my $gql = q{
+		query getPaginatedCollection($limit: Int = 100) {
+			paginatedCollection {
+				tracks(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						duration
+						availability
+						artistTemplate
+						explicit
+						artists {
+							id
+							title
+							image { src palette }
+						}
+						release {
+							id
+							title
+							image { src palette }
+						}
+						__typename
+					}
+				}
 			}
 		}
-		playlists(limit: $limit, cursor: $playlistsCursor) @include(if: $playlists) {
-			page { total next cursor }
-			items {
-				id title image { src }
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		my $col = $data->{paginatedCollection} || {};
+		my $tracks = $col->{tracks} || {};
+		$cb->($tracks->{items} || []);
+	}, 'getPaginatedCollection', $gql, { limit => 100 }, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+}
+
+# Get user playlists
+sub getUserPlaylists {
+	my ($self, $cb) = @_;
+
+	my $gql = q{
+		query getUserPlaylists {
+			collection {
+				playlists {
+					id
+					title
+					image { src palette }
+					description
+					isPublic
+				}
 			}
 		}
-	}
-}
-GRAPHQL
+	};
 
-	$self->_graphql($cb, 'getSearchAll', $gql, {
-		query => $query,
-		limit => $limit,
-		trackCursor => $trackCursor,
-		artistsCursor => $artistsCursor,
-		releasesCursor => $releasesCursor,
-		playlistsCursor => $playlistsCursor,
-		tracks => 1,
-		artists => 1,
-		releases => 1,
-		playlists => 1,
-	}, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
-}
-
-# Categorized search - Tracks (wrapper around getSearchAll)
-sub searchTracks {
-	my ($self, $cb, $args) = @_;
-	my $query = $args->{query};
-	my $cursor = $args->{cursor};
-	$log->info("searchTracks: query='$query', cursor=$cursor");
-	return $self->getSearchAll($cb, {
-		query => $query,
-		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
-		trackCursor => $cursor,
-		artists => 0,
-		releases => 0,
-		playlists => 0,
-		tracks => 1,
-	});
-}
-
-# Categorized search - Artists (wrapper around getSearchAll)
-sub searchArtists {
-	my ($self, $cb, $args) = @_;
-	my $query = $args->{query};
-	my $cursor = $args->{cursor};
-	$log->info("searchArtists: query='$query', cursor=$cursor");
-	return $self->getSearchAll($cb, {
-		query => $query,
-		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
-		artistsCursor => $cursor,
-		tracks => 0,
-		releases => 0,
-		playlists => 0,
-		artists => 1,
-	});
-}
-
-# Categorized search - Releases/Albums (wrapper around getSearchAll)
-sub searchReleases {
-	my ($self, $cb, $args) = @_;
-	my $query = $args->{query};
-	my $cursor = $args->{cursor};
-	$log->info("searchReleases: query='$query', cursor=$cursor");
-	return $self->getSearchAll($cb, {
-		query => $query,
-		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
-		releasesCursor => $cursor,
-		tracks => 0,
-		artists => 0,
-		playlists => 0,
-		releases => 1,
-	});
-}
-
-# Categorized search - Playlists (wrapper around getSearchAll)
-sub searchPlaylists {
-	my ($self, $cb, $args) = @_;
-	my $query = $args->{query};
-	my $cursor = $args->{cursor};
-	$log->info("searchPlaylists: query='$query', cursor=$cursor");
-	return $self->getSearchAll($cb, {
-		query => $query,
-		limit => Plugins::Zvuk::API::DEFAULT_LIMIT,
-		playlistsCursor => $cursor,
-		tracks => 0,
-		artists => 0,
-		releases => 0,
-		playlists => 1,
-	});
+	$self->_graphql(sub {
+		my $data = shift;
+		my $col = $data->{collection} || {};
+		$cb->($col->{playlists} || []);
+	}, 'getUserPlaylists', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 1;

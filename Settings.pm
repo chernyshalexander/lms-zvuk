@@ -15,7 +15,7 @@ sub name {
 }
 
 sub page {
-	return 'plugins/Zvuk/settings/basic.html';
+	return 'plugins/zvuk/settings/basic.html';
 }
 
 sub prefs {

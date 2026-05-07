@@ -1,18 +1,22 @@
 PLUGIN_ZVUK
 	EN	Zvuk Music
-	RU	Zvuk Music
+	RU	Звук
 
 PLUGIN_ZVUK_DESC
 	EN	Zvuk (zvuk.com) music streaming plugin for Lyrion Music Server
-	RU	Плагин потокового воспроизведения Zvuk (zvuk.com) для Lyrion Music Server
+	RU	Плагин потокового воспроизведения Звук (zvuk.com) для Lyrion Music Server
 
 PLUGIN_ZVUK_NO_ACCOUNTS
 	EN	Please configure your Zvuk token in the plugin settings
-	RU	Настройте токен Zvuk в параметрах плагина
+	RU	Настройте токен Звук в параметрах плагина
 
 PLUGIN_ZVUK_REQUIRES_CREDENTIALS
 	EN	A Zvuk account token is required. Please visit the settings page.
-	RU	Требуется токен учётной записи Zvuk. Перейдите на страницу параметров.
+	RU	Требуется токен учётной записи Звук. Перейдите на страницу параметров.
+
+PLUGIN_ZVUK_ERROR_NOT_LOGGED_IN
+	EN	No account configured. Please check plugin settings.
+	RU	Учётная запись не настроена. Проверьте параметры плагина.
 
 PLUGIN_ZVUK_ACCOUNTS
 	EN	Configured Accounts
@@ -28,11 +32,11 @@ PLUGIN_ZVUK_ADD_ACCOUNT
 
 PLUGIN_ZVUK_ADD_ACCOUNT_DESC
 	EN	Enter your Zvuk API token (32-character hex string from zvuk.com cookies: auth= field)
-	RU	Введите токен Zvuk (32-символьная шестнадцатеричная строка из cookies zvuk.com: поле auth=)
+	RU	Введите токен Звук (32-символьная hex-строка из cookies zvuk.com: поле auth=)
 
 PLUGIN_ZVUK_TOKEN_PLACEHOLDER
 	EN	Paste your Zvuk token here
-	RU	Вставьте ваш токен Zvuk здесь
+	RU	Вставьте ваш токен здесь
 
 PLUGIN_ZVUK_DELETE_ACCOUNT
 	EN	Remove
@@ -40,7 +44,7 @@ PLUGIN_ZVUK_DELETE_ACCOUNT
 
 PLUGIN_ZVUK_DELETE_CONFIRM
 	EN	Remove this Zvuk account?
-	RU	Удалить эту учётную запись Zvuk?
+	RU	Удалить эту учётную запись Звук?
 
 PLUGIN_ZVUK_AUTH_FAILED
 	EN	Token validation failed. Please check the token and try again.
@@ -48,39 +52,39 @@ PLUGIN_ZVUK_AUTH_FAILED
 
 PLUGIN_ZVUK_QUALITY
 	EN	Streaming Quality
-	RU	Качество потока
+	RU	Качество звука
 
 PLUGIN_ZVUK_QUALITY_DESC
-	EN	Select the audio quality for streaming. High requires a Zvuk subscription.
-	RU	Выберите качество аудио для потока. Высокое требует подписку Zvuk.
+	EN	Select the audio quality for streaming. High/Lossless requires a Zvuk subscription.
+	RU	Выберите качество аудио для потока. Высокое/Lossless требует подписку.
 
 PLUGIN_ZVUK_QUALITY_MID
 	EN	Medium (MP3 ~192 kbps)
 	RU	Среднее (MP3 ~192 кбит/с)
 
 PLUGIN_ZVUK_QUALITY_HIGH
-	EN	High (MP3 320 kbps, requires subscription)
-	RU	Высокое (MP3 320 кбит/с, требуется подписка)
+	EN	High (MP3 320 kbps)
+	RU	Высокое (MP3 320 кбит/с)
 
 PLUGIN_ZVUK_QUALITY_FLAC
-	EN	Lossless (FLAC, requires subscription)
-	RU	Без потерь (FLAC, требуется подписка)
+	EN	Lossless (FLAC)
+	RU	Максимальное (FLAC / Hi-Fi)
 
 PLUGIN_ZVUK_MY_MUSIC
 	EN	My Music
-	RU	Моя Музыка
+	RU	Моя музыка
 
 PLUGIN_ZVUK_COLLECTION
-	EN	Saved Tracks
-	RU	Сохранённые треки
+	EN	Favorite Tracks
+	RU	Любимые треки
 
 PLUGIN_ZVUK_PLAYLISTS
-	EN	Playlists
-	RU	Плейлисты
+	EN	My Playlists
+	RU	Мои плейлисты
 
 PLUGIN_ZVUK_WAVE
-	EN	Personal Wave (Radio)
-	RU	Личная Волна (Радио)
+	EN	Personal Wave
+	RU	Моя Волна
 
 PLUGIN_ZVUK_SEARCH
 	EN	Search
@@ -96,7 +100,7 @@ PLUGIN_ZVUK_SEARCH_ALBUMS
 
 PLUGIN_ZVUK_SEARCH_ARTISTS
 	EN	Artists
-	RU	Артисты
+	RU	Исполнители
 
 PLUGIN_ZVUK_SEARCH_PLAYLISTS
 	EN	Playlists
@@ -104,15 +108,15 @@ PLUGIN_ZVUK_SEARCH_PLAYLISTS
 
 PLUGIN_ZVUK_ERROR_STREAM
 	EN	Could not get stream URL for this track
-	RU	Не удалось получить URL потока для этого трека
+	RU	Не удалось получить ссылку на поток
 
 PLUGIN_ZVUK_ERROR_API
 	EN	Zvuk API error
-	RU	Ошибка API Zvuk
+	RU	Ошибка API Звук
 
 PLUGIN_ZVUK_SELECT_ACCOUNT
 	EN	Switch Account
-	RU	Переключить учётную запись
+	RU	Сменить учётную запись
 
 PLUGIN_ZVUK_TOP_TRACKS
 	EN	Top Tracks
@@ -123,5 +127,5 @@ PLUGIN_ZVUK_ALBUMS
 	RU	Альбомы
 
 PLUGIN_ZVUK_LOAD_MORE_WAVE
-	EN	Load More Recommendations
-	RU	Загрузить ещё рекомендации
+	EN	Load More
+	RU	Загрузить ещё

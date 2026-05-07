@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <extension>
     <name>PLUGIN_ZVUK</name>
+    <id>zvuk</id>
     <module>Plugins::Zvuk::Plugin</module>
     <version>0.1.0</version>
     <description>PLUGIN_ZVUK_DESC</description>
@@ -10,8 +11,8 @@
         <minVersion>8.0.0</minVersion>
         <maxVersion>*</maxVersion>
     </targetApplication>
-    <optionsURL>plugins/Zvuk/settings/basic.html</optionsURL>
-    <icon>plugins/Zvuk/html/images/logo.png</icon>
+    <optionsURL>plugins/zvuk/settings/basic.html</optionsURL>
+    <icon>plugins/zvuk/html/images/logo.png</icon>
     <creator>Alexander Chernysh</creator>
     <email>chernysh.a@gmail.com</email>
     <homepageURL>https://github.com/chernyshalexander/lms-zvuk</homepageURL>
