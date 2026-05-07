@@ -14,7 +14,6 @@ use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
 
 my $log   = logger('plugin.zvuk');
-my $cache = Slim::Utils::Cache->new();
 my @pendingMeta;
 
 sub new {
@@ -114,12 +113,12 @@ sub getNextTrack {
 				request     => HTTP::Request->new(GET => $streamUrl),
 				onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
 				onError     => sub {
-					$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
+					$class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration);
 				},
-				passthrough => [ $song->track, { cb => sub { $class->_finalizeMetadata($song, $format, $prefQuality, $successCb) } }, $streamUrl ],
+				passthrough => [ $song->track, { cb => sub { $class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration) } }, $streamUrl ],
 			});
 		} else {
-			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
+			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration);
 		}
 
 	}, [$id]);
@@ -135,7 +134,7 @@ sub _finalizeMetadata {
 		# Recovery duration if missing
 		if (!$duration) {
 			my ($id) = $track_url =~ m{zvuk://(\d+)};
-			my $meta = $cache->get("zvuk_meta_$id");
+			my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
 			if ($meta && $meta->{duration}) {
 				$duration = $meta->{duration};
 				$song->duration($duration);
@@ -180,7 +179,7 @@ sub getMetadataFor {
 	my ($id) = $url =~ m{zvuk://(\d+)};
 	return {} unless $id;
 
-	my $meta = $cache->get("zvuk_meta_$id");
+	my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
 	return $meta if $meta;
 
 	my $icon = $class->getIcon();

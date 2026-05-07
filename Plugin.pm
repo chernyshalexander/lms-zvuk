@@ -308,6 +308,9 @@ sub _renderTrack {
 		favorites_title => $track->{title} . " - " . $artist,
 		line1           => $track->{title},
 		line2           => $artist,
+		artist          => $artist,
+		album           => $track->{release}->{title} || $track->{album}->{title} || "",
+		duration        => $track->{duration},
 		on_select       => 'play',
 		url             => $url,
 		play            => $url,
@@ -320,10 +323,19 @@ sub _renderTrack {
 sub _getArtistName {
 	my ($item) = @_;
 	
-	return $item->{artistTemplate} if $item->{artistTemplate};
+	my $template = $item->{artistTemplate};
+	my $artists  = $item->{artists} || [];
 	
-	if ($item->{artists} && ref $item->{artists} eq 'ARRAY' && scalar @{$item->{artists}}) {
-		return join(', ', map { $_->{title} } @{$item->{artists}});
+	if ($template) {
+		# Resolve placeholders like {0}, {1}, etc.
+		if ($template =~ /\{/) {
+			$template =~ s/\{(\d+)\}/$artists->[$1] ? $artists->[$1]->{title} : ""/ge;
+		}
+		return $template;
+	}
+	
+	if (ref $artists eq 'ARRAY' && scalar @$artists) {
+		return join(', ', map { $_->{title} } @$artists);
 	}
 	
 	return '';

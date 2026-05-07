@@ -62,6 +62,12 @@ sub getToken {
 }
 
 # Return the configured quality preference
+my $cache = Slim::Utils::Cache->new();
+
+sub cache {
+    return $cache;
+}
+
 sub getQuality {
     return $prefs->get('quality') || QUALITY_HIGH;
 }
@@ -103,15 +109,21 @@ sub cacheTrackMetadata {
         my $icon  = $class->getImageUrl($track, 'usePlaceholder');
         my $artist = $class->_getArtistName($track);
 
+        my $dur = int($track->{duration} || 0);
         my $meta = {
             id          => $id,
             title       => $track->{title}          || '',
             artist      => $artist,
             album       => ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '',
-            duration    => $track->{duration}        || 0,
+            duration    => $dur,
+            secs        => $dur,
             icon        => $icon,
             cover       => $icon,
         };
+
+        if ($log->is_debug) {
+            $log->debug("Caching metadata for track $id: " . $track->{title} . " (duration: $dur)");
+        }
 
         $cache->set( "zvuk_meta_$id", $meta, DEFAULT_TTL );
         $meta;
@@ -121,10 +133,19 @@ sub cacheTrackMetadata {
 sub _getArtistName {
     my ($class, $item) = @_;
     
-    return $item->{artistTemplate} if $item->{artistTemplate};
+    my $template = $item->{artistTemplate};
+    my $artists  = $item->{artists} || [];
     
-    if ($item->{artists} && ref $item->{artists} eq 'ARRAY' && scalar @{$item->{artists}}) {
-        return join(', ', map { $_->{title} } @{$item->{artists}});
+    if ($template) {
+        # Resolve placeholders like {0}, {1}, etc.
+        if ($template =~ /\{/) {
+            $template =~ s/\{(\d+)\}/$artists->[$1] ? $artists->[$1]->{title} : ""/ge;
+        }
+        return $template;
+    }
+    
+    if (ref $artists eq 'ARRAY' && scalar @$artists) {
+        return join(', ', map { $_->{title} } @$artists);
     }
     
     return '';
