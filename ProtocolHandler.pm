@@ -69,7 +69,6 @@ sub getNextTrack {
 		my $stream  = $content->{stream};
 		my $duration = $content->{duration};
 
-		# Set duration IMMEDIATELY from API response to update UI/Progress bar as fast as possible
 		if ($duration) {
 			$song->duration($duration);
 			Slim::Music::Info::setDuration($song->track, $duration);
@@ -109,54 +108,28 @@ sub getNextTrack {
 		$song->streamUrl($streamUrl);
 		$song->pluginData(format => $format);
 
-		if (CAN_FLAC_SEEK && $format eq 'flc') {
-			require Slim::Utils::Scanner::Remote;
-			my $http = Slim::Networking::Async::HTTP->new;
-			$http->send_request({
-				request     => HTTP::Request->new(GET => $streamUrl),
-				onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
-				onError     => sub { $successCb->() },
-				passthrough => [ $song->track, { cb => $successCb }, $streamUrl ],
-			});
-		} else {
-			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
-		}
+		# Parse remote header to get accurate duration/bitrate before playback starts
+		# This ensures progress bar and time display are available immediately in SqueezePlay
+		require Slim::Utils::Scanner::Remote;
+		Slim::Utils::Scanner::Remote::parseRemoteHeader(
+			$song->track, $streamUrl, $format,
+			sub {
+				# Header parsed successfully, bitrate/duration from stream now available
+				$client->currentPlaylistUpdateTime(Time::HiRes::time());
+				Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
+				$successCb->();
+			},
+			sub {
+				# Header parse failed, just continue with what we have
+				my ($http, $error) = @_;
+				$log->warn("Could not parse $format header for track $id: $error");
+				$successCb->();
+			}
+		);
 
 	}, [$id]);
 }
 
-sub _finalizeMetadata {
-	my ($class, $song, $format, $prefQuality, $successCb) = @_;
-
-	if ($song->track) {
-		my $track_url = $song->track->url;
-		my $duration  = $song->duration;
-
-		if (!$duration) {
-			my ($id) = $track_url =~ m{zvuk://(\d+)};
-			my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
-			if ($meta && $meta->{duration}) {
-				$duration = $meta->{duration};
-				$song->duration($duration);
-			}
-		}
-
-		my $bitrate = $song->track->bitrate;
-		if (!$bitrate || $bitrate < 1000) {
-			$bitrate = ($format eq 'flc') ? 900_000 : ($prefQuality eq 'mid' ? 128_000 : 320_000);
-			Slim::Music::Info::setBitrate($song->track, $bitrate);
-		}
-
-		Slim::Music::Info::setDuration($song->track, $duration) if $duration;
-
-		if ($format eq 'mp3') {
-			$song->track->samplerate(44100) unless $song->track->samplerate;
-			$song->track->samplesize(16)    unless $song->track->samplesize;
-		}
-	}
-
-	$successCb->();
-}
 
 sub getMetadataFor {
 	my ($class, $client, $url) = @_;
