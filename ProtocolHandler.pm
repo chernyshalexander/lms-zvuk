@@ -107,6 +107,7 @@ sub getNextTrack {
 
 		$song->streamUrl($streamUrl);
 		$song->pluginData(format => $format);
+		$song->track->content_type($format);
 
 		# Parse remote header to get accurate duration/bitrate before playback starts
 		# This ensures progress bar and time display are available immediately in SqueezePlay
