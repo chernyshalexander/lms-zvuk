@@ -1,6 +1,7 @@
 package Plugins::Zvuk::API;
 
 use strict;
+use warnings;
 
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
@@ -22,7 +23,7 @@ use constant DEFAULT_LIMIT => 50;
 use constant MAX_LIMIT     => 200;
 
 # --- Quality levels ---
-use constant QUALITY_MID  => 'mid';   # MP3 ~192kbps
+use constant QUALITY_MID  => 'mid';   # MP3 128kbps
 use constant QUALITY_HIGH => 'high';  # MP3 320kbps
 use constant QUALITY_FLAC => 'flac';  # FLAC lossless
 
@@ -34,7 +35,6 @@ use constant USER_AGENT =>
 # --- Image resolutions ---
 use constant IMAGE_SIZE => '500x500';
 
-my $cache = Slim::Utils::Cache->new;
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 

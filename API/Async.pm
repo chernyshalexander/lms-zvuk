@@ -1,8 +1,8 @@
 package Plugins::Zvuk::API::Async;
 
 use strict;
+use warnings;
 
-use Async::Util;
 use Digest::MD5 qw(md5_hex);
 use JSON::XS;
 use Slim::Networking::SimpleAsyncHTTP;
@@ -364,7 +364,7 @@ sub getPlaylistTracks {
 	my ($self, $cb, $id) = @_;
 
 	my $gql = q{
-		query getPlaylistTracks($id: ID!, $limit: Int = 100, $offset: Int = 0) {
+		query getPlaylistTracks($id: ID!, $limit: Int = 500, $offset: Int = 0) {
 			playlistTracks(id: $id, limit: $limit, offset: $offset) {
 				id title duration availability artistTemplate
 				release { title image { src } }
@@ -375,7 +375,7 @@ sub getPlaylistTracks {
 	$self->_graphql(sub {
 		my $data = shift;
 		$cb->($data->{playlistTracks} || []);
-	}, 'getPlaylistTracks', $gql, { id => $id });
+	}, 'getPlaylistTracks', $gql, { id => $id, limit => 500, offset => 0 });
 }
 
 # Get personalized wave
@@ -448,7 +448,7 @@ sub getCollection {
 	my ($self, $cb) = @_;
 
 	my $gql = q{
-		query getPaginatedCollection($limit: Int = 100) {
+		query getPaginatedCollection($limit: Int = 500) {
 			paginatedCollection {
 				tracks(pagination: {first: $limit}) {
 					items {
@@ -480,7 +480,7 @@ sub getCollection {
 		my $col = $data->{paginatedCollection} || {};
 		my $tracks = $col->{tracks} || {};
 		$cb->($tracks->{items} || []);
-	}, 'getPaginatedCollection', $gql, { limit => 100 }, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	}, 'getPaginatedCollection', $gql, { limit => 500 }, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 # Get user playlists

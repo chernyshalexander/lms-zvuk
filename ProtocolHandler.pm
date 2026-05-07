@@ -1,6 +1,8 @@
 package Plugins::Zvuk::ProtocolHandler;
 
 use strict;
+use warnings;
+
 use base qw(Slim::Player::Protocols::HTTPS);
 
 use Slim::Utils::Cache;
@@ -12,6 +14,8 @@ use Time::HiRes qw(time);
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
+
+use constant CAN_FLAC_SEEK => UNIVERSAL::can('Slim::Utils::Scanner::Remote', 'parseFlacHeader');
 
 my $log   = logger('plugin.zvuk');
 my @pendingMeta;
@@ -105,20 +109,17 @@ sub getNextTrack {
 		$song->streamUrl($streamUrl);
 		$song->pluginData(format => $format);
 
-		# Optimization: Start playback immediately for MP3, only parse for FLAC
-		if ($format eq 'flc') {
+		if (CAN_FLAC_SEEK && $format eq 'flc') {
 			require Slim::Utils::Scanner::Remote;
 			my $http = Slim::Networking::Async::HTTP->new;
 			$http->send_request({
 				request     => HTTP::Request->new(GET => $streamUrl),
 				onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
-				onError     => sub {
-					$class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration);
-				},
-				passthrough => [ $song->track, { cb => sub { $class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration) } }, $streamUrl ],
+				onError     => sub { $successCb->() },
+				passthrough => [ $song->track, { cb => $successCb }, $streamUrl ],
 			});
 		} else {
-			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb, $duration);
+			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
 		}
 
 	}, [$id]);
@@ -129,9 +130,8 @@ sub _finalizeMetadata {
 
 	if ($song->track) {
 		my $track_url = $song->track->url;
-		my $duration = $song->duration;
+		my $duration  = $song->duration;
 
-		# Recovery duration if missing
 		if (!$duration) {
 			my ($id) = $track_url =~ m{zvuk://(\d+)};
 			my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
@@ -141,33 +141,17 @@ sub _finalizeMetadata {
 			}
 		}
 
-		# Update the LMS database with the correct content type before notifying the system
-		# This ensures the correct icon (MP3/FLC) is shown in the playlist
-		eval {
-			require Slim::Schema;
-			Slim::Schema->updateOrCreate({
-				url        => $track_url,
-				attributes => { 
-					CONTENT_TYPE => $format,
-				},
-			});
-			Slim::Schema->clearContentTypeCache($track_url);
-		};
-
-		# Set bitrate estimate
 		my $bitrate = $song->track->bitrate;
 		if (!$bitrate || $bitrate < 1000) {
 			$bitrate = ($format eq 'flc') ? 900_000 : ($prefQuality eq 'mid' ? 128_000 : 320_000);
 			Slim::Music::Info::setBitrate($song->track, $bitrate);
 		}
 
-		if ($duration) {
-			Slim::Music::Info::setDuration($song->track, $duration);
-		}
+		Slim::Music::Info::setDuration($song->track, $duration) if $duration;
 
 		if ($format eq 'mp3') {
 			$song->track->samplerate(44100) unless $song->track->samplerate;
-			$song->track->samplesize(16) unless $song->track->samplesize;
+			$song->track->samplesize(16)    unless $song->track->samplesize;
 		}
 	}
 
@@ -203,10 +187,7 @@ sub getMetadataFor {
 	return { type => 'mp3', icon => $icon };
 }
 
-sub canDirectStream {
-	my ($class, $song, $url) = @_;
-	return $url =~ m{^https?://} ? 1 : 0;
-}
+sub canDirectStream { 0 }
 
 sub canSeek {
 	return 1;
@@ -231,7 +212,7 @@ sub getHeaders {
 sub getFormatForURL {
 	my ($class, $url) = @_;
 	return if $url =~ m{zvuk://\w+:};
-	my $prefQuality = Plugins::Zvuk::API::getQuality();
+	my $prefQuality = Plugins::Zvuk::API->getQuality();
 	return $prefQuality eq 'flac' ? 'flc' : 'mp3';
 }
 

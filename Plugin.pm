@@ -1,7 +1,8 @@
 package Plugins::Zvuk::Plugin;
 
 use strict;
-# Inherit from OPMLBased to get standard LMS menu handling and search provider support
+use warnings;
+
 use base qw(Slim::Plugin::OPMLBased);
 
 use Slim::Utils::Log;
@@ -54,16 +55,6 @@ sub initPlugin {
 		_init_api_client($userId);
 	}
 
-	# Register global search provider like Yandex
-	Slim::Menu::GlobalSearch->registerInfoProvider( zvuk => (
-		func => sub {
-			my ($client, $tags) = @_;
-			return {
-				name  => 'Zvuk',
-				items => _globalSearchItems($client, $tags->{search}),
-			};
-		},
-	) );
 }
 
 sub _init_api_client {
@@ -160,9 +151,15 @@ sub _searchGeneric {
 	my $query = $args->{search};
 	my $cursor = $args->{cursor};
 
+	my %cursorKeys = (
+		tracks    => 'trackCursor',
+		artists   => 'artistsCursor',
+		releases  => 'releasesCursor',
+		playlists => 'playlistsCursor',
+	);
 	my %vars = ( query => $query, tracks => 0, artists => 0, releases => 0, playlists => 0 );
 	$vars{$type} = 1;
-	$vars{$type . "Cursor"} = $cursor if $cursor;
+	$vars{$cursorKeys{$type}} = $cursor if $cursor;
 
 	$api->search(sub {
 		my $data = shift;
@@ -313,7 +310,7 @@ sub _renderTrack {
 		line1           => $track->{title},
 		line2           => $artist,
 		artist          => $artist,
-		album           => $track->{release}->{title} || $track->{album}->{title} || "",
+		album           => $track->{release}->{title} || "",
 		duration        => $track->{duration},
 		secs            => $track->{duration},
 		on_select       => 'play',
@@ -325,33 +322,14 @@ sub _renderTrack {
 	};
 }
 
-sub _getArtistName {
-	my ($item) = @_;
-	
-	my $template = $item->{artistTemplate};
-	my $artists  = $item->{artists} || [];
-	
-	if ($template) {
-		# Resolve placeholders like {0}, {1}, etc.
-		if ($template =~ /\{/) {
-			$template =~ s/\{(\d+)\}/$artists->[$1] ? $artists->[$1]->{title} : ""/ge;
-		}
-		return $template;
-	}
-	
-	if (ref $artists eq 'ARRAY' && scalar @$artists) {
-		return join(', ', map { $_->{title} } @$artists);
-	}
-	
-	return '';
-}
+sub _getArtistName { Plugins::Zvuk::API->_getArtistName($_[0]) }
 
 sub _renderAlbum {
 	my ($album) = @_;
 	return {
 		name      => $album->{title},
 		line1     => $album->{title},
-		line2     => $album->{artistTemplate},
+		line2     => _getArtistName($album),
 		type      => 'link',
 		url       => \&handleAlbum,
 		passthrough => [{ id => $album->{id} }],
@@ -379,11 +357,6 @@ sub _renderPlaylist {
 		passthrough => [{ id => $playlist->{id} }],
 		image     => Plugins::Zvuk::API->getImageUrl($playlist),
 	};
-}
-
-sub _globalSearchItems {
-	my ($client, $query) = @_;
-	return [];
 }
 
 1;

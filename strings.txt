@@ -59,8 +59,8 @@ PLUGIN_ZVUK_QUALITY_DESC
 	RU	Выберите качество аудио для потока. Высокое/Lossless требует подписку.
 
 PLUGIN_ZVUK_QUALITY_MID
-	EN	Medium (MP3 ~192 kbps)
-	RU	Среднее (MP3 ~192 кбит/с)
+	EN	Medium (MP3 128 kbps)
+	RU	Среднее (MP3 128 кбит/с)
 
 PLUGIN_ZVUK_QUALITY_HIGH
 	EN	High (MP3 320 kbps)
