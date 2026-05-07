@@ -62,6 +62,7 @@ sub getToken {
 }
 
 # Return the configured quality preference
+# Centralized cache shared by all Zvuk modules (Plugin, ProtocolHandler, Async)
 my $cache = Slim::Utils::Cache->new();
 
 sub cache {
@@ -137,7 +138,8 @@ sub _getArtistName {
     my $artists  = $item->{artists} || [];
     
     if ($template) {
-        # Resolve placeholders like {0}, {1}, etc.
+        # The Zvuk API uses templates like "{0} & {1}" for multiple artists.
+        # We resolve these placeholders by replacing them with names from the 'artists' array.
         if ($template =~ /\{/) {
             $template =~ s/\{(\d+)\}/$artists->[$1] ? $artists->[$1]->{title} : ""/ge;
         }

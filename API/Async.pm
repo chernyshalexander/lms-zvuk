@@ -12,7 +12,9 @@ use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::API;
 
-my $cache = Slim::Utils::Cache->new();
+# CRITICAL: We use a centralized cache from Plugins::Zvuk::API.
+# This avoids data isolation and ensures metadata is consistent across the plugin.
+# Centralized cache is used from Plugins::Zvuk::API
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
@@ -44,10 +46,10 @@ sub _graphql {
 	# Create a unique cache key based on user, operation and variables
 	my $cacheKey;
 	if ($ttl > 0) {
-		my $vars_json = $variables ? encode_json($variables) : '';
+		my $vars_json = $variables ? encode_json($variables) : '{}';
 		$cacheKey = "zvuk_gql:${userId}:${operationName}:" . md5_hex($vars_json);
 		
-		if (my $cached = $cache->get($cacheKey)) {
+		if (my $cached = Plugins::Zvuk::API->cache->get($cacheKey)) {
 			$log->debug("Cache hit for $operationName ($userId)");
 			$cb->($cached);
 			return;
@@ -111,7 +113,7 @@ sub _graphql {
 			}
 
 			if ($cacheKey && $data) {
-				$cache->set($cacheKey, $data, $ttl);
+				Plugins::Zvuk::API->cache->set($cacheKey, $data, $ttl);
 				$log->debug("GraphQL: Cached $operationName for ${ttl}s");
 			}
 
@@ -221,6 +223,10 @@ sub search {
 		}
 	};
 
+	# CRITICAL: Zvuk API requires true/false boolean types for these flags.
+	# Standard Perl '1' or '0' would be encoded as integers (1/0) in JSON,
+	# causing the GraphQL server to return a 400 Bad Request.
+	# Using JSON::XS scalar references (\1 and \0) forces correct JSON boolean encoding.
 	my $vars = {
 		query => $query,
 		limit => $limit,

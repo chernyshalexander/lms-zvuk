@@ -1,6 +1,7 @@
 package Plugins::Zvuk::Plugin;
 
 use strict;
+# Inherit from OPMLBased to get standard LMS menu handling and search provider support
 use base qw(Slim::Plugin::OPMLBased);
 
 use Slim::Utils::Log;
@@ -71,6 +72,7 @@ sub _init_api_client {
 	my $account  = $accounts->{$userId};
 
 	if ($account && $account->{token}) {
+		# Each account gets its own Async API client with its own userId/deviceId
 		$api_clients{$userId} = Plugins::Zvuk::API::Async->new({ userId => $userId });
 		return $api_clients{$userId};
 	}
@@ -176,6 +178,8 @@ sub _searchGeneric {
 		my $page = $section->{page} || {};
 		my $nextCursor = $page->{next};
 
+		# CRITICAL: We cache metadata proactively during browsing.
+		# This allows ProtocolHandler to show the duration/progress bar instantly on playback.
 		my @items = @$items;
 		Plugins::Zvuk::API->cacheTrackMetadata(\@items) if $type eq 'tracks';
 		my @rendered = map { $renderSub->($_, @renderArgs) } @items;
@@ -311,6 +315,7 @@ sub _renderTrack {
 		artist          => $artist,
 		album           => $track->{release}->{title} || $track->{album}->{title} || "",
 		duration        => $track->{duration},
+		secs            => $track->{duration},
 		on_select       => 'play',
 		url             => $url,
 		play            => $url,

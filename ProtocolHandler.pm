@@ -65,7 +65,7 @@ sub getNextTrack {
 		my $stream  = $content->{stream};
 		my $duration = $content->{duration};
 
-		# 1. Set duration IMMEDIATELY from API response
+		# Set duration IMMEDIATELY from API response to update UI/Progress bar as fast as possible
 		if ($duration) {
 			$song->duration($duration);
 			Slim::Music::Info::setDuration($song->track, $duration);
@@ -141,7 +141,8 @@ sub _finalizeMetadata {
 			}
 		}
 
-		# Set type in DB before notifying LMS
+		# Update the LMS database with the correct content type before notifying the system
+		# This ensures the correct icon (MP3/FLC) is shown in the playlist
 		eval {
 			require Slim::Schema;
 			Slim::Schema->updateOrCreate({
