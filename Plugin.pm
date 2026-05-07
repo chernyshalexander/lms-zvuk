@@ -176,7 +176,9 @@ sub _searchGeneric {
 		my $page = $section->{page} || {};
 		my $nextCursor = $page->{next};
 
-		my @rendered = map { $renderSub->($_, @renderArgs) } @$items;
+		my @items = @$items;
+		Plugins::Zvuk::API->cacheTrackMetadata(\@items) if $type eq 'tracks';
+		my @rendered = map { $renderSub->($_, @renderArgs) } @items;
 
 		if ($nextCursor) {
 			push @rendered, {
@@ -222,6 +224,7 @@ sub handleArtistTracks {
 
 	$api->getArtistTracks(sub {
 		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 0) } @$items ] });
 	}, $id);
 }
@@ -244,6 +247,7 @@ sub handleAlbum {
 
 	$api->getAlbumTracks(sub {
 		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 0) } @$items ] });
 	}, $id);
 }
@@ -255,6 +259,7 @@ sub handlePlaylist {
 
 	$api->getPlaylistTracks(sub {
 		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
 	}, $id);
 }
@@ -265,6 +270,7 @@ sub handlePersonalWave {
 
 	$api->getPersonalWave(sub {
 		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
 	});
 }
@@ -275,6 +281,7 @@ sub handleCollection {
 
 	$api->getCollection(sub {
 		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
 	});
 }

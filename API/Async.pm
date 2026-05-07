@@ -259,33 +259,31 @@ sub getTracks {
 	}, 'getTracks', $gql, { ids => $ids });
 }
 
-# Get stream URL using Tiny API (direct links, more reliable than GraphQL)
+# Get stream URLs using GraphQL (fastest as it includes duration)
 sub getStream {
-	my ($self, $cb, $id, $quality) = @_;
-	$quality ||= 'high';
+	my ($self, $cb, $ids) = @_;
 
-	my $token = Plugins::Zvuk::API->getToken($self->{userId});
-	
-	my $http = Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $response = shift;
-			my $result = eval { decode_json($response->content) };
-			if ($result && $result->{result}) {
-				$cb->($result->{result});
-			} else {
-				$cb->({ error => 'no_stream' });
+	my $gql = q{
+		query getStream($ids: [ID!]!) {
+			mediaContents(ids: $ids) {
+				... on Track {
+					id
+					duration
+					stream {
+						high
+						mid
+						flac
+						flacdrm
+					}
+				}
 			}
-		},
-		sub {
-			$cb->({ error => $_[1] });
 		}
-	);
+	};
 
-	$http->get(
-		Plugins::Zvuk::API::TINY_API_URL . "/track/stream?id=$id&quality=$quality",
-		'x-auth-token' => $token,
-		'user-agent'   => Plugins::Zvuk::API::USER_AGENT
-	);
+	$self->_graphql(sub {
+		my $data = shift;
+		$cb->($data->{mediaContents} || []);
+	}, 'getStream', $gql, { ids => $ids }, { ttl => 0 });
 }
 
 # Get album tracks

@@ -56,27 +56,55 @@ sub getNextTrack {
 	_getAPIHandler($client)->getStream(sub {
 		my $data = shift;
 
-		if (!$data || $data->{error}) {
-			$log->error("getStream error for track $id: " . ($data->{error} || 'no response'));
+		if (!$data || !ref $data || !@$data) {
+			$log->error("getStream error for track $id: no response or empty");
 			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
 			return;
 		}
 
-		my $streamUrl = $data->{stream};
-		my $quality   = $data->{quality} || $prefQuality;
-		
+		my $content = $data->[0];
+		my $stream  = $content->{stream};
+		my $duration = $content->{duration};
+
+		# 1. Set duration IMMEDIATELY from API response
+		if ($duration) {
+			$song->duration($duration);
+			Slim::Music::Info::setDuration($song->track, $duration);
+		}
+
+		my $streamUrl;
+		my $format = 'mp3';
+
+		if ($prefQuality eq 'flac') {
+			# Check both flac and flacdrm
+			if ($stream->{flac}) {
+				$streamUrl = $stream->{flac};
+				$format = 'flc';
+			} elsif ($stream->{flacdrm}) {
+				$streamUrl = $stream->{flacdrm};
+				$format = 'flc';
+			} else {
+				$streamUrl = $stream->{high} || $stream->{mid};
+			}
+		} elsif ($prefQuality eq 'high') {
+			$streamUrl = $stream->{high} || $stream->{mid};
+		} else {
+			$streamUrl = $stream->{mid} || $stream->{high};
+		}
+
 		if (!$streamUrl) {
 			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
 			return;
 		}
 
-		my $format = ($quality eq 'flac') ? 'flc' : 'mp3';
-		
-		$log->info("Resolved Zvuk stream ($quality) for track $id: $streamUrl");
+		# 2. Set bitrate estimate
+		my $bitrate = ($format eq 'flc') ? 900_000 : ($prefQuality eq 'mid' ? 128_000 : 320_000);
+		Slim::Music::Info::setBitrate($song->track, $bitrate);
+
+		$log->info("Resolved Zvuk stream ($format) for track $id: $streamUrl");
 
 		$song->streamUrl($streamUrl);
 		$song->pluginData(format => $format);
-		$song->pluginData(quality => $quality);
 
 		# Optimization: Start playback immediately for MP3, only parse for FLAC
 		if ($format eq 'flc') {
@@ -86,15 +114,15 @@ sub getNextTrack {
 				request     => HTTP::Request->new(GET => $streamUrl),
 				onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
 				onError     => sub {
-					$class->_finalizeMetadata($song, $format, $quality, $successCb);
+					$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
 				},
-				passthrough => [ $song->track, { cb => sub { $class->_finalizeMetadata($song, $format, $quality, $successCb) } }, $streamUrl ],
+				passthrough => [ $song->track, { cb => sub { $class->_finalizeMetadata($song, $format, $prefQuality, $successCb) } }, $streamUrl ],
 			});
 		} else {
-			$class->_finalizeMetadata($song, $format, $quality, $successCb);
+			$class->_finalizeMetadata($song, $format, $prefQuality, $successCb);
 		}
 
-	}, $id, $prefQuality);
+	}, [$id]);
 }
 
 sub _finalizeMetadata {
