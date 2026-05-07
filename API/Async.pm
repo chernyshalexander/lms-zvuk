@@ -494,6 +494,35 @@ sub getCollection {
 						image { src palette }
 					}
 				}
+				podcasts(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						description
+						image { src palette }
+					}
+				}
+				episodes(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						description
+						duration
+						podcast {
+							id
+							title
+							image { src palette }
+						}
+					}
+				}
+				synthesis_playlists(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						description
+						image { src palette }
+					}
+				}
 			}
 		}
 	};
@@ -508,6 +537,15 @@ sub getCollection {
 		} elsif ($type eq 'artists') {
 			my $artists = $col->{artists} || {};
 			$result = $artists->{items} || [];
+		} elsif ($type eq 'podcasts') {
+			my $podcasts = $col->{podcasts} || {};
+			$result = $podcasts->{items} || [];
+		} elsif ($type eq 'episodes') {
+			my $episodes = $col->{episodes} || {};
+			$result = $episodes->{items} || [];
+		} elsif ($type eq 'synthesis_playlists') {
+			my $playlists = $col->{synthesis_playlists} || {};
+			$result = $playlists->{items} || [];
 		} else {
 			my $tracks = $col->{tracks} || {};
 			$result = $tracks->{items} || [];

@@ -119,6 +119,9 @@ sub handleFeed {
 				{ name => cstring($client, 'ALBUMS'),  type => 'link', url => \&handleFavoriteAlbums },
 				{ name => cstring($client, 'ARTISTS'),  type => 'link', url => \&handleFavoriteArtists },
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists },
+				{ name => cstring($client, 'PODCASTS'),  type => 'link', url => \&handleFavoritePodcasts },
+				{ name => cstring($client, 'EPISODES'),  type => 'link', url => \&handleFavoriteEpisodes },
+				{ name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists },
 			],
 		},
 	]});
@@ -309,6 +312,36 @@ sub handleFavoriteArtists {
 	}, 'artists');
 }
 
+sub handleFavoritePodcasts {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getCollection(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderPodcast($_) } @$items ] });
+	}, 'podcasts');
+}
+
+sub handleFavoriteEpisodes {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getCollection(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderEpisode($_) } @$items ] });
+	}, 'episodes');
+}
+
+sub handleSynthesisPlaylists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getCollection(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderPlaylist($_) } @$items ] });
+	}, 'synthesis_playlists');
+}
+
 sub handleUserPlaylists {
 	my ($client, $cb) = @_;
 	my $api = _get_api_client($client);
@@ -378,6 +411,31 @@ sub _renderPlaylist {
 		url       => \&handlePlaylist,
 		passthrough => [{ id => $playlist->{id} }],
 		image     => Plugins::Zvuk::API->getImageUrl($playlist),
+	};
+}
+
+sub _renderPodcast {
+	my ($podcast) = @_;
+	return {
+		name      => $podcast->{title},
+		line1     => $podcast->{title},
+		line2     => $podcast->{description} || "",
+		type      => 'text',
+		image     => Plugins::Zvuk::API->getImageUrl($podcast),
+	};
+}
+
+sub _renderEpisode {
+	my ($episode) = @_;
+	my $podcast_name = $episode->{podcast} ? $episode->{podcast}->{title} : "Podcast";
+	return {
+		name      => $episode->{title},
+		line1     => $episode->{title},
+		line2     => $podcast_name,
+		duration  => $episode->{duration},
+		secs      => $episode->{duration},
+		type      => 'text',
+		image     => $episode->{podcast} ? Plugins::Zvuk::API->getImageUrl($episode->{podcast}) : "",
 	};
 }
 
