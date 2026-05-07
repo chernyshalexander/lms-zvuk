@@ -109,13 +109,14 @@ sub cacheTrackMetadata {
         my $id    = $track->{id} or next;
         my $icon  = $class->getImageUrl($track, 'usePlaceholder');
         my $artist = $class->_getArtistName($track);
+        my $album = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
 
         my $dur = int($track->{duration} || 0);
         my $meta = {
             id          => $id,
             title       => $track->{title}          || '',
             artist      => $artist,
-            album       => ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '',
+            album       => $album,
             duration    => $dur,
             secs        => $dur,
             icon        => $icon,
@@ -123,7 +124,12 @@ sub cacheTrackMetadata {
         };
 
         if ($log->is_debug) {
-            $log->debug("Caching metadata for track $id: " . $track->{title} . " (duration: $dur)");
+            my $artistCount = scalar(@{$track->{artists} || []});
+            $log->debug("Caching track $id: title=" . $track->{title} .
+                ", artist=" . ($artist || 'N/A') .
+                ", album=" . ($album || 'N/A') .
+                ", artists_array=$artistCount" .
+                ", duration=$dur");
         }
 
         $cache->set( "zvuk_meta_$id", $meta, DEFAULT_TTL );
