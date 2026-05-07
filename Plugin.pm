@@ -308,7 +308,7 @@ sub _renderTrack {
 		name            => $track->{title} . ($showArtist ? " - " . $artist : ""),
 		favorites_title => $track->{title} . " - " . $artist,
 		line1           => $track->{title},
-		line2           => $artist,
+		line2           => $showArtist ? ($artist . " • " . ($track->{release}->{title} || "")) : "",
 		artist          => $artist,
 		album           => $track->{release}->{title} || "",
 		duration        => $track->{duration},
