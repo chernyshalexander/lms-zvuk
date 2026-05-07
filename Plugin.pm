@@ -282,6 +282,12 @@ sub handleCollection {
 
 	$api->getCollection(sub {
 		my $items = shift || [];
+		if ($log->is_debug && @$items) {
+			$log->debug("Collection: got " . scalar(@$items) . " tracks");
+			$log->debug("First track: title=" . $items->[0]->{title} .
+				", artists=" . scalar(@{$items->[0]->{artists} || []}) .
+				", release=" . ($items->[0]->{release}->{title} || 'N/A'));
+		}
 		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
 	});

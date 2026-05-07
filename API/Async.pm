@@ -203,7 +203,8 @@ sub search {
 				tracks(limit: $limit, cursor: $trackCursor) @include(if: $tracks) {
 					items {
 						id title duration availability artistTemplate
-						release { title image { src } }
+						artists { id title }
+						release { id title image { src } }
 					}
 					page { total next }
 				}
@@ -302,6 +303,8 @@ sub getAlbumTracks {
 				id title
 				tracks {
 					id title duration availability artistTemplate
+					artists { id title }
+					release { id title image { src } }
 				}
 			}
 		}
@@ -324,7 +327,8 @@ sub getArtistTracks {
 				id title
 				topTracks {
 					id title duration availability artistTemplate
-					release { title image { src } }
+					artists { id title }
+					release { id title image { src } }
 				}
 			}
 		}
@@ -367,7 +371,8 @@ sub getPlaylistTracks {
 		query getPlaylistTracks($id: ID!, $limit: Int = 500, $offset: Int = 0) {
 			playlistTracks(id: $id, limit: $limit, offset: $offset) {
 				id title duration availability artistTemplate
-				release { title image { src } }
+				artists { id title }
+				release { id title image { src } }
 			}
 		}
 	};
