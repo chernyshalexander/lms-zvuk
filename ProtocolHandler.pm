@@ -230,6 +230,7 @@ sub explodePlaylist {
 	my %dispatch = (
 		album    => 'Plugins::Zvuk::Plugin::handleAlbum',
 		playlist => 'Plugins::Zvuk::Plugin::handlePlaylist',
+		artist   => 'Plugins::Zvuk::Plugin::handleArtistTracks',
 	);
 
 	return $cb->([$url]) unless $dispatch{$type};
