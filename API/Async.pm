@@ -448,9 +448,10 @@ sub getPersonalWave {
 	}, 'getPersonalWave', $gql, $vars, { ttl => 0 });
 }
 
-# Get user collection (favorite tracks)
+# Get user collection (favorite tracks, albums, artists)
 sub getCollection {
-	my ($self, $cb) = @_;
+	my ($self, $cb, $type) = @_;
+	$type ||= 'tracks';  # default to tracks
 
 	my $gql = q{
 		query getPaginatedCollection($limit: Int = 500) {
@@ -476,6 +477,23 @@ sub getCollection {
 						__typename
 					}
 				}
+				releases(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						type
+						date
+						artistTemplate
+						image { src palette }
+					}
+				}
+				artists(pagination: {first: $limit}) {
+					items {
+						id
+						title
+						image { src palette }
+					}
+				}
 			}
 		}
 	};
@@ -483,8 +501,18 @@ sub getCollection {
 	$self->_graphql(sub {
 		my $data = shift;
 		my $col = $data->{paginatedCollection} || {};
-		my $tracks = $col->{tracks} || {};
-		$cb->($tracks->{items} || []);
+		my $result;
+		if ($type eq 'releases') {
+			my $releases = $col->{releases} || {};
+			$result = $releases->{items} || [];
+		} elsif ($type eq 'artists') {
+			my $artists = $col->{artists} || {};
+			$result = $artists->{items} || [];
+		} else {
+			my $tracks = $col->{tracks} || {};
+			$result = $tracks->{items} || [];
+		}
+		$cb->($result);
 	}, 'getPaginatedCollection', $gql, { limit => 500 }, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 

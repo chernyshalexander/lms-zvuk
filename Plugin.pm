@@ -116,6 +116,8 @@ sub handleFeed {
 			type => 'outline',
 			items => [
 				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'), type => 'link', url => \&handleCollection },
+				{ name => cstring($client, 'ALBUMS'),  type => 'link', url => \&handleFavoriteAlbums },
+				{ name => cstring($client, 'ARTISTS'),  type => 'link', url => \&handleFavoriteArtists },
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists },
 			],
 		},
@@ -282,15 +284,29 @@ sub handleCollection {
 
 	$api->getCollection(sub {
 		my $items = shift || [];
-		if ($log->is_debug && @$items) {
-			$log->debug("Collection: got " . scalar(@$items) . " tracks");
-			$log->debug("First track: title=" . $items->[0]->{title} .
-				", artists=" . scalar(@{$items->[0]->{artists} || []}) .
-				", release=" . ($items->[0]->{release}->{title} || 'N/A'));
-		}
 		Plugins::Zvuk::API->cacheTrackMetadata($items);
 		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
-	});
+	}, 'tracks');
+}
+
+sub handleFavoriteAlbums {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getCollection(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderAlbum($_) } @$items ] });
+	}, 'releases');
+}
+
+sub handleFavoriteArtists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getCollection(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderArtist($_) } @$items ] });
+	}, 'artists');
 }
 
 sub handleUserPlaylists {
