@@ -18,7 +18,11 @@ cd /home/chernysh/Projects/lms-zvuk
 ### Requirements
 
 - `sqlite3` command-line tool (usually pre-installed)
-- Script must be run as the same user running LMS
+- Script automatically finds cache database at:
+  - `/var/lib/squeezeboxserver/cache/cache.db` (Lyrion Music Server)
+  - `~/.slimserver-lyrion/cache.db` (alternative location)
+  - `~/.slimserver/cache.db` (Logitech Media Server)
+  - `~/.logitechmediaserver/cache.db` (legacy)
 - LMS must have been run at least once (to create cache database)
 
 ### What Gets Cleared

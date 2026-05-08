@@ -9,7 +9,9 @@
 set -e
 
 # Detect LMS cache database location
-if [ -f ~/.slimserver-lyrion/cache.db ]; then
+if [ -f /var/lib/squeezeboxserver/cache/cache.db ]; then
+    CACHE_DB=/var/lib/squeezeboxserver/cache/cache.db
+elif [ -f ~/.slimserver-lyrion/cache.db ]; then
     CACHE_DB=~/.slimserver-lyrion/cache.db
 elif [ -f ~/.slimserver/cache.db ]; then
     CACHE_DB=~/.slimserver/cache.db
@@ -18,6 +20,7 @@ elif [ -f ~/.logitechmediaserver/cache.db ]; then
 else
     echo "Error: Could not find LMS cache database"
     echo "Checked locations:"
+    echo "  /var/lib/squeezeboxserver/cache/cache.db"
     echo "  ~/.slimserver-lyrion/cache.db"
     echo "  ~/.slimserver/cache.db"
     echo "  ~/.logitechmediaserver/cache.db"
