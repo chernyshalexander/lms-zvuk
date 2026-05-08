@@ -146,7 +146,7 @@ sub _getCacheTTL {
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
 	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userCollectionReleases|userCollectionArtists|userPaginatedPodcasts|userPaginatedEpisodes)$/;
-	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
+	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getPlaylistTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
 
@@ -417,7 +417,15 @@ sub getPlaylistTracks {
 
 	$self->_graphql(sub {
 		my $data = shift;
-		$cb->($data->{playlistTracks} || []);
+		my $tracks = $data->{playlistTracks} || [];
+		if (@$tracks && $log->is_debug) {
+			my $first = $tracks->[0];
+			$log->debug("Playlist first track: title=" . $first->{title} .
+				", release=" . ($first->{release} ? $first->{release}->{title} : 'EMPTY') .
+				", artists=" . scalar(@{$first->{artists} || []}) .
+				", artistTemplate=" . ($first->{artistTemplate} || 'EMPTY'));
+		}
+		$cb->($tracks);
 	}, 'getPlaylistTracks', $gql, { id => $id, limit => 500, offset => 0 });
 }
 
