@@ -146,7 +146,7 @@ sub _getCacheTTL {
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
 	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists)$/;
-	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums)$/;
+	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
 
@@ -298,8 +298,8 @@ sub getAlbumTracks {
 	my ($self, $cb, $id) = @_;
 
 	my $gql = q{
-		query getAlbumTracks($id: ID!) {
-			releases(ids: [$id]) {
+		query getAlbumTracks($ids: [ID!]!) {
+			getReleases(ids: $ids) {
 				id title
 				tracks {
 					id title duration availability artistTemplate
@@ -312,9 +312,9 @@ sub getAlbumTracks {
 
 	$self->_graphql(sub {
 		my $data = shift;
-		my $album = $data->{releases}->[0];
+		my $album = $data->{getReleases}->[0];
 		$cb->($album ? $album->{tracks} : []);
-	}, 'getAlbumTracks', $gql, { id => $id });
+	}, 'getAlbumTracks', $gql, { ids => [$id] });
 }
 
 # Get artist top tracks
@@ -322,10 +322,10 @@ sub getArtistTracks {
 	my ($self, $cb, $id) = @_;
 
 	my $gql = q{
-		query getArtistTracks($id: ID!) {
-			artists(ids: [$id]) {
+		query getArtistTracks($ids: [ID!]!, $tracksLimit: Int = 50, $tracksOffset: Int = 0) {
+			getArtists(ids: $ids) {
 				id title
-				topTracks {
+				popularTracks(offset: $tracksOffset, limit: $tracksLimit) {
 					id title duration availability artistTemplate
 					artists { id title }
 					release { id title image { src } }
@@ -336,9 +336,9 @@ sub getArtistTracks {
 
 	$self->_graphql(sub {
 		my $data = shift;
-		my $artist = $data->{artists}->[0];
-		$cb->($artist ? $artist->{topTracks} : []);
-	}, 'getArtistTracks', $gql, { id => $id });
+		my $artist = $data->{getArtists}->[0];
+		$cb->($artist ? $artist->{popularTracks} : []);
+	}, 'getArtistTracks', $gql, { ids => [$id], tracksLimit => 50, tracksOffset => 0 });
 }
 
 # Get artist albums
@@ -346,10 +346,10 @@ sub getArtistAlbums {
 	my ($self, $cb, $id) = @_;
 
 	my $gql = q{
-		query getArtistAlbums($id: ID!) {
-			artists(ids: [$id]) {
+		query getArtistAlbums($ids: [ID!]!, $releasesLimit: Int = 100, $releasesOffset: Int = 0) {
+			getArtists(ids: $ids) {
 				id title
-				releases {
+				releases(offset: $releasesOffset, limit: $releasesLimit) {
 					id title type date artistTemplate image { src }
 				}
 			}
@@ -358,9 +358,47 @@ sub getArtistAlbums {
 
 	$self->_graphql(sub {
 		my $data = shift;
-		my $artist = $data->{artists}->[0];
+		my $artist = $data->{getArtists}->[0];
 		$cb->($artist ? $artist->{releases} : []);
-	}, 'getArtistAlbums', $gql, { id => $id });
+	}, 'getArtistAlbums', $gql, { ids => [$id], releasesLimit => 100, releasesOffset => 0 });
+}
+
+# Get podcast episodes
+sub getPodcastEpisodes {
+	my ($self, $cb, $id) = @_;
+
+	my $gql = q{
+		query getPodcastEpisodes($ids: [ID!]!) {
+			getPodcasts(ids: $ids) {
+				id title
+				episodes { id }
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $podcast  = $data->{getPodcasts}->[0];
+		my $ep_stubs = $podcast ? ($podcast->{episodes} || []) : [];
+		my @ids = map { $_->{id} } @$ep_stubs;
+		return $cb->([]) unless @ids;
+
+		my $gql2 = q{
+			query getEpisodes($ids: [ID!]!) {
+				getEpisodes(ids: $ids) {
+					id title duration
+					image { src }
+					podcast { id title image { src } }
+				}
+			}
+		};
+
+		$self->_graphql(sub {
+			my $d2 = shift;
+			$cb->($d2 ? ($d2->{getEpisodes} || []) : []);
+		}, 'getEpisodes', $gql2, { ids => \@ids });
+	}, 'getPodcastEpisodes', $gql, { ids => [$id] });
 }
 
 # Get playlist tracks

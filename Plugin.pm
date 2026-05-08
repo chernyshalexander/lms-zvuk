@@ -246,6 +246,17 @@ sub handleArtistAlbums {
 	}, $id);
 }
 
+sub handlePodcast {
+	my ($client, $cb, $args, $params) = @_;
+	my $id = $params->{id} || $args->{id};
+	my $api = _get_api_client($client);
+
+	$api->getPodcastEpisodes(sub {
+		my $items = shift || [];
+		$cb->({ items => [ map { _renderEpisode($_) } @$items ] });
+	}, $id);
+}
+
 sub handleAlbum {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
@@ -417,11 +428,13 @@ sub _renderPlaylist {
 sub _renderPodcast {
 	my ($podcast) = @_;
 	return {
-		name      => $podcast->{title},
-		line1     => $podcast->{title},
-		line2     => $podcast->{description} || "",
-		type      => 'text',
-		image     => Plugins::Zvuk::API->getImageUrl($podcast),
+		name        => $podcast->{title},
+		line1       => $podcast->{title},
+		line2       => $podcast->{description} || "",
+		type        => 'link',
+		url         => \&handlePodcast,
+		passthrough => [{ id => $podcast->{id} }],
+		image       => Plugins::Zvuk::API->getImageUrl($podcast),
 	};
 }
 
