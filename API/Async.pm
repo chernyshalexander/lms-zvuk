@@ -121,14 +121,19 @@ sub _graphql {
 		},
 		sub {
 			my ($http, $error) = @_;
-			my $content = $http->content if $http;
+			my $content = $http && $http->content ? $http->content : '';
 			$log->error("GraphQL HTTP error ($operationName): $error");
+			$log->info("GraphQL request body: " . encode_json($body));
+			$log->info("GraphQL response content: $content") if $content;
 			if ($content) {
-				$log->debug("GraphQL response content: $content");
 				my $parsed = eval { decode_json($content) };
 				if ($parsed && $parsed->{errors}) {
-					my $gql_error = encode_json($parsed->{errors});
-					$log->error("GraphQL errors: $gql_error");
+					foreach my $err (@{$parsed->{errors}}) {
+						$log->error("  - " . ($err->{message} || 'Unknown error'));
+						if ($err->{extensions} && $err->{extensions}->{details}) {
+							$log->error("    Details: " . $err->{extensions}->{details});
+						}
+					}
 				}
 			}
 			$cb->({ error => 'http_error', details => $error });
