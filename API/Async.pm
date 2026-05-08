@@ -145,7 +145,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|getUserTracks|getUserCollection|getUserPaginatedPodcasts|getUserPaginatedEpisodes|getUserPaginatedSynthesis)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
@@ -489,76 +489,131 @@ sub getPersonalWave {
 # Get user collection (favorite tracks, albums, artists)
 sub getCollection {
 	my ($self, $cb, $type) = @_;
-	$type ||= 'tracks';  # default to tracks
+	$type ||= 'tracks';
 
+	if ($type eq 'tracks') {
+		_getCollectionTracks($self, $cb);
+	} elsif ($type eq 'releases') {
+		_getCollectionReleases($self, $cb);
+	} elsif ($type eq 'artists') {
+		_getCollectionArtists($self, $cb);
+	} elsif ($type eq 'podcasts') {
+		_getCollectionPodcasts($self, $cb);
+	} elsif ($type eq 'episodes') {
+		_getCollectionEpisodes($self, $cb);
+	} elsif ($type eq 'synthesis_playlists') {
+		_getCollectionSynthesis($self, $cb);
+	} else {
+		$cb->([]);
+	}
+}
+
+sub _getCollectionTracks {
+	my ($self, $cb) = @_;
 	my $gql = q{
-		query getPaginatedCollection($limit: Int = 500) {
+		query userTracks {
+			collection {
+				tracks {
+					id
+					title
+					duration
+					availability
+					artistTemplate
+					explicit
+					artists { id title image { src } }
+					release { id title image { src } }
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $col = $data->{collection} || {};
+		$cb->($col->{tracks} || []);
+	}, 'getUserTracks', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+}
+
+sub _getCollectionReleases {
+	my ($self, $cb) = @_;
+	my $gql = q{
+		query getUserCollection {
+			collection {
+				releases { id }
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $col = $data->{collection} || {};
+		my $ids = $col->{releases} || [];
+		my @release_ids = map { $_->{id} } @$ids;
+		return $cb->([]) unless @release_ids;
+
+		my $gql2 = q{
+			query getReleases($ids: [ID!]!) {
+				getReleases(ids: $ids) {
+					id title type date artistTemplate image { src }
+				}
+			}
+		};
+
+		$self->_graphql(sub {
+			my $d2 = shift;
+			if (!$d2 || $d2->{error}) { $cb->([]); return; }
+			$cb->($d2->{getReleases} || []);
+		}, 'getReleases', $gql2, { ids => \@release_ids });
+	}, 'getUserCollection', $gql, {});
+}
+
+sub _getCollectionArtists {
+	my ($self, $cb) = @_;
+	my $gql = q{
+		query getUserCollection {
+			collection {
+				artists { id }
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $col = $data->{collection} || {};
+		my $ids = $col->{artists} || [];
+		my @artist_ids = map { $_->{id} } @$ids;
+		return $cb->([]) unless @artist_ids;
+
+		my $gql2 = q{
+			query getArtists($ids: [ID!]!) {
+				getArtists(ids: $ids) {
+					id title image { src }
+				}
+			}
+		};
+
+		$self->_graphql(sub {
+			my $d2 = shift;
+			if (!$d2 || $d2->{error}) { $cb->([]); return; }
+			$cb->($d2->{getArtists} || []);
+		}, 'getArtists', $gql2, { ids => \@artist_ids });
+	}, 'getUserCollection', $gql, {});
+}
+
+sub _getCollectionPodcasts {
+	my ($self, $cb) = @_;
+	my $gql = q{
+		query userPaginatedPodcasts {
 			paginatedCollection {
-				tracks(pagination: {first: $limit}) {
-					items {
-						id
-						title
-						duration
-						availability
-						artistTemplate
-						explicit
-						artists {
-							id
-							title
-							image { src palette }
-						}
-						release {
-							id
-							title
-							image { src palette }
-						}
-						__typename
-					}
-				}
-				releases(pagination: {first: $limit}) {
-					items {
-						id
-						title
-						type
-						date
-						artistTemplate
-						image { src palette }
-					}
-				}
-				artists(pagination: {first: $limit}) {
-					items {
-						id
-						title
-						image { src palette }
-					}
-				}
-				podcasts(pagination: {first: $limit}) {
+				podcasts(pagination: {first: 500}) {
 					items {
 						id
 						title
 						description
-						image { src palette }
-					}
-				}
-				episodes(pagination: {first: $limit}) {
-					items {
-						id
-						title
-						description
-						duration
-						podcast {
-							id
-							title
-							image { src palette }
-						}
-					}
-				}
-				synthesis_playlists(pagination: {first: $limit}) {
-					items {
-						id
-						title
-						description
-						image { src palette }
+						image { src }
 					}
 				}
 			}
@@ -567,29 +622,65 @@ sub getCollection {
 
 	$self->_graphql(sub {
 		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{paginatedCollection} || {};
-		my $result;
-		if ($type eq 'releases') {
-			my $releases = $col->{releases} || {};
-			$result = $releases->{items} || [];
-		} elsif ($type eq 'artists') {
-			my $artists = $col->{artists} || {};
-			$result = $artists->{items} || [];
-		} elsif ($type eq 'podcasts') {
-			my $podcasts = $col->{podcasts} || {};
-			$result = $podcasts->{items} || [];
-		} elsif ($type eq 'episodes') {
-			my $episodes = $col->{episodes} || {};
-			$result = $episodes->{items} || [];
-		} elsif ($type eq 'synthesis_playlists') {
-			my $playlists = $col->{synthesis_playlists} || {};
-			$result = $playlists->{items} || [];
-		} else {
-			my $tracks = $col->{tracks} || {};
-			$result = $tracks->{items} || [];
+		my $pods = $col->{podcasts} || {};
+		$cb->($pods->{items} || []);
+	}, 'getUserPaginatedPodcasts', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+}
+
+sub _getCollectionEpisodes {
+	my ($self, $cb) = @_;
+	my $gql = q{
+		query userPaginatedEpisodes {
+			paginatedCollection {
+				episodes(pagination: {first: 500}) {
+					items {
+						id
+						title
+						description
+						duration
+						image { src }
+						podcast { id title image { src } }
+					}
+				}
+			}
 		}
-		$cb->($result);
-	}, 'getPaginatedCollection', $gql, { limit => 500 }, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $col = $data->{paginatedCollection} || {};
+		my $eps = $col->{episodes} || {};
+		$cb->($eps->{items} || []);
+	}, 'getUserPaginatedEpisodes', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+}
+
+sub _getCollectionSynthesis {
+	my ($self, $cb) = @_;
+	my $gql = q{
+		query userPaginatedSynthesis {
+			paginatedCollection {
+				synthesis_playlists(pagination: {first: 500}) {
+					items {
+						id
+						title
+						description
+						image { src }
+					}
+				}
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) { $cb->([]); return; }
+		my $col = $data->{paginatedCollection} || {};
+		my $synth = $col->{synthesis_playlists} || {};
+		$cb->($synth->{items} || []);
+	}, 'getUserPaginatedSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 # Get user playlists
