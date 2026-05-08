@@ -107,6 +107,12 @@ sub cacheTrackMetadata {
     return [ map {
         my $track = $_;
         my $id    = $track->{id} or next;
+
+        # Check if already cached, skip if found
+        if (my $cached = $cache->get("zvuk_meta_$id")) {
+            return $cached;
+        }
+
         my $icon  = $class->getImageUrl($track, 'usePlaceholder');
         my $artist = $class->_getArtistName($track);
         my $album = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
@@ -122,15 +128,6 @@ sub cacheTrackMetadata {
             icon        => $icon,
             cover       => $icon,
         };
-
-        if ($log->is_debug) {
-            my $artistCount = scalar(@{$track->{artists} || []});
-            $log->debug("Caching track $id: title=" . $track->{title} .
-                ", artist=" . ($artist || 'N/A') .
-                ", album=" . ($album || 'N/A') .
-                ", artists_array=$artistCount" .
-                ", duration=$dur");
-        }
 
         $cache->set( "zvuk_meta_$id", $meta, DEFAULT_TTL );
         $meta;
