@@ -145,7 +145,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userCollectionReleases|userCollectionArtists|userPaginatedPodcasts|userPaginatedEpisodes)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
@@ -538,7 +538,7 @@ sub _getCollectionTracks {
 sub _getCollectionReleases {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userCollection {
+		query userCollectionReleases {
 			collection {
 				releases {
 					id
@@ -557,13 +557,13 @@ sub _getCollectionReleases {
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
 		$cb->($col->{releases} || []);
-	}, 'userCollection', $gql, {});
+	}, 'userCollectionReleases', $gql, {});
 }
 
 sub _getCollectionArtists {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userCollection {
+		query userCollectionArtists {
 			collection {
 				artists {
 					id
@@ -579,7 +579,7 @@ sub _getCollectionArtists {
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
 		$cb->($col->{artists} || []);
-	}, 'userCollection', $gql, {});
+	}, 'userCollectionArtists', $gql, {});
 }
 
 sub _getCollectionPodcasts {
