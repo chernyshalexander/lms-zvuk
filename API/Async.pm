@@ -511,7 +511,7 @@ sub getCollection {
 sub _getCollectionTracks {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userTracks {
+		query getUserTracks {
 			collection {
 				tracks {
 					id
@@ -606,7 +606,7 @@ sub _getCollectionArtists {
 sub _getCollectionPodcasts {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userPaginatedPodcasts {
+		query getUserPaginatedPodcasts {
 			paginatedCollection {
 				podcasts(pagination: {first: 500}) {
 					items {
@@ -632,7 +632,7 @@ sub _getCollectionPodcasts {
 sub _getCollectionEpisodes {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userPaginatedEpisodes {
+		query getUserPaginatedEpisodes {
 			paginatedCollection {
 				episodes(pagination: {first: 500}) {
 					items {
@@ -660,7 +660,7 @@ sub _getCollectionEpisodes {
 sub _getCollectionSynthesis {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userPaginatedSynthesis {
+		query getUserPaginatedSynthesis {
 			paginatedCollection {
 				synthesis_playlists(pagination: {first: 500}) {
 					items {
