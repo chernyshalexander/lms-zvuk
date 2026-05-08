@@ -159,7 +159,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes|userSynthesis)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
@@ -652,25 +652,10 @@ sub _getCollectionEpisodes {
 
 sub _getCollectionSynthesis {
 	my ($self, $cb) = @_;
-	my $gql = q{
-		query userSynthesis {
-			collection {
-				synthesis_playlists {
-					id
-					title
-					description
-					image { src }
-				}
-			}
-		}
-	};
-
-	$self->_graphql(sub {
-		my $data = shift;
-		if (!$data || $data->{error}) { $cb->([]); return; }
-		my $col = $data->{collection} || {};
-		$cb->($col->{synthesis_playlists} || []);
-	}, 'userSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	# Synthesis playlists API endpoint not available or not supported
+	# Return empty list for now
+	$log->debug("Synthesis playlists: returning empty list (not available via API)");
+	$cb->([]);
 }
 
 # Get user playlists
