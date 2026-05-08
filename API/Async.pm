@@ -417,15 +417,7 @@ sub getPlaylistTracks {
 
 	$self->_graphql(sub {
 		my $data = shift;
-		my $tracks = $data->{playlistTracks} || [];
-		if (@$tracks && $log->is_debug) {
-			my $first = $tracks->[0];
-			$log->debug("Playlist first track: title=" . $first->{title} .
-				", release=" . ($first->{release} ? $first->{release}->{title} : 'EMPTY') .
-				", artists=" . scalar(@{$first->{artists} || []}) .
-				", artistTemplate=" . ($first->{artistTemplate} || 'EMPTY'));
-		}
-		$cb->($tracks);
+		$cb->($data->{playlistTracks} || []);
 	}, 'getPlaylistTracks', $gql, { id => $id, limit => 500, offset => 0 });
 }
 
