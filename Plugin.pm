@@ -99,6 +99,7 @@ sub handleFeed {
 		{
 			name => cstring($client, 'PLUGIN_ZVUK_SEARCH'),
 			type => 'outline',
+			image => 'plugins/zvuk/html/images/search.png',
 			items => [
 				{ name => cstring($client, 'PLUGIN_ZVUK_SEARCH_TRACKS'),    type => 'search', url => \&searchTracks },
 				{ name => cstring($client, 'PLUGIN_ZVUK_SEARCH_ARTISTS'),   type => 'search', url => \&searchArtists },
@@ -110,18 +111,20 @@ sub handleFeed {
 			name => cstring($client, 'PLUGIN_ZVUK_WAVE'),
 			type => 'link',
 			url  => \&handlePersonalWave,
+			image => 'plugins/zvuk/html/images/radio.png',
 		},
 		{
 			name => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
 			type => 'outline',
+			image => 'plugins/zvuk/html/images/favorites.png',
 			items => [
-				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'), type => 'link', url => \&handleCollection },
-				{ name => cstring($client, 'ALBUMS'),  type => 'link', url => \&handleFavoriteAlbums },
-				{ name => cstring($client, 'ARTISTS'),  type => 'link', url => \&handleFavoriteArtists },
-				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists },
-				{ name => cstring($client, 'PODCASTS'),  type => 'link', url => \&handleFavoritePodcasts },
-				{ name => cstring($client, 'EPISODES'),  type => 'link', url => \&handleFavoriteEpisodes },
-				{ name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists },
+				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'), type => 'link', url => \&handleCollection, image => 'plugins/zvuk/html/images/personal.png' },
+				{ name => cstring($client, 'ALBUMS'),  type => 'link', url => \&handleFavoriteAlbums, image => 'plugins/zvuk/html/images/albums.png' },
+				{ name => cstring($client, 'ARTISTS'),  type => 'link', url => \&handleFavoriteArtists, image => 'plugins/zvuk/html/images/artists.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
+				{ name => cstring($client, 'PODCASTS'),  type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'EPISODES'),  type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
 		},
 	]});
