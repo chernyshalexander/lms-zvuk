@@ -145,7 +145,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes|userSynthesis)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes|userPaginatedSynthesis)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
@@ -639,13 +639,15 @@ sub _getCollectionEpisodes {
 sub _getCollectionSynthesis {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query userSynthesis {
-			collection {
-				synthesis_playlists {
-					id
-					title
-					description
-					image { src }
+		query userPaginatedSynthesis {
+			paginatedCollection {
+				synthesis_playlists(pagination: {first: 500}) {
+					items {
+						id
+						title
+						description
+						image { src }
+					}
 				}
 			}
 		}
@@ -654,9 +656,10 @@ sub _getCollectionSynthesis {
 	$self->_graphql(sub {
 		my $data = shift;
 		if (!$data || $data->{error}) { $cb->([]); return; }
-		my $col = $data->{collection} || {};
-		$cb->($col->{synthesis_playlists} || []);
-	}, 'userSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+		my $col = $data->{paginatedCollection} || {};
+		my $synth = $col->{synthesis_playlists} || {};
+		$cb->($synth->{items} || []);
+	}, 'userPaginatedSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 # Get user playlists
