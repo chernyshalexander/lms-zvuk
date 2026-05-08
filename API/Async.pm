@@ -540,7 +540,14 @@ sub _getCollectionReleases {
 	my $gql = q{
 		query getUserCollection {
 			collection {
-				releases { id }
+				releases {
+					id
+					title
+					type
+					date
+					artistTemplate
+					image { src }
+				}
 			}
 		}
 	};
@@ -549,23 +556,7 @@ sub _getCollectionReleases {
 		my $data = shift;
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
-		my $ids = $col->{releases} || [];
-		my @release_ids = map { $_->{id} } @$ids;
-		return $cb->([]) unless @release_ids;
-
-		my $gql2 = q{
-			query getReleases($ids: [ID!]!) {
-				getReleases(ids: $ids) {
-					id title type date artistTemplate image { src }
-				}
-			}
-		};
-
-		$self->_graphql(sub {
-			my $d2 = shift;
-			if (!$d2 || $d2->{error}) { $cb->([]); return; }
-			$cb->($d2->{getReleases} || []);
-		}, 'getReleases', $gql2, { ids => \@release_ids });
+		$cb->($col->{releases} || []);
 	}, 'getUserCollection', $gql, {});
 }
 
@@ -574,7 +565,11 @@ sub _getCollectionArtists {
 	my $gql = q{
 		query getUserCollection {
 			collection {
-				artists { id }
+				artists {
+					id
+					title
+					image { src }
+				}
 			}
 		}
 	};
@@ -583,23 +578,7 @@ sub _getCollectionArtists {
 		my $data = shift;
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
-		my $ids = $col->{artists} || [];
-		my @artist_ids = map { $_->{id} } @$ids;
-		return $cb->([]) unless @artist_ids;
-
-		my $gql2 = q{
-			query getArtists($ids: [ID!]!) {
-				getArtists(ids: $ids) {
-					id title image { src }
-				}
-			}
-		};
-
-		$self->_graphql(sub {
-			my $d2 = shift;
-			if (!$d2 || $d2->{error}) { $cb->([]); return; }
-			$cb->($d2->{getArtists} || []);
-		}, 'getArtists', $gql2, { ids => \@artist_ids });
+		$cb->($col->{artists} || []);
 	}, 'getUserCollection', $gql, {});
 }
 
