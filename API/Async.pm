@@ -145,7 +145,7 @@ sub _getCacheTTL {
 	my ($operationName) = @_;
 
 	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
-	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|getUserTracks|getUserCollection|getUserPaginatedPodcasts|getUserPaginatedEpisodes|getUserPaginatedSynthesis)$/;
+	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userPaginatedPodcasts|userPaginatedEpisodes|userPaginatedSynthesis)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
@@ -511,7 +511,7 @@ sub getCollection {
 sub _getCollectionTracks {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserTracks {
+		query userTracks {
 			collection {
 				tracks {
 					id
@@ -532,13 +532,13 @@ sub _getCollectionTracks {
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
 		$cb->($col->{tracks} || []);
-	}, 'getUserTracks', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	}, 'userTracks', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 sub _getCollectionReleases {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserCollection {
+		query userCollection {
 			collection {
 				releases {
 					id
@@ -557,13 +557,13 @@ sub _getCollectionReleases {
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
 		$cb->($col->{releases} || []);
-	}, 'getUserCollection', $gql, {});
+	}, 'userCollection', $gql, {});
 }
 
 sub _getCollectionArtists {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserCollection {
+		query userCollection {
 			collection {
 				artists {
 					id
@@ -579,13 +579,13 @@ sub _getCollectionArtists {
 		if (!$data || $data->{error}) { $cb->([]); return; }
 		my $col = $data->{collection} || {};
 		$cb->($col->{artists} || []);
-	}, 'getUserCollection', $gql, {});
+	}, 'userCollection', $gql, {});
 }
 
 sub _getCollectionPodcasts {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserPaginatedPodcasts {
+		query userPaginatedPodcasts {
 			paginatedCollection {
 				podcasts(pagination: {first: 500}) {
 					items {
@@ -605,13 +605,13 @@ sub _getCollectionPodcasts {
 		my $col = $data->{paginatedCollection} || {};
 		my $pods = $col->{podcasts} || {};
 		$cb->($pods->{items} || []);
-	}, 'getUserPaginatedPodcasts', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	}, 'userPaginatedPodcasts', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 sub _getCollectionEpisodes {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserPaginatedEpisodes {
+		query userPaginatedEpisodes {
 			paginatedCollection {
 				episodes(pagination: {first: 500}) {
 					items {
@@ -633,13 +633,13 @@ sub _getCollectionEpisodes {
 		my $col = $data->{paginatedCollection} || {};
 		my $eps = $col->{episodes} || {};
 		$cb->($eps->{items} || []);
-	}, 'getUserPaginatedEpisodes', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	}, 'userPaginatedEpisodes', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 sub _getCollectionSynthesis {
 	my ($self, $cb) = @_;
 	my $gql = q{
-		query getUserPaginatedSynthesis {
+		query userPaginatedSynthesis {
 			paginatedCollection {
 				synthesis_playlists(pagination: {first: 500}) {
 					items {
@@ -659,7 +659,7 @@ sub _getCollectionSynthesis {
 		my $col = $data->{paginatedCollection} || {};
 		my $synth = $col->{synthesis_playlists} || {};
 		$cb->($synth->{items} || []);
-	}, 'getUserPaginatedSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
+	}, 'userPaginatedSynthesis', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
 # Get user playlists
