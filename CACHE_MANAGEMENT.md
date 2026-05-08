@@ -2,18 +2,24 @@
 
 ## Clear Cache Script
 
-The `clear_cache.pl` script allows you to clear Zvuk plugin cache entries.
+The `clear_cache.sh` script allows you to clear Zvuk plugin cache entries directly from the LMS cache database.
 
 ### Usage
 
 ```bash
 # Clear only GraphQL query cache (fastest, recommended for testing)
 cd /home/chernysh/Projects/lms-zvuk
-perl clear_cache.pl
+./clear_cache.sh
 
 # Clear all Zvuk cache including metadata
-perl clear_cache.pl --all
+./clear_cache.sh --all
 ```
+
+### Requirements
+
+- `sqlite3` command-line tool (usually pre-installed)
+- Script must be run as the same user running LMS
+- LMS must have been run at least once (to create cache database)
 
 ### What Gets Cleared
 
