@@ -121,7 +121,16 @@ sub _graphql {
 		},
 		sub {
 			my ($http, $error) = @_;
+			my $content = $http->content if $http;
 			$log->error("GraphQL HTTP error ($operationName): $error");
+			if ($content) {
+				$log->debug("GraphQL response content: $content");
+				my $parsed = eval { decode_json($content) };
+				if ($parsed && $parsed->{errors}) {
+					my $gql_error = encode_json($parsed->{errors});
+					$log->error("GraphQL errors: $gql_error");
+				}
+			}
 			$cb->({ error => 'http_error', details => $error });
 		},
 		{ timeout => 15 }
