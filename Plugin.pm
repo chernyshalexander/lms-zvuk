@@ -124,7 +124,8 @@ sub handleFeed {
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 				{ name => cstring($client, 'PODCASTS'),  type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
 				{ name => cstring($client, 'EPISODES'),  type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
-				{ name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
+				# TODO: Synthesis Playlists API endpoint not available
+				# { name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
 		},
 	]});
