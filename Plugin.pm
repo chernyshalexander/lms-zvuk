@@ -428,9 +428,7 @@ sub handleUserPlaylists {
 
 sub _renderTrack {
 	my ($track, $showArtist) = @_;
-	my $quality = Plugins::Zvuk::API->getQuality();
-	my $ext     = $quality eq 'flac' ? 'flc' : 'mp3';
-	my $url     = 'zvuk://' . $track->{id} . '.' . $ext;
+	my $url = 'zvuk://' . $track->{id};
 	my $artist = _getArtistName($track);
 
 	return {
