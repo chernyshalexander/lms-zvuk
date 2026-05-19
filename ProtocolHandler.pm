@@ -111,31 +111,40 @@ sub getNextTrack {
 
 		# Parse remote header to get accurate duration/bitrate before playback starts
 		# This ensures progress bar and time display are available immediately in SqueezePlay
-		# FLAC: skip parseRemoteHeader as it may override the format from HTTP stream detection
-		if ($format eq 'flc') {
-			# For FLAC, we already have duration and format is set correctly
-			# Just notify and proceed to avoid format override
+		require Slim::Utils::Scanner::Remote;
+
+		my $parseCallback = sub {
 			$client->currentPlaylistUpdateTime(Time::HiRes::time());
 			Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
+
+			# For FLAC: additionally parse FLAC header for detailed metadata (async, non-blocking)
+			if ($format eq 'flc' && CAN_FLAC_SEEK) {
+				$log->info("Parsing FLAC header async for track $id");
+				my $http = Slim::Networking::Async::HTTP->new;
+				$http->send_request({
+					request     => HTTP::Request->new(GET => $streamUrl),
+					onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
+					onError     => sub {
+						my ($self, $error) = @_;
+						$log->warn("Could not parse FLAC header for track $id: $error");
+					},
+					passthrough => [$song->track, {cb => sub {}}, $streamUrl],
+				});
+			}
+
 			$successCb->();
-		} else {
-			require Slim::Utils::Scanner::Remote;
-			Slim::Utils::Scanner::Remote::parseRemoteHeader(
-				$song->track, $streamUrl, $format,
-				sub {
-					# Header parsed successfully, bitrate/duration from stream now available
-					$client->currentPlaylistUpdateTime(Time::HiRes::time());
-					Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
-					$successCb->();
-				},
-				sub {
-					# Header parse failed, just continue with what we have
-					my ($error) = @_;
-					$log->warn("Could not parse $format header for track $id: $error");
-					$successCb->();
-				}
-			);
-		}
+		};
+
+		my $errorCallback = sub {
+			my ($error) = @_;
+			$log->warn("Could not parse $format header for track $id: $error");
+			$successCb->();
+		};
+
+		Slim::Utils::Scanner::Remote::parseRemoteHeader(
+			$song->track, $streamUrl, $format,
+			$parseCallback, $errorCallback
+		);
 
 	}, [$id]);
 }
@@ -167,35 +176,11 @@ sub getMetadataFor {
 		}, [$id]);
 	}
 
-	# Return format type: use actual format from current song if playing, otherwise use quality preference
-	my $type = 'mp3';  # default
-
-	# Check if this track is currently playing and has format info in pluginData
-	my $song = $client->playingSong() if $client;
-	if ($song) {
-		my $playingSongUrl = $song->track->url;
-		my $currentTrackUrl = $song->currentTrack->url;
-		my $isPlaying = ($playingSongUrl eq $url || $currentTrackUrl eq $url);
-
-		$log->info("getMetadataFor track $id: playingSong.url=$playingSongUrl, currentTrack.url=$currentTrackUrl, queryUrl=$url, isPlaying=$isPlaying");
-
-		if ($isPlaying) {
-			my $pluginFormat = $song->pluginData('format');
-			$log->info("getMetadataFor: track $id IS PLAYING - pluginData(format)='$pluginFormat'");
-			$type = $pluginFormat if $pluginFormat;
-		}
-	} else {
-		$log->info("getMetadataFor track $id: no playingSong");
-	}
-
-	if ($type eq 'mp3') {
-		# For non-playing tracks or when format not set in pluginData, use quality preference
-		my $quality = Plugins::Zvuk::API->getQuality();
-		$type = $quality eq 'flac' ? 'flc' : 'mp3';
-		$log->info("getMetadataFor track $id: returning type='$type' (from quality=$quality)");
-	} else {
-		$log->info("getMetadataFor track $id: returning type='$type' (from pluginData)");
-	}
+	# Return format type based on quality preference
+	# getMetadataFor is called for all tracks in playlist, not just current,
+	# so we use the user's quality preference to determine the format
+	my $quality = Plugins::Zvuk::API->getQuality();
+	my $type = $quality eq 'flac' ? 'flc' : 'mp3';
 
 	return { type => $type, icon => $icon };
 }
