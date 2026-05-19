@@ -172,15 +172,29 @@ sub getMetadataFor {
 
 	# Check if this track is currently playing and has format info in pluginData
 	my $song = $client->playingSong() if $client;
-	if ($song && ($song->track->url eq $url || $song->currentTrack->url eq $url)) {
-		my $pluginFormat = $song->pluginData('format');
-		$type = $pluginFormat if $pluginFormat;
-		$log->debug("getMetadataFor: using format '$type' from pluginData for track $id");
+	if ($song) {
+		my $playingSongUrl = $song->track->url;
+		my $currentTrackUrl = $song->currentTrack->url;
+		my $isPlaying = ($playingSongUrl eq $url || $currentTrackUrl eq $url);
+
+		$log->info("getMetadataFor track $id: playingSong.url=$playingSongUrl, currentTrack.url=$currentTrackUrl, queryUrl=$url, isPlaying=$isPlaying");
+
+		if ($isPlaying) {
+			my $pluginFormat = $song->pluginData('format');
+			$log->info("getMetadataFor: track $id IS PLAYING - pluginData(format)='$pluginFormat'");
+			$type = $pluginFormat if $pluginFormat;
+		}
 	} else {
-		# For non-playing tracks, use quality preference
+		$log->info("getMetadataFor track $id: no playingSong");
+	}
+
+	if ($type eq 'mp3') {
+		# For non-playing tracks or when format not set in pluginData, use quality preference
 		my $quality = Plugins::Zvuk::API->getQuality();
 		$type = $quality eq 'flac' ? 'flc' : 'mp3';
-		$log->debug("getMetadataFor: using format '$type' from quality preference for track $id");
+		$log->info("getMetadataFor track $id: returning type='$type' (from quality=$quality)");
+	} else {
+		$log->info("getMetadataFor track $id: returning type='$type' (from pluginData)");
 	}
 
 	return { type => $type, icon => $icon };
