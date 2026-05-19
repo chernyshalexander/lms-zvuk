@@ -167,9 +167,21 @@ sub getMetadataFor {
 		}, [$id]);
 	}
 
-	# Return format type based on quality preference: 'flc' for FLAC, 'mp3' otherwise
-	my $quality = Plugins::Zvuk::API->getQuality();
-	my $type = $quality eq 'flac' ? 'flc' : 'mp3';
+	# Return format type: use actual format from current song if playing, otherwise use quality preference
+	my $type = 'mp3';  # default
+
+	# Check if this track is currently playing and has format info in pluginData
+	my $song = $client->playingSong() if $client;
+	if ($song && ($song->track->url eq $url || $song->currentTrack->url eq $url)) {
+		my $pluginFormat = $song->pluginData('format');
+		$type = $pluginFormat if $pluginFormat;
+		$log->debug("getMetadataFor: using format '$type' from pluginData for track $id");
+	} else {
+		# For non-playing tracks, use quality preference
+		my $quality = Plugins::Zvuk::API->getQuality();
+		$type = $quality eq 'flac' ? 'flc' : 'mp3';
+		$log->debug("getMetadataFor: using format '$type' from quality preference for track $id");
+	}
 
 	return { type => $type, icon => $icon };
 }
