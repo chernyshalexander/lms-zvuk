@@ -112,6 +112,7 @@ sub getNextTrack {
 		# Update cache with format type for immediate metadata display
 		my $cached_meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id") || {};
 		$cached_meta->{type} = $format;
+		$cached_meta->{_cached_quality} = Plugins::Zvuk::API->getQuality();
 		Plugins::Zvuk::API->cache->set("zvuk_meta_$id", $cached_meta, Plugins::Zvuk::API::DEFAULT_TTL);
 
 		# Parse remote header to get accurate duration/bitrate before playback starts
@@ -150,7 +151,13 @@ sub getMetadataFor {
 
 	my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
 	if ($meta) {
-		$meta->{type} //= Plugins::Zvuk::API->getQuality() eq 'flac' ? 'flc' : 'mp3';
+		my $quality = Plugins::Zvuk::API->getQuality();
+		if ($meta->{_cached_quality} && $meta->{_cached_quality} ne $quality) {
+			# Quality setting changed since cache was set — invalidate cached type
+			delete $meta->{type};
+			delete $meta->{_cached_quality};
+		}
+		$meta->{type} //= $quality eq 'flac' ? 'flc' : 'mp3';
 		return $meta;
 	}
 
