@@ -109,6 +109,11 @@ sub getNextTrack {
 		$song->pluginData(format => $format);
 		$song->track->content_type($format);
 
+		# Update cache with format type for immediate metadata display
+		my $cached_meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id") || {};
+		$cached_meta->{type} = $format;
+		Plugins::Zvuk::API->cache->set("zvuk_meta_$id", $cached_meta, Plugins::Zvuk::API::DEFAULT_TTL);
+
 		# Parse remote header to get accurate duration/bitrate before playback starts
 		# This ensures progress bar and time display are available immediately in SqueezePlay
 		require Slim::Utils::Scanner::Remote;
@@ -118,21 +123,6 @@ sub getNextTrack {
 			# Ensure parseRemoteHeader didn't override the format (especially for FLAC)
 			$song->track->content_type($format);
 			Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
-
-			# For FLAC: additionally parse FLAC header for detailed metadata (async, non-blocking)
-			if ($format eq 'flc' && CAN_FLAC_SEEK) {
-				$log->info("Parsing FLAC header async for track $id");
-				my $http = Slim::Networking::Async::HTTP->new;
-				$http->send_request({
-					request     => HTTP::Request->new(GET => $streamUrl),
-					onStream    => \&Slim::Utils::Scanner::Remote::parseFlacHeader,
-					onError     => sub {
-						my ($self, $error) = @_;
-						$log->warn("Could not parse FLAC header for track $id: $error");
-					},
-					passthrough => [$song->track, {cb => sub {}}, $streamUrl],
-				});
-			}
 
 			$successCb->();
 		};
@@ -159,7 +149,10 @@ sub getMetadataFor {
 	return {} unless $id;
 
 	my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
-	return $meta if $meta;
+	if ($meta) {
+		$meta->{type} //= Plugins::Zvuk::API->getQuality() eq 'flac' ? 'flc' : 'mp3';
+		return $meta;
+	}
 
 	my $icon = $class->getIcon();
 
@@ -199,7 +192,8 @@ sub audioScrobblerSource {
 
 sub formatOverride {
 	my ($class, $song) = @_;
-	return $song->pluginData('format') || 'mp3';
+	return $song->pluginData('format')
+		|| (Plugins::Zvuk::API->getQuality() eq 'flac' ? 'flc' : 'mp3');
 }
 
 sub getHeaders {
