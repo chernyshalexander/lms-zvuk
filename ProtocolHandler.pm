@@ -115,6 +115,8 @@ sub getNextTrack {
 
 		my $parseCallback = sub {
 			$client->currentPlaylistUpdateTime(Time::HiRes::time());
+			# Ensure parseRemoteHeader didn't override the format (especially for FLAC)
+			$song->track->content_type($format);
 			Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
 
 			# For FLAC: additionally parse FLAC header for detailed metadata (async, non-blocking)
