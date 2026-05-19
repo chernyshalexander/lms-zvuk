@@ -111,29 +111,29 @@ sub getNextTrack {
 
 		# Parse remote header to get accurate duration/bitrate before playback starts
 		# This ensures progress bar and time display are available immediately in SqueezePlay
-		require Slim::Utils::Scanner::Remote;
-
-		my $headerCallback = sub {
+		# FLAC: skip parseRemoteHeader as it may override the format from HTTP stream detection
+		if ($format eq 'flc') {
+			# For FLAC, we already have duration and format is set correctly
+			# Just notify and proceed to avoid format override
 			$client->currentPlaylistUpdateTime(Time::HiRes::time());
 			Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
 			$successCb->();
-		};
-
-		my $errorCallback = sub {
-			my ($error) = @_;
-			$log->warn("Could not parse $format header for track $id: $error");
-			$successCb->();
-		};
-
-		# For FLAC: use native parseFlacHeader to prevent format override from HTTP stream detection
-		if ($format eq 'flc' && CAN_FLAC_SEEK) {
-			Slim::Utils::Scanner::Remote::parseFlacHeader(
-				$song->track, $streamUrl, $headerCallback, $errorCallback
-			);
 		} else {
+			require Slim::Utils::Scanner::Remote;
 			Slim::Utils::Scanner::Remote::parseRemoteHeader(
 				$song->track, $streamUrl, $format,
-				$headerCallback, $errorCallback
+				sub {
+					# Header parsed successfully, bitrate/duration from stream now available
+					$client->currentPlaylistUpdateTime(Time::HiRes::time());
+					Slim::Control::Request::notifyFromArray($client, ['newmetadata']);
+					$successCb->();
+				},
+				sub {
+					# Header parse failed, just continue with what we have
+					my ($error) = @_;
+					$log->warn("Could not parse $format header for track $id: $error");
+					$successCb->();
+				}
 			);
 		}
 
