@@ -167,7 +167,11 @@ sub getMetadataFor {
 		}, [$id]);
 	}
 
-	return { type => 'mp3', icon => $icon };
+	# Return format type based on quality preference: 'flc' for FLAC, 'mp3' otherwise
+	my $quality = Plugins::Zvuk::API->getQuality();
+	my $type = $quality eq 'flac' ? 'flc' : 'mp3';
+
+	return { type => $type, icon => $icon };
 }
 
 sub canDirectStream { 0 }
