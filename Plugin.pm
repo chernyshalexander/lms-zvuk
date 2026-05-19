@@ -70,16 +70,15 @@ sub _init_api_client {
 	return;
 }
 
+sub _getUserIdForClient {
+	my ($client) = @_;
+	my $userId = $client ? $prefs->client($client)->get('userId') : undef;
+	return $userId || Plugins::Zvuk::API->getSomeUserId();
+}
+
 sub _get_api_client {
 	my ($client) = @_;
-	my $userId;
-
-	if ($client) {
-		$userId = $prefs->client($client)->get('userId');
-	}
-
-	$userId ||= Plugins::Zvuk::API->getSomeUserId();
-
+	my $userId = _getUserIdForClient($client);
 	return $api_clients{$userId} if $userId && $api_clients{$userId};
 	return _init_api_client($userId) if $userId;
 	return;
@@ -88,17 +87,21 @@ sub _get_api_client {
 sub handleFeed {
 	my ($client, $cb, $args) = @_;
 
-	my $api = _get_api_client($client);
-	
-	if (!$api) {
+	unless (_get_api_client($client)) {
 		$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_NOT_LOGGED_IN'), type => 'text' }]);
 		return;
 	}
 
-	$cb->({ items => [
+	_buildRootMenu($client, $cb);
+}
+
+sub _buildRootMenu {
+	my ($client, $cb) = @_;
+
+	my @items = (
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SEARCH'),
-			type => 'outline',
+			name  => cstring($client, 'PLUGIN_ZVUK_SEARCH'),
+			type  => 'outline',
 			image => 'plugins/zvuk/html/images/search.png',
 			items => [
 				{ name => cstring($client, 'PLUGIN_ZVUK_SEARCH_TRACKS'),    type => 'search', url => \&searchTracks },
@@ -108,27 +111,81 @@ sub handleFeed {
 			],
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_WAVE'),
-			type => 'link',
-			url  => \&handlePersonalWave,
+			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
+			type  => 'link',
+			url   => \&handlePersonalWave,
 			image => 'plugins/zvuk/html/images/radio.png',
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
-			type => 'outline',
+			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
+			type  => 'outline',
 			image => 'plugins/zvuk/html/images/favorites.png',
 			items => [
-				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'), type => 'link', url => \&handleCollection, image => 'plugins/zvuk/html/images/personal.png' },
-				{ name => cstring($client, 'ALBUMS'),  type => 'link', url => \&handleFavoriteAlbums, image => 'plugins/zvuk/html/images/albums.png' },
-				{ name => cstring($client, 'ARTISTS'),  type => 'link', url => \&handleFavoriteArtists, image => 'plugins/zvuk/html/images/artists.png' },
-				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),  type => 'link', url => \&handleUserPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
-				{ name => cstring($client, 'PODCASTS'),  type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
-				{ name => cstring($client, 'EPISODES'),  type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'),  type => 'link', url => \&handleCollection,      image => 'plugins/zvuk/html/images/personal.png' },
+				{ name => cstring($client, 'ALBUMS'),                  type => 'link', url => \&handleFavoriteAlbums,  image => 'plugins/zvuk/html/images/albums.png' },
+				{ name => cstring($client, 'ARTISTS'),                 type => 'link', url => \&handleFavoriteArtists, image => 'plugins/zvuk/html/images/artists.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),   type => 'link', url => \&handleUserPlaylists,   image => 'plugins/zvuk/html/images/playlists.png' },
+				{ name => cstring($client, 'PODCASTS'),                type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'EPISODES'),                type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
 				# TODO: Synthesis Playlists API endpoint not available
-				# { name => 'Synthesis Playlists',  type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
+				# { name => 'Synthesis Playlists', type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
 		},
-	]});
+	);
+
+	my $accounts = $prefs->get('accounts') || {};
+	if (scalar(keys %$accounts) > 1) {
+		my $userId  = _getUserIdForClient($client);
+		my $account = $accounts->{$userId} || {};
+		my $name    = $account->{name} || $userId;
+
+		push @items, {
+			name  => cstring($client, 'PLUGIN_ZVUK_SELECT_ACCOUNT') . ': ' . $name,
+			type  => 'link',
+			url   => \&selectAccount,
+			image => 'plugins/zvuk/html/images/accnts.png',
+		};
+	}
+
+	$cb->({ items => \@items });
+}
+
+sub selectAccount {
+	my ($client, $cb, $args) = @_;
+
+	my $accounts      = $prefs->get('accounts') || {};
+	my $currentUserId = _getUserIdForClient($client);
+
+	my @items;
+	foreach my $userId (sort keys %$accounts) {
+		my $account   = $accounts->{$userId};
+		my $name      = $account->{name} || $userId;
+		my $isCurrent = defined $currentUserId && $userId eq $currentUserId;
+
+		push @items, {
+			name        => ($isCurrent ? '> ' : '  ') . $name,
+			type        => 'link',
+			url         => \&_switchAccount,
+			passthrough => [$userId],
+		};
+	}
+
+	$cb->({ items => \@items });
+}
+
+sub _switchAccount {
+	my ($client, $cb, $args, $userId) = @_;
+
+	my $accounts = $prefs->get('accounts') || {};
+	unless (exists $accounts->{$userId}) {
+		$cb->({ items => [{ name => 'Error: account not found', type => 'text' }] });
+		return;
+	}
+
+	$prefs->client($client)->set('userId', $userId);
+	$log->info("Zvuk: " . $client->name() . " switched to userId=$userId");
+
+	handleFeed($client, $cb, $args);
 }
 
 # --- Search Handlers ---
