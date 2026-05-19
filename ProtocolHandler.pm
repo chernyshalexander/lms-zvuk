@@ -54,8 +54,21 @@ sub getNextTrack {
 	my $client = $song->master();
 	$log->info("Resolving Zvuk stream for track ID: $id");
 
+	# Dozagurka: auto-load next batch of wave tracks when approaching end of queue
+	if ($client) {
+		my $is_wave = $client->pluginData('zvuk_wave_active');
+		if ($is_wave) {
+			my $playlist_size = Slim::Player::Playlist::count($client);
+			my $current_index = Slim::Player::Source::playingSongIndex($client);
+			if (defined $playlist_size && defined $current_index
+					&& ($playlist_size - $current_index) <= 2) {
+				_loadMoreWaveTracks($client);
+			}
+		}
+	}
+
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
-	
+
 	_getAPIHandler($client)->getStream(sub {
 		my $data = shift;
 
@@ -225,8 +238,15 @@ sub scanUrl {
 sub explodePlaylist {
 	my ($class, $client, $url, $cb) = @_;
 
-	my ($type, $id) = $url =~ m{zvuk://(\w+):(\d+)};
-	return $cb->([$url]) unless $type && $id;
+	my ($type, $id) = $url =~ m{zvuk://(\w+)(?::(\d+))?};
+	return $cb->([$url]) unless $type;
+
+	# Handle Personal Wave radio
+	if ($type eq 'wave') {
+		return _explodeWave($client, $cb);
+	}
+
+	return $cb->([$url]) unless $id;
 
 	my %dispatch = (
 		album    => 'Plugins::Zvuk::Plugin::handleAlbum',
@@ -247,11 +267,45 @@ sub explodePlaylist {
 	use strict 'refs';
 }
 
+sub _explodeWave {
+	my ($client, $cb) = @_;
+
+	_getAPIHandler($client)->getPersonalWave(sub {
+		my $items = shift || [];
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
+
+		# Set flag to enable dozagurka (auto-loading) during playback
+		$client->pluginData(zvuk_wave_active => 1) if $client;
+
+		my @urls = map { 'zvuk://' . $_->{id} } @$items;
+		$cb->(\@urls);
+	});
+}
+
 sub isRemote { 1 }
 
 sub getIcon {
 	my ( $class, $url ) = @_;
 	return Plugins::Zvuk::Plugin->_pluginDataFor('icon');
+}
+
+sub _loadMoreWaveTracks {
+	my ($client) = @_;
+	return unless $client;
+
+	_getAPIHandler($client)->getPersonalWave(sub {
+		my $items = shift || [];
+		return unless $items && @$items;
+
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
+
+		for my $track (@$items) {
+			my $url = 'zvuk://' . $track->{id};
+			Slim::Control::Request::executeRequest($client, ['playlist', 'add', $url]);
+		}
+
+		$log->info("Loaded " . scalar(@$items) . " more wave tracks to queue");
+	});
 }
 
 sub _getAPIHandler {

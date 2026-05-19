@@ -49,12 +49,27 @@ sub initPlugin {
 		weight => 10,
 	);
 
+	# Subscribe to events to clear wave_active flag when playback stops
+	Slim::Control::Request::subscribe(\&_onStop, [['stop', 'playlist']]);
+
 	# Initialize API clients for all accounts at startup
 	my $accounts = $prefs->get('accounts') || {};
 	foreach my $userId (keys %$accounts) {
 		_init_api_client($userId);
 	}
 
+}
+
+sub _onStop {
+	my ($request) = @_;
+	my $client = $request->client();
+	return unless $client;
+
+	my $action = $request->getRequest(0);
+	if ($action eq 'stop' || ($action eq 'playlist' && $request->getRequest(1) eq 'clear')) {
+		$client->pluginData(zvuk_wave_active => 0);
+		$log->debug("Cleared zvuk_wave_active flag");
+	}
 }
 
 sub _init_api_client {
@@ -112,8 +127,8 @@ sub _buildRootMenu {
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
-			type  => 'link',
-			url   => \&handlePersonalWave,
+			type  => 'audio',
+			url   => 'zvuk://wave',
 			image => 'plugins/zvuk/html/images/radio.png',
 		},
 		{
