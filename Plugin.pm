@@ -160,45 +160,13 @@ sub _buildRootMenu {
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
-							type => 'outline',
-							items => [
-								{
-									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
-									type => 'link',
-									url => \&handleLanguageSelect,
-										passthrough => [{ language => 'all' }],
-								},
-								{
-									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
-									type => 'link',
-									url => \&handleLanguageSelect,
-										passthrough => [{ language => 'foreign' }],
-								},
-								{
-									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
-									type => 'link',
-									url => \&handleLanguageSelect,
-										passthrough => [{ language => 'russian' }],
-								},
-							],
+							type => 'link',
+							url => \&handleLanguageMenu,
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
-							type => 'outline',
-							items => [
-								{
-									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
-									type => 'link',
-									url => \&handleVocalSelect,
-										passthrough => [{ vocal => 1 }],
-								},
-								{
-									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
-									type => 'link',
-									url => \&handleVocalSelect,
-										passthrough => [{ vocal => 0 }],
-								},
-							],
+							type => 'link',
+							url => \&handleVocalMenu,
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
@@ -780,6 +748,88 @@ sub handleVocalSelect {
 	my $vocal = $params->{vocal};
 	_updateSetting($client, 'vocal', $vocal);
 	$callback->();
+}
+
+# Generate language selection menu
+sub handleLanguageMenu {
+	my ($client, $callback) = @_;
+	my $account_id = 'default';
+	if ($client) {
+		my $api = _getAPIHandler($client);
+		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	}
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	my $current_lang = $settings->{language} || 'all';
+
+	my @lang_items = (
+		{
+			name => ($current_lang eq 'all' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
+			type => 'link',
+			url => \&handleLanguageSelect,
+			passthrough => [{ language => 'all' }],
+		},
+		{
+			name => ($current_lang eq 'foreign' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
+			type => 'link',
+			url => \&handleLanguageSelect,
+			passthrough => [{ language => 'foreign' }],
+		},
+		{
+			name => ($current_lang eq 'russian' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
+			type => 'link',
+			url => \&handleLanguageSelect,
+			passthrough => [{ language => 'russian' }],
+		},
+		{
+			name => '← Назад',
+			type => 'link',
+			url => sub {
+				my ($client, $cb) = @_;
+				$cb->();
+			},
+		},
+	);
+
+	$callback->(\@lang_items);
+}
+
+# Generate vocal selection menu
+sub handleVocalMenu {
+	my ($client, $callback) = @_;
+	my $account_id = 'default';
+	if ($client) {
+		my $api = _getAPIHandler($client);
+		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	}
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	my $current_vocal = $settings->{vocal} // 1;
+
+	my @vocal_items = (
+		{
+			name => ($current_vocal == 1 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
+			type => 'link',
+			url => \&handleVocalSelect,
+			passthrough => [{ vocal => 1 }],
+		},
+		{
+			name => ($current_vocal == 0 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
+			type => 'link',
+			url => \&handleVocalSelect,
+			passthrough => [{ vocal => 0 }],
+		},
+		{
+			name => '← Назад',
+			type => 'link',
+			url => sub {
+				my ($client, $cb) = @_;
+				$cb->();
+			},
+		},
+	);
+
+	$callback->(\@vocal_items);
 }
 
 1;
