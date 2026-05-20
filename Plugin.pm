@@ -142,30 +142,21 @@ sub _buildRootMenu {
 					items => [
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
-							type => 'input',
-							inputType => 'real',
-							rangeStart => '0',
-							rangeEnd => '1',
-							initialValue => sub { _getSettingValue('popular', 0.5) },
-							onchange => sub { _updateSetting('popular', $_[1]) },
+							type => 'link',
+							url => \&handleSlider,
+							passthrough => [{ key => 'popular' }],
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY'),
-							type => 'input',
-							inputType => 'real',
-							rangeStart => '0',
-							rangeEnd => '1',
-							initialValue => sub { _getSettingValue('energy', 0.5) },
-							onchange => sub { _updateSetting('energy', $_[1]) },
+							type => 'link',
+							url => \&handleSlider,
+							passthrough => [{ key => 'energy' }],
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN'),
-							type => 'input',
-							inputType => 'real',
-							rangeStart => '0',
-							rangeEnd => '1',
-							initialValue => sub { _getSettingValue('fun', 0.5) },
-							onchange => sub { _updateSetting('fun', $_[1]) },
+							type => 'link',
+							url => \&handleSlider,
+							passthrough => [{ key => 'fun' }],
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
@@ -173,18 +164,21 @@ sub _buildRootMenu {
 							items => [
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
-									type => 'input',
-									onchange => sub { _updateSetting('language', 'all') },
+									type => 'link',
+									url => &handleLanguageSelect,
+						passthrough => [{ language => 'all' }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
-									type => 'input',
-									onchange => sub { _updateSetting('language', 'foreign') },
+									type => 'link',
+									url => &handleLanguageSelect,
+						passthrough => [{ language => 'foreign' }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
-									type => 'input',
-									onchange => sub { _updateSetting('language', 'russian') },
+									type => 'link',
+									url => &handleLanguageSelect,
+						passthrough => [{ language => 'russian' }],
 								},
 							],
 						},
@@ -194,13 +188,15 @@ sub _buildRootMenu {
 							items => [
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
-									type => 'input',
-									onchange => sub { _updateSetting('vocal', 1) },
+									type => 'link',
+									url => &handleVocalSelect,
+						passthrough => [{ vocal => 1 }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
-									type => 'input',
-									onchange => sub { _updateSetting('vocal', 0) },
+									type => 'link',
+									url => &handleVocalSelect,
+						passthrough => [{ vocal => 0 }],
 								},
 							],
 						},
@@ -654,40 +650,42 @@ sub _getGenresMenu {
 	my @genre_items;
 	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
 		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
+		my $checkbox_char = $is_selected ? '[✓]' : '[  ]';
 		push @genre_items, {
-			name => $genre->{label},
-			type => 'input',
-			checkbox => 1,
-			checked => $is_selected,
-			onchange => sub { _toggleGenre($genre->{name}, $_[1]) },
+			name => "$checkbox_char " . string($genre->{label}),
+			type => 'link',
+			url => \&handleGenreToggle,
+			passthrough => [{ genre => $genre->{name}, account_id => $account_id }],
 		};
 	}
 
 	return \@genre_items;
 }
 
-sub _toggleGenre {
-	my ($genre_name, $is_checked) = @_;
-	my $client = Slim::Player::Playlist::shuffle_list()->[0];
-	return unless $client;
+sub handleGenreToggle {
+	my ($client, $callback, $args) = @_;
 
-	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	my $genre_name = $args->{genre};
+	my $account_id = $args->{account_id};
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = $settings->{genres} || [];
 	my %genre_hash = map { $_ => 1 } @$genres;
 
-	if ($is_checked) {
-		$genre_hash{$genre_name} = 1;
-	} else {
+	# Toggle
+	if ($genre_hash{$genre_name}) {
 		delete $genre_hash{$genre_name};
+	} else {
+		$genre_hash{$genre_name} = 1;
 	}
 
 	$settings->{genres} = [sort keys %genre_hash];
 	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
 
-	$log->info("Genre toggled: $genre_name = $is_checked");
+	$log->info("Genre toggled: $genre_name, new genres: " . join(',', @{$settings->{genres}}));
+
+	# Вернуть в меню жанров
+	$callback->(_getGenresMenu());
 }
 
 sub _getAPIHandler {
@@ -702,6 +700,54 @@ sub _initAPIHandler {
 	my $api = Plugins::Zvuk::API::Async->new();
 	$client->pluginData(zvuk_api => $api);
 	return $api;
+}
+
+# Handle slider changes (Popular, Energy, Fun)
+sub handleSlider {
+	my ($client, $callback, $args) = @_;
+	my $key = $args->{key};
+	my $current_value = _getSettingValue($key, 0.5);
+
+	# Generate menu items for slider values (0, 0.1, 0.2, ... 1.0)
+	my @slider_items;
+	for (my $i = 0; $i <= 10; $i++) {
+		my $val = $i / 10;
+		my $marker = abs($val - $current_value) < 0.01 ? '●' : '○';
+		push @slider_items, {
+			name => sprintf("$marker  %.1f", $val),
+			type => 'link',
+			url => \&handleSliderValue,
+			passthrough => [{ key => $key, value => $val }],
+		};
+	}
+
+	$callback->(\@slider_items);
+}
+
+# Handle actual slider value selection
+sub handleSliderValue {
+	my ($client, $callback, $args) = @_;
+	my $key = $args->{key};
+	my $value = $args->{value};
+
+	_updateSetting($key, $value);
+	$callback->();  # Return empty, goes back to previous menu
+}
+
+# Handle language selection
+sub handleLanguageSelect {
+	my ($client, $callback, $args) = @_;
+	my $language = $args->{language};
+	_updateSetting('language', $language);
+	$callback->();  # Return empty, goes back to previous menu
+}
+
+# Handle vocal selection
+sub handleVocalSelect {
+	my ($client, $callback, $args) = @_;
+	my $vocal = $args->{vocal};
+	_updateSetting('vocal', $vocal);
+	$callback->();  # Return empty, goes back to previous menu
 }
 
 1;
