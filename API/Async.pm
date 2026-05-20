@@ -11,6 +11,7 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::API;
+use Plugins::Zvuk::WaveSettings;
 
 # CRITICAL: We use a centralized cache from Plugins::Zvuk::API.
 # This avoids data isolation and ensures metadata is consistent across the plugin.
@@ -423,7 +424,7 @@ sub getPlaylistTracks {
 
 # Get personalized wave
 sub getPersonalWave {
-	my ($self, $cb) = @_;
+	my ($self, $cb, $wave_settings) = @_;
 
 	my $gql = q{
 		query getPersonalWave($contentInput: PersonalWaveContentInput, $first: PositiveInt! = 2, $options: PersonalWaveOptions, $waveInput: WaveInput, $waveSrc: MagicSource) {
@@ -471,20 +472,33 @@ sub getPersonalWave {
 		}
 	};
 
+	# Use provided settings or defaults
+	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings('default');
+
+	my $mood_str = sprintf("energy:%g,fun:%g",
+		$wave_settings->{energy} // 0.5,
+		$wave_settings->{fun} // 0.5
+	);
+
 	my $vars = {
 		waveSrc => "AMAZME",
 		first   => 3,
 		options => {
-			popular => 0.5,
-			mood    => "energy:0.5,fun:0.5",
-			language => "foreign",
-			vocal => 1,
-			genre => [
-				{ name => "easy_listening_ambient", type => "LVL1" },
-				{ name => "electronic", type => "LVL1" },
-			],
+			popular  => $wave_settings->{popular} // 0.5,
+			mood     => $mood_str,
 		},
 	};
+
+	# Add optional settings if provided
+	$vars->{options}->{language} = $wave_settings->{language}
+		if defined $wave_settings->{language};
+	$vars->{options}->{vocal} = $wave_settings->{vocal}
+		if defined $wave_settings->{vocal};
+
+	# Add genres if provided
+	if ($wave_settings->{genres} && @{$wave_settings->{genres}}) {
+		$vars->{options}->{genre} = Plugins::Zvuk::WaveSettings::getGenreNames($wave_settings->{genres});
+	}
 
 	$self->_graphql(sub {
 		my $data = shift;
