@@ -138,7 +138,7 @@ sub _buildRootMenu {
 				},
 				{
 					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-					type => 'link',
+					type => 'outline',
 					items => [
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
@@ -160,7 +160,7 @@ sub _buildRootMenu {
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
-							type => 'link',
+							type => 'outline',
 							items => [
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
@@ -184,7 +184,7 @@ sub _buildRootMenu {
 						},
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
-							type => 'link',
+							type => 'outline',
 							items => [
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
