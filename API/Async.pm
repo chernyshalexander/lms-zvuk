@@ -473,9 +473,9 @@ sub getPersonalWave {
 
 	my $vars = {
 		waveSrc => "AMAZME",
-		first   => 20,
+		first   => 3,
 		options => {
-			popular => undef,
+			popular => 1,
 			mood    => "energy:0.5,fun:0.5",
 		},
 	};
