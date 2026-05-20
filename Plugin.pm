@@ -662,6 +662,16 @@ sub _getGenresMenu {
 		};
 	}
 
+	# Добавить кнопку "Назад"
+	push @genre_items, {
+		name => '← Назад',
+		type => 'link',
+		url => sub {
+			my ($client, $cb) = @_;
+			$cb->();
+		},
+	};
+
 	return \@genre_items;
 }
 
