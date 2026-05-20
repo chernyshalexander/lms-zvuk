@@ -203,7 +203,7 @@ sub _buildRootMenu {
 						{
 							name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 							type => 'link',
-							items => sub { _getGenresMenu() },
+							url => \&handleGenresMenu,
 						},
 					],
 				},
@@ -609,8 +609,7 @@ sub _renderEpisode {
 # --- Wave Settings Helper Functions ---
 
 sub _getSettingValue {
-	my ($key, $default) = @_;
-	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	my ($client, $key, $default) = @_;
 	return $default unless $client;
 
 	my $api = _getAPIHandler($client);
@@ -621,8 +620,7 @@ sub _getSettingValue {
 }
 
 sub _updateSetting {
-	my ($key, $value) = @_;
-	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	my ($client, $key, $value) = @_;
 	return unless $client;
 
 	my $api = _getAPIHandler($client);
@@ -635,8 +633,13 @@ sub _updateSetting {
 	$log->info("Wave setting updated: $key = $value");
 }
 
+sub handleGenresMenu {
+	my ($client, $callback) = @_;
+	$callback->(_getGenresMenu($client));
+}
+
 sub _getGenresMenu {
-	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	my ($client) = @_;
 	my $account_id = 'default';
 	if ($client) {
 		my $api = _getAPIHandler($client);
@@ -685,7 +688,7 @@ sub handleGenreToggle {
 	$log->info("Genre toggled: $genre_name, new genres: " . join(',', @{$settings->{genres}}));
 
 	# Вернуть в меню жанров
-	$callback->(_getGenresMenu());
+	$callback->(_getGenresMenu($client));
 }
 
 sub _getAPIHandler {
@@ -706,7 +709,7 @@ sub _initAPIHandler {
 sub handleSlider {
 	my ($client, $callback, $args) = @_;
 	my $key = $args->{key};
-	my $current_value = _getSettingValue($key, 0.5);
+	my $current_value = _getSettingValue($client, $key, 0.5);
 
 	# Generate menu items for slider values (0, 0.1, 0.2, ... 1.0)
 	my @slider_items;
@@ -730,7 +733,7 @@ sub handleSliderValue {
 	my $key = $args->{key};
 	my $value = $args->{value};
 
-	_updateSetting($key, $value);
+	_updateSetting($client, $key, $value);
 	$callback->();  # Return empty, goes back to previous menu
 }
 
@@ -738,7 +741,7 @@ sub handleSliderValue {
 sub handleLanguageSelect {
 	my ($client, $callback, $args) = @_;
 	my $language = $args->{language};
-	_updateSetting('language', $language);
+	_updateSetting($client, 'language', $language);
 	$callback->();  # Return empty, goes back to previous menu
 }
 
@@ -746,7 +749,7 @@ sub handleLanguageSelect {
 sub handleVocalSelect {
 	my ($client, $callback, $args) = @_;
 	my $vocal = $args->{vocal};
-	_updateSetting('vocal', $vocal);
+	_updateSetting($client, 'vocal', $vocal);
 	$callback->();  # Return empty, goes back to previous menu
 }
 
