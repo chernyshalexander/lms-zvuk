@@ -14,6 +14,7 @@ use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
 use Plugins::Zvuk::ProtocolHandler;
 use Plugins::Zvuk::Settings;
+use Plugins::Zvuk::WaveSettings;
 
 my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
@@ -127,9 +128,90 @@ sub _buildRootMenu {
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
-			type  => 'audio',
-			url   => 'zvuk://wave',
+			type  => 'link',
 			image => 'plugins/zvuk/html/images/radio.png',
+			items => [
+				{
+					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
+					type => 'audio',
+					url  => 'zvuk://wave',
+				},
+				{
+					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+					type => 'link',
+					items => [
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
+							type => 'input',
+							inputType => 'real',
+							rangeStart => '0',
+							rangeEnd => '1',
+							initialValue => sub { _getSettingValue('popular', 0.5) },
+							onchange => sub { _updateSetting('popular', $_[1]) },
+						},
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY'),
+							type => 'input',
+							inputType => 'real',
+							rangeStart => '0',
+							rangeEnd => '1',
+							initialValue => sub { _getSettingValue('energy', 0.5) },
+							onchange => sub { _updateSetting('energy', $_[1]) },
+						},
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN'),
+							type => 'input',
+							inputType => 'real',
+							rangeStart => '0',
+							rangeEnd => '1',
+							initialValue => sub { _getSettingValue('fun', 0.5) },
+							onchange => sub { _updateSetting('fun', $_[1]) },
+						},
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
+							type => 'link',
+							items => [
+								{
+									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
+									type => 'input',
+									onchange => sub { _updateSetting('language', 'all') },
+								},
+								{
+									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
+									type => 'input',
+									onchange => sub { _updateSetting('language', 'foreign') },
+								},
+								{
+									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
+									type => 'input',
+									onchange => sub { _updateSetting('language', 'russian') },
+								},
+							],
+						},
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
+							type => 'link',
+							items => [
+								{
+									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
+									type => 'input',
+									onchange => sub { _updateSetting('vocal', 1) },
+								},
+								{
+									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
+									type => 'input',
+									onchange => sub { _updateSetting('vocal', 0) },
+								},
+							],
+						},
+						{
+							name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+							type => 'link',
+							items => sub { _getGenresMenu() },
+						},
+					],
+				},
+			],
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
@@ -526,6 +608,100 @@ sub _renderEpisode {
 		type      => 'text',
 		image     => $episode->{podcast} ? Plugins::Zvuk::API->getImageUrl($episode->{podcast}) : "",
 	};
+}
+
+# --- Wave Settings Helper Functions ---
+
+sub _getSettingValue {
+	my ($key, $default) = @_;
+	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	return $default unless $client;
+
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	return $settings->{$key} // $default;
+}
+
+sub _updateSetting {
+	my ($key, $value) = @_;
+	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	return unless $client;
+
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	$settings->{$key} = $value;
+	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
+
+	$log->info("Wave setting updated: $key = $value");
+}
+
+sub _getGenresMenu {
+	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	my $account_id = 'default';
+	if ($client) {
+		my $api = _getAPIHandler($client);
+		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	}
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	my $selected_genres = $settings->{genres} || [];
+	my %selected = map { $_ => 1 } @$selected_genres;
+
+	my @genre_items;
+	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
+		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
+		push @genre_items, {
+			name => $genre->{label},
+			type => 'input',
+			checkbox => 1,
+			checked => $is_selected,
+			onchange => sub { _toggleGenre($genre->{name}, $_[1]) },
+		};
+	}
+
+	return \@genre_items;
+}
+
+sub _toggleGenre {
+	my ($genre_name, $is_checked) = @_;
+	my $client = Slim::Player::Playlist::shuffle_list()->[0];
+	return unless $client;
+
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+	my $genres = $settings->{genres} || [];
+	my %genre_hash = map { $_ => 1 } @$genres;
+
+	if ($is_checked) {
+		$genre_hash{$genre_name} = 1;
+	} else {
+		delete $genre_hash{$genre_name};
+	}
+
+	$settings->{genres} = [sort keys %genre_hash];
+	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
+
+	$log->info("Genre toggled: $genre_name = $is_checked");
+}
+
+sub _getAPIHandler {
+	my ($client) = @_;
+	return unless $client;
+	return $client->pluginData('zvuk_api') || _initAPIHandler($client);
+}
+
+sub _initAPIHandler {
+	my ($client) = @_;
+	require Plugins::Zvuk::API::Async;
+	my $api = Plugins::Zvuk::API::Async->new();
+	$client->pluginData(zvuk_api => $api);
+	return $api;
 }
 
 1;
