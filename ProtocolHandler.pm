@@ -14,6 +14,7 @@ use Time::HiRes qw(time);
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
+use Plugins::Zvuk::WaveSettings;
 
 use constant CAN_FLAC_SEEK => UNIVERSAL::can('Slim::Utils::Scanner::Remote', 'parseFlacHeader');
 
@@ -269,17 +270,32 @@ sub explodePlaylist {
 
 sub _explodeWave {
 	my ($client, $cb) = @_;
+	return unless $client;
+
+	$log->info("Loading Personal Wave");
+
+	# Get current account ID
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+
+	# Load wave settings for this account
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+
+	# Store in pluginData for later use
+	$client->pluginData(zvuk_wave_settings => $wave_settings) if $client;
+
+	$client->pluginData(zvuk_wave_active => 1) if $client;
 
 	_getAPIHandler($client)->getPersonalWave(sub {
 		my $items = shift || [];
-		Plugins::Zvuk::API->cacheTrackMetadata($items);
+		return unless $items && @$items;
 
-		# Set flag to enable dozagurka (auto-loading) during playback
-		$client->pluginData(zvuk_wave_active => 1) if $client;
+		$log->info("Got " . scalar(@$items) . " wave tracks");
+		Plugins::Zvuk::API->cacheTrackMetadata($items);
 
 		my @urls = map { 'zvuk://' . $_->{id} } @$items;
 		$cb->(\@urls);
-	});
+	}, $wave_settings);
 }
 
 sub isRemote { 1 }
@@ -293,19 +309,40 @@ sub _loadMoreWaveTracks {
 	my ($client) = @_;
 	return unless $client;
 
+	my $content_input;
+	my $last = $client->pluginData('zvuk_wave_last_track');
+	if ($last && $last->{id}) {
+		my $elapsed       = time() - ($last->{started} || time());
+		my $play_duration = $elapsed > $last->{duration} ? $last->{duration} : $elapsed;
+		my $is_skipped    = $play_duration < ($last->{duration} * 0.5) ? \1 : \0;
+
+		$content_input = {
+			trackId       => $last->{id},
+			trackDuration => $last->{duration},
+			playDuration  => int($play_duration),
+			isSkipped     => $is_skipped,
+		};
+	}
+
+	# Load stored wave settings (or use defaults)
+	my $wave_settings = $client->pluginData('zvuk_wave_settings');
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+
 	_getAPIHandler($client)->getPersonalWave(sub {
 		my $items = shift || [];
 		return unless $items && @$items;
 
+		$log->info("Dozagurka loaded " . scalar(@$items) . " more tracks");
 		Plugins::Zvuk::API->cacheTrackMetadata($items);
 
 		for my $track (@$items) {
-			my $url = 'zvuk://' . $track->{id};
-			Slim::Control::Request::executeRequest($client, ['playlist', 'add', $url]);
+			Slim::Control::Request::executeRequest(
+				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
+			);
 		}
-
-		$log->info("Loaded " . scalar(@$items) . " more wave tracks to queue");
-	});
+	}, $wave_settings);
 }
 
 sub _getAPIHandler {
