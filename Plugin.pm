@@ -737,7 +737,7 @@ sub handleLanguageSelect {
 
 	my $language = $params->{language};
 	_updateSetting($client, 'language', $language);
-	$callback->();
+	$callback->(_getLanguageMenu($client));
 }
 
 # Handle vocal selection
@@ -747,12 +747,18 @@ sub handleVocalSelect {
 
 	my $vocal = $params->{vocal};
 	_updateSetting($client, 'vocal', $vocal);
-	$callback->();
+	$callback->(_getVocalMenu($client));
 }
 
-# Generate language selection menu
+# Generate language selection menu handler
 sub handleLanguageMenu {
 	my ($client, $callback) = @_;
+	$callback->(_getLanguageMenu($client));
+}
+
+# Return language menu items
+sub _getLanguageMenu {
+	my ($client) = @_;
 	my $account_id = 'default';
 	if ($client) {
 		my $api = _getAPIHandler($client);
@@ -791,12 +797,18 @@ sub handleLanguageMenu {
 		},
 	);
 
-	$callback->(\@lang_items);
+	return \@lang_items;
 }
 
-# Generate vocal selection menu
+# Generate vocal selection menu handler
 sub handleVocalMenu {
 	my ($client, $callback) = @_;
+	$callback->(_getVocalMenu($client));
+}
+
+# Return vocal menu items
+sub _getVocalMenu {
+	my ($client) = @_;
 	my $account_id = 'default';
 	if ($client) {
 		my $api = _getAPIHandler($client);
@@ -829,7 +841,7 @@ sub handleVocalMenu {
 		},
 	);
 
-	$callback->(\@vocal_items);
+	return \@vocal_items;
 }
 
 1;
