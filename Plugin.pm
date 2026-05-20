@@ -718,7 +718,7 @@ sub handleSlider {
 	my @slider_items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
-		my $marker = abs($val - $current_value) < 0.01 ? '*' : '-';
+		my $marker = abs($val - $current_value) < 0.01 ? '[x]' : '[ ]';
 		push @slider_items, {
 			name => sprintf("$marker %.1f", $val),
 			type => 'link',
