@@ -475,8 +475,14 @@ sub getPersonalWave {
 		waveSrc => "AMAZME",
 		first   => 3,
 		options => {
-			popular => 1,
+			popular => 0.5,
 			mood    => "energy:0.5,fun:0.5",
+			language => "foreign",
+			vocal => 1,
+			genre => [
+				{ name => "easy_listening_ambient", type => "LVL1" },
+				{ name => "electronic", type => "LVL1" },
+			],
 		},
 	};
 
