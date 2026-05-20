@@ -653,7 +653,7 @@ sub _getGenresMenu {
 	my @genre_items;
 	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
 		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
-		my $checkbox_char = $is_selected ? '[✓]' : '[  ]';
+		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
 		push @genre_items, {
 			name => "$checkbox_char " . string($genre->{label}),
 			type => 'link',
@@ -718,9 +718,9 @@ sub handleSlider {
 	my @slider_items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
-		my $marker = abs($val - $current_value) < 0.01 ? '●' : '○';
+		my $marker = abs($val - $current_value) < 0.01 ? '*' : '-';
 		push @slider_items, {
-			name => sprintf("$marker  %.1f", $val),
+			name => sprintf("$marker %.1f", $val),
 			type => 'link',
 			url => \&handleSliderValue,
 			passthrough => [{ key => $key, value => $val }],
