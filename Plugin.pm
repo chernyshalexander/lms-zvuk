@@ -165,20 +165,20 @@ sub _buildRootMenu {
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
 									type => 'link',
-									url => &handleLanguageSelect,
-						passthrough => [{ language => 'all' }],
+									url => \&handleLanguageSelect,
+										passthrough => [{ language => 'all' }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
 									type => 'link',
-									url => &handleLanguageSelect,
-						passthrough => [{ language => 'foreign' }],
+									url => \&handleLanguageSelect,
+										passthrough => [{ language => 'foreign' }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
 									type => 'link',
-									url => &handleLanguageSelect,
-						passthrough => [{ language => 'russian' }],
+									url => \&handleLanguageSelect,
+										passthrough => [{ language => 'russian' }],
 								},
 							],
 						},
@@ -189,14 +189,14 @@ sub _buildRootMenu {
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
 									type => 'link',
-									url => &handleVocalSelect,
-						passthrough => [{ vocal => 1 }],
+									url => \&handleVocalSelect,
+										passthrough => [{ vocal => 1 }],
 								},
 								{
 									name => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
 									type => 'link',
-									url => &handleVocalSelect,
-						passthrough => [{ vocal => 0 }],
+									url => \&handleVocalSelect,
+										passthrough => [{ vocal => 0 }],
 								},
 							],
 						},
@@ -666,10 +666,11 @@ sub _getGenresMenu {
 }
 
 sub handleGenreToggle {
-	my ($client, $callback, $args) = @_;
+	my ($client, $callback, $args, $params) = @_;
+	return unless $params;
 
-	my $genre_name = $args->{genre};
-	my $account_id = $args->{account_id};
+	my $genre_name = $params->{genre};
+	my $account_id = $params->{account_id};
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = $settings->{genres} || [];
@@ -707,8 +708,10 @@ sub _initAPIHandler {
 
 # Handle slider changes (Popular, Energy, Fun)
 sub handleSlider {
-	my ($client, $callback, $args) = @_;
-	my $key = $args->{key};
+	my ($client, $callback, $args, $params) = @_;
+	return unless $params;
+
+	my $key = $params->{key};
 	my $current_value = _getSettingValue($client, $key, 0.5);
 
 	# Generate menu items for slider values (0, 0.1, 0.2, ... 1.0)
@@ -729,28 +732,34 @@ sub handleSlider {
 
 # Handle actual slider value selection
 sub handleSliderValue {
-	my ($client, $callback, $args) = @_;
-	my $key = $args->{key};
-	my $value = $args->{value};
+	my ($client, $callback, $args, $params) = @_;
+	return unless $params;
+
+	my $key = $params->{key};
+	my $value = $params->{value};
 
 	_updateSetting($client, $key, $value);
-	$callback->();  # Return empty, goes back to previous menu
+	$callback->();
 }
 
 # Handle language selection
 sub handleLanguageSelect {
-	my ($client, $callback, $args) = @_;
-	my $language = $args->{language};
+	my ($client, $callback, $args, $params) = @_;
+	return unless $params;
+
+	my $language = $params->{language};
 	_updateSetting($client, 'language', $language);
-	$callback->();  # Return empty, goes back to previous menu
+	$callback->();
 }
 
 # Handle vocal selection
 sub handleVocalSelect {
-	my ($client, $callback, $args) = @_;
-	my $vocal = $args->{vocal};
+	my ($client, $callback, $args, $params) = @_;
+	return unless $params;
+
+	my $vocal = $params->{vocal};
 	_updateSetting($client, 'vocal', $vocal);
-	$callback->();  # Return empty, goes back to previous menu
+	$callback->();
 }
 
 1;
