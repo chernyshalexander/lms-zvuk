@@ -737,6 +737,16 @@ sub handleSlider {
 		};
 	}
 
+	# Добавить кнопку "Назад"
+	push @slider_items, {
+		name => '← Назад',
+		type => 'link',
+		url => sub {
+			my ($client, $cb) = @_;
+			$cb->();
+		},
+	};
+
 	$callback->(\@slider_items);
 }
 
