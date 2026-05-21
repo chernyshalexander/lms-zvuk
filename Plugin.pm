@@ -752,12 +752,22 @@ sub handleWaveSettings {
 	}
 	$log->info("=== END DEBUG ===");
 
-	# Web/Material UI: isWeb=1 OR isControl not set
-	# Jive/Classic: isControl=1
-	my $isWebUI = ($args && ($args->{isWeb} || !$args->{isControl}));
+	# Web/Material UI detection:
+	# - Web: isWeb=1
+	# - Material: isControl=1 AND quantity > 1000 (Material requests large quantities)
+	# Jive/Classic: isControl=1 AND quantity < 1000
+	my $isWebUI = 0;
+	if ($args) {
+		if ($args->{isWeb}) {
+			$isWebUI = 1;  # Web UI
+		} elsif ($args->{isControl} && $args->{quantity} && $args->{quantity} > 1000) {
+			$isWebUI = 1;  # Material UI (high quantity = web-like)
+		}
+	}
 
 	$log->info("DECISION: isWebUI=$isWebUI (isWeb=" . ($args->{isWeb} // 'undef') .
-	           ", isControl=" . ($args->{isControl} // 'undef') . ")");
+	           ", isControl=" . ($args->{isControl} // 'undef') .
+	           ", quantity=" . ($args->{quantity} // 'undef') . ")");
 
 	if ($isWebUI) {
 		$log->info("-> Routing to WIZARD");
