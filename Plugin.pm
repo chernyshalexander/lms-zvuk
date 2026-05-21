@@ -736,15 +736,34 @@ sub _getWaveMenuItems {
 sub handleWaveSettings {
 	my ($client, $callback, $args) = @_;
 
+	# Full debug logging
+	$log->info("=== handleWaveSettings DEBUG ===");
+	if ($args) {
+		foreach my $key (sort keys %$args) {
+			my $val = $args->{$key};
+			if (ref $val) {
+				$log->info("  $key => REF " . ref($val));
+			} else {
+				$log->info("  $key => " . ($val // 'undef'));
+			}
+		}
+	} else {
+		$log->info("  \$args is undef");
+	}
+	$log->info("=== END DEBUG ===");
+
 	# Web/Material UI: isWeb=1 OR isControl not set
 	# Jive/Classic: isControl=1
 	my $isWebUI = ($args && ($args->{isWeb} || !$args->{isControl}));
 
+	$log->info("DECISION: isWebUI=$isWebUI (isWeb=" . ($args->{isWeb} // 'undef') .
+	           ", isControl=" . ($args->{isControl} // 'undef') . ")");
+
 	if ($isWebUI) {
-		# Web/Material UI: use wizard
+		$log->info("-> Routing to WIZARD");
 		handleWaveWizardStart($client, $callback, $args);
 	} else {
-		# Jive/Classic: traditional settings menu
+		$log->info("-> Routing to SETTINGS");
 		$callback->({ items => _getWaveSettingsItems($client) });
 	}
 }
