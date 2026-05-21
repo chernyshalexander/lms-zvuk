@@ -736,11 +736,20 @@ sub _getWaveMenuItems {
 sub handleWaveSettings {
 	my ($client, $callback, $args) = @_;
 
+	# Debug: log args to see what we get
+	if ($args) {
+		$log->info("DEBUG handleWaveSettings - args keys: " . join(", ", keys %$args));
+		$log->info("DEBUG   isWeb => " . ($args->{isWeb} // 'undef'));
+		$log->info("DEBUG   isControl => " . ($args->{isControl} // 'undef'));
+	}
+
 	if ($args && $args->{isWeb}) {
 		# Web/Material UI: use wizard
+		$log->info("DEBUG: Routing to wizard (isWeb=1)");
 		handleWaveWizardStart($client, $callback, $args);
 	} else {
 		# Jive/Classic: traditional settings menu
+		$log->info("DEBUG: Routing to settings menu (isWeb not set)");
 		$callback->({ items => _getWaveSettingsItems($client) });
 	}
 }
@@ -754,6 +763,7 @@ sub handleWaveWizardStart {
 		language => undef,
 		vocal    => undef,
 		genres   => [],
+		isWeb    => ($args && $args->{isWeb}) ? 1 : 0,
 	};
 	$callback->(_getWizardStep($client, 1, $state));
 }
