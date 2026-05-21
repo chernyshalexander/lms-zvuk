@@ -650,10 +650,11 @@ sub _getGenresMenu {
 		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
 		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
 		push @genre_items, {
-			name => "$checkbox_char " . string($genre->{label}),
-			type => 'link',
-			url => \&handleGenreToggle,
-			passthrough => [{ genre => $genre->{name}, account_id => $account_id }],
+			name       => "$checkbox_char " . cstring($client, $genre->{label}),
+			type       => 'link',
+			url        => \&handleGenreToggle,
+			passthrough => [{ genre => $genre->{name} }],
+			nextWindow => 'refresh',
 		};
 	}
 
@@ -674,7 +675,9 @@ sub handleGenreToggle {
 	return unless $params;
 
 	my $genre_name = $params->{genre};
-	my $account_id = $params->{account_id};
+
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = $settings->{genres} || [];
