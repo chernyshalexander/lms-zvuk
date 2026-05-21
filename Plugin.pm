@@ -732,7 +732,16 @@ sub _getWaveMenuItems {
 }
 
 sub handleWaveWizardStart {
-	my ($client, $callback) = @_;
+	my ($client, $callback, $args) = @_;
+
+	# Debug: log what we receive in $args
+	if ($args) {
+		$log->info("DEBUG handleWaveWizardStart - args keys: " . join(", ", keys %$args));
+		foreach my $key (keys %$args) {
+			$log->info("DEBUG   $key => " . (ref $args->{$key} ? ref($args->{$key}) : $args->{$key}));
+		}
+	}
+
 	my $state = {
 		popular  => undef,
 		energy   => undef,
