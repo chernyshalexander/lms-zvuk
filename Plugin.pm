@@ -137,43 +137,9 @@ sub _buildRootMenu {
 					url  => 'zvuk://wave',
 				},
 				{
-					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-					type => 'outline',
-					items => [
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
-							type => 'link',
-							url => \&handleSlider,
-							passthrough => [{ key => 'popular' }],
-						},
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY'),
-							type => 'link',
-							url => \&handleSlider,
-							passthrough => [{ key => 'energy' }],
-						},
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN'),
-							type => 'link',
-							url => \&handleSlider,
-							passthrough => [{ key => 'fun' }],
-						},
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
-							type => 'link',
-							url => \&handleLanguageMenu,
-						},
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
-							type => 'link',
-							url => \&handleVocalMenu,
-						},
-						{
-							name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-							type => 'link',
-							url => \&handleGenresMenu,
-						},
-					],
+					name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+					type  => 'outline',
+					items => _getWaveSettingsItems($client),
 				},
 			],
 		},
@@ -574,7 +540,46 @@ sub _renderEpisode {
 	};
 }
 
-# --- Wave Settings Helper Functions ---
+# --- Wave Settings ---
+
+sub _getWaveSettingsItems {
+	my ($client) = @_;
+	return [
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
+			type => 'link',
+			url  => \&handleSlider,
+			passthrough => [{ key => 'popular' }],
+		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY'),
+			type => 'link',
+			url  => \&handleSlider,
+			passthrough => [{ key => 'energy' }],
+		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN'),
+			type => 'link',
+			url  => \&handleSlider,
+			passthrough => [{ key => 'fun' }],
+		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
+			type => 'link',
+			url  => \&handleLanguageMenu,
+		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
+			type => 'link',
+			url  => \&handleVocalMenu,
+		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+			type => 'link',
+			url  => \&handleGenresMenu,
+		},
+	];
+}
 
 sub _getSettingValue {
 	my ($client, $key, $default) = @_;
@@ -630,13 +635,12 @@ sub _getGenresMenu {
 		};
 	}
 
-	# Добавить кнопку "Назад"
 	push @genre_items, {
-		name => '← Назад',
+		name => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type => 'link',
-		url => sub {
-			my ($client, $cb) = @_;
-			$cb->();
+		url  => sub {
+			my ($cl, $cb) = @_;
+			$cb->({ items => _getWaveSettingsItems($cl) });
 		},
 	};
 
@@ -688,11 +692,14 @@ sub _initAPIHandler {
 sub handleSlider {
 	my ($client, $callback, $args, $params) = @_;
 	return unless $params;
-
 	my $key = $params->{key};
+	$callback->(_getSliderItems($client, $key));
+}
+
+sub _getSliderItems {
+	my ($client, $key) = @_;
 	my $current_value = _getSettingValue($client, $key, 0.5);
 
-	# Generate menu items for slider values (0, 0.1, 0.2, ... 1.0)
 	my @slider_items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
@@ -705,17 +712,16 @@ sub handleSlider {
 		};
 	}
 
-	# Добавить кнопку "Назад"
 	push @slider_items, {
-		name => '← Назад',
+		name => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type => 'link',
-		url => sub {
-			my ($client, $cb) = @_;
-			$cb->();
+		url  => sub {
+			my ($cl, $cb) = @_;
+			$cb->({ items => _getWaveSettingsItems($cl) });
 		},
 	};
 
-	$callback->(\@slider_items);
+	return \@slider_items;
 }
 
 # Handle actual slider value selection
@@ -727,7 +733,7 @@ sub handleSliderValue {
 	my $value = $params->{value};
 
 	_updateSetting($client, $key, $value);
-	$callback->();
+	$callback->(_getSliderItems($client, $key));
 }
 
 # Handle language selection
@@ -788,11 +794,11 @@ sub _getLanguageMenu {
 			passthrough => [{ language => 'russian' }],
 		},
 		{
-			name => '← Назад',
+			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
 			type => 'link',
-			url => sub {
-				my ($client, $cb) = @_;
-				$cb->();
+			url  => sub {
+				my ($cl, $cb) = @_;
+				$cb->({ items => _getWaveSettingsItems($cl) });
 			},
 		},
 	);
@@ -832,11 +838,11 @@ sub _getVocalMenu {
 			passthrough => [{ vocal => 0 }],
 		},
 		{
-			name => '← Назад',
+			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
 			type => 'link',
-			url => sub {
-				my ($client, $cb) = @_;
-				$cb->();
+			url  => sub {
+				my ($cl, $cb) = @_;
+				$cb->({ items => _getWaveSettingsItems($cl) });
 			},
 		},
 	);
