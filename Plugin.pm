@@ -546,30 +546,30 @@ sub _getWaveSettingsItems {
 	my ($client) = @_;
 	return [
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR'),
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR') . ': ' . _getSliderLabel($client, 'popular'),
 			type => 'link',
 			url  => \&handleSlider,
 			passthrough => [{ key => 'popular' }],
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY'),
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY') . ': ' . _getSliderLabel($client, 'energy'),
 			type => 'link',
 			url  => \&handleSlider,
 			passthrough => [{ key => 'energy' }],
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN'),
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN') . ': ' . _getSliderLabel($client, 'fun'),
 			type => 'link',
 			url  => \&handleSlider,
 			passthrough => [{ key => 'fun' }],
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE') . ': ' . _getLangLabel($client),
 			type => 'link',
 			url  => \&handleLanguageMenu,
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
+			name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL') . ': ' . _getVocalLabel($client),
 			type => 'link',
 			url  => \&handleVocalMenu,
 		},
@@ -579,6 +579,28 @@ sub _getWaveSettingsItems {
 			url  => \&handleGenresMenu,
 		},
 	];
+}
+
+sub _getSliderLabel {
+	my ($client, $key) = @_;
+	return sprintf('%.1f', _getSettingValue($client, $key, 0.5));
+}
+
+sub _getLangLabel {
+	my ($client) = @_;
+	my $val = _getSettingValue($client, 'language', 'all');
+	my %map = (
+		all     => 'PLUGIN_ZVUK_LANGUAGE_ALL',
+		foreign => 'PLUGIN_ZVUK_LANGUAGE_FOREIGN',
+		russian => 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN',
+	);
+	return cstring($client, $map{$val} || $map{all});
+}
+
+sub _getVocalLabel {
+	my ($client) = @_;
+	my $val = _getSettingValue($client, 'vocal', 1);
+	return cstring($client, $val ? 'PLUGIN_ZVUK_VOCAL_WITH' : 'PLUGIN_ZVUK_VOCAL_WITHOUT');
 }
 
 sub _getSettingValue {
@@ -705,10 +727,11 @@ sub _getSliderItems {
 		my $val = $i / 10;
 		my $marker = abs($val - $current_value) < 0.01 ? '[x]' : '[ ]';
 		push @slider_items, {
-			name => sprintf("$marker %.1f", $val),
-			type => 'link',
-			url => \&handleSliderValue,
+			name       => sprintf("$marker %.1f", $val),
+			type       => 'link',
+			url        => \&handleSliderValue,
 			passthrough => [{ key => $key, value => $val }],
+			nextWindow => 'grandparent',
 		};
 	}
 
@@ -776,22 +799,25 @@ sub _getLanguageMenu {
 
 	my @lang_items = (
 		{
-			name => ($current_lang eq 'all' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
-			type => 'link',
-			url => \&handleLanguageSelect,
+			name       => ($current_lang eq 'all' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
+			type       => 'link',
+			url        => \&handleLanguageSelect,
 			passthrough => [{ language => 'all' }],
+			nextWindow => 'grandparent',
 		},
 		{
-			name => ($current_lang eq 'foreign' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
-			type => 'link',
-			url => \&handleLanguageSelect,
+			name       => ($current_lang eq 'foreign' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
+			type       => 'link',
+			url        => \&handleLanguageSelect,
 			passthrough => [{ language => 'foreign' }],
+			nextWindow => 'grandparent',
 		},
 		{
-			name => ($current_lang eq 'russian' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
-			type => 'link',
-			url => \&handleLanguageSelect,
+			name       => ($current_lang eq 'russian' ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
+			type       => 'link',
+			url        => \&handleLanguageSelect,
 			passthrough => [{ language => 'russian' }],
+			nextWindow => 'grandparent',
 		},
 		{
 			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
@@ -826,16 +852,18 @@ sub _getVocalMenu {
 
 	my @vocal_items = (
 		{
-			name => ($current_vocal == 1 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
-			type => 'link',
-			url => \&handleVocalSelect,
+			name       => ($current_vocal == 1 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
+			type       => 'link',
+			url        => \&handleVocalSelect,
 			passthrough => [{ vocal => 1 }],
+			nextWindow => 'grandparent',
 		},
 		{
-			name => ($current_vocal == 0 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
-			type => 'link',
-			url => \&handleVocalSelect,
+			name       => ($current_vocal == 0 ? '[x]' : '[ ]') . ' ' . cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
+			type       => 'link',
+			url        => \&handleVocalSelect,
 			passthrough => [{ vocal => 0 }],
+			nextWindow => 'grandparent',
 		},
 		{
 			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
