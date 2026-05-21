@@ -826,21 +826,22 @@ sub _getWizardStepLabel {
 
 	return unless defined $value;
 
+	# Only show labels for exact values: 0.0, 0.5, 1.0
 	if ($step == 1) {  # Popularity
-		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_UNKNOWN'); }
-		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_POPULAR'); }
-		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_FAVORITES'); }
+		if (abs($value - 0.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_UNKNOWN'); }
+		elsif (abs($value - 0.5) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_POPULAR'); }
+		elsif (abs($value - 1.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_FAVORITES'); }
 	} elsif ($step == 2) {  # Energy
-		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_CALM'); }
-		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_NEUTRAL'); }
-		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_ENERGETIC'); }
+		if (abs($value - 0.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_CALM'); }
+		elsif (abs($value - 0.5) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_NEUTRAL'); }
+		elsif (abs($value - 1.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_ENERGETIC'); }
 	} elsif ($step == 3) {  # Fun
-		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_SAD'); }
-		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_NEUTRAL'); }
-		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_HAPPY'); }
+		if (abs($value - 0.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_SAD'); }
+		elsif (abs($value - 0.5) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_NEUTRAL'); }
+		elsif (abs($value - 1.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_HAPPY'); }
 	}
 
-	return sprintf('%.1f', $value);
+	return '';
 }
 
 sub _getWizardPopularityStep {
@@ -849,8 +850,10 @@ sub _getWizardPopularityStep {
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
 		my $label = _getWizardStepLabel($client, 1, $val);
+		my $name = sprintf("%.1f", $val);
+		$name .= ' - ' . $label if $label;
 		push @items, {
-			name        => sprintf("%.1f", $val) . ' - ' . $label,
+			name        => $name,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 1, value => $val, state => $state }],
@@ -872,8 +875,10 @@ sub _getWizardEnergyStep {
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
 		my $label = _getWizardStepLabel($client, 2, $val);
+		my $name = sprintf("%.1f", $val);
+		$name .= ' - ' . $label if $label;
 		push @items, {
-			name        => sprintf("%.1f", $val) . ' - ' . $label,
+			name        => $name,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 2, value => $val, state => $state }],
@@ -895,8 +900,10 @@ sub _getWizardFunStep {
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
 		my $label = _getWizardStepLabel($client, 3, $val);
+		my $name = sprintf("%.1f", $val);
+		$name .= ' - ' . $label if $label;
 		push @items, {
-			name        => sprintf("%.1f", $val) . ' - ' . $label,
+			name        => $name,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 3, value => $val, state => $state }],
