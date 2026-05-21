@@ -579,9 +579,9 @@ sub _getWaveSettingsItems {
 			url  => \&handleGenresMenu,
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
-			type => 'link',
-			url  => \&handleWaveMenu,
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
 		},
 	];
 }
@@ -633,24 +633,6 @@ sub _updateSetting {
 	$log->info("Wave setting updated: $key = $value");
 }
 
-sub handleWaveMenu {
-	my ($client, $callback) = @_;
-	$callback->({
-		items => [
-			{
-				name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
-				type => 'audio',
-				url  => 'zvuk://wave',
-			},
-			{
-				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type  => 'outline',
-				items => _getWaveSettingsItems($client),
-			},
-		],
-	});
-}
-
 sub handleGenresMenu {
 	my ($client, $callback) = @_;
 	$callback->(_getGenresMenu($client));
@@ -682,12 +664,9 @@ sub _getGenresMenu {
 	}
 
 	push @genre_items, {
-		name => cstring($client, 'PLUGIN_ZVUK_BACK'),
-		type => 'link',
-		url  => sub {
-			my ($cl, $cb) = @_;
-			$cb->({ items => _getWaveSettingsItems($cl) });
-		},
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
 	};
 
 	return \@genre_items;
@@ -762,12 +741,9 @@ sub _getSliderItems {
 	}
 
 	push @slider_items, {
-		name => cstring($client, 'PLUGIN_ZVUK_BACK'),
-		type => 'link',
-		url  => sub {
-			my ($cl, $cb) = @_;
-			$cb->({ items => _getWaveSettingsItems($cl) });
-		},
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
 	};
 
 	return \@slider_items;
@@ -846,12 +822,9 @@ sub _getLanguageMenu {
 			nextWindow => 'parent',
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
-			type => 'link',
-			url  => sub {
-				my ($cl, $cb) = @_;
-				$cb->({ items => _getWaveSettingsItems($cl) });
-			},
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
 		},
 	);
 
@@ -892,12 +865,9 @@ sub _getVocalMenu {
 			nextWindow => 'parent',
 		},
 		{
-			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
-			type => 'link',
-			url  => sub {
-				my ($cl, $cb) = @_;
-				$cb->({ items => _getWaveSettingsItems($cl) });
-			},
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
 		},
 	);
 
