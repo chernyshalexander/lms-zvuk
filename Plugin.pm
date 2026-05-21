@@ -722,60 +722,70 @@ sub _getWaveMenuItems {
 		url  => 'zvuk://wave',
 	};
 
-	# For web/material: use wizard
-	# For jive/classic: use traditional settings menu
 	push @items, {
 		name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 		type  => 'link',
-		url   => \&handleWaveSettings,
+		url   => \&handleWaveSettingsRouter,
 	};
 
 	return \@items;
 }
 
-sub handleWaveSettings {
+sub handleWaveSettingsRouter {
 	my ($client, $callback, $args) = @_;
 
-	# Full debug logging
-	$log->info("=== handleWaveSettings DEBUG ===");
+	$log->info("=== Wave Settings Router Decision ===");
+	$log->info("Args received: " . (defined $args ? "YES" : "UNDEF"));
+
+	my $isWeb = $args && $args->{isWeb} ? 1 : 0;
+	my $isControl = $args && defined $args->{isControl} ? $args->{isControl} : undef;
+	my $quantity = $args && defined $args->{quantity} ? $args->{quantity} : undef;
+
+	$log->info("  isWeb=$isWeb");
+	$log->info("  isControl=" . (defined $isControl ? $isControl : 'undef'));
+	$log->info("  quantity=" . (defined $quantity ? $quantity : 'undef'));
+
 	if ($args) {
 		foreach my $key (sort keys %$args) {
+			next if $key =~ /^(isWeb|isControl|quantity)$/;
 			my $val = $args->{$key};
 			if (ref $val) {
-				$log->info("  $key => REF " . ref($val));
+				$log->info("  $key => [" . ref($val) . "]");
 			} else {
 				$log->info("  $key => " . ($val // 'undef'));
 			}
 		}
+	}
+
+	my $useWizard = 0;
+	my $reason = '';
+
+	if ($isWeb) {
+		$useWizard = 1;
+		$reason = 'isWeb=1';
+	} elsif (!defined $isControl) {
+		$useWizard = 1;
+		$reason = 'isControl undefined';
+	} elsif ($isControl && (!defined $quantity || $quantity > 5000)) {
+		$useWizard = 1;
+		$reason = 'isControl=1 AND (quantity undef OR quantity > 5000)';
 	} else {
-		$log->info("  \$args is undef");
-	}
-	$log->info("=== END DEBUG ===");
-
-	# Web/Material UI detection:
-	# - Web: isWeb=1
-	# - Material: isControl=1 AND quantity > 1000 (Material requests large quantities)
-	# Jive/Classic: isControl=1 AND quantity < 1000
-	my $isWebUI = 0;
-	if ($args) {
-		if ($args->{isWeb}) {
-			$isWebUI = 1;  # Web UI
-		} elsif ($args->{isControl} && $args->{quantity} && $args->{quantity} > 1000) {
-			$isWebUI = 1;  # Material UI (high quantity = web-like)
-		}
+		$reason = 'isControl=1 AND quantity <= 5000';
 	}
 
-	$log->info("DECISION: isWebUI=$isWebUI (isWeb=" . ($args->{isWeb} // 'undef') .
-	           ", isControl=" . ($args->{isControl} // 'undef') .
-	           ", quantity=" . ($args->{quantity} // 'undef') . ")");
+	$log->info("Decision: useWizard=$useWizard (Reason: $reason)");
+	$log->info("=== End Router Decision ===");
 
-	if ($isWebUI) {
-		$log->info("-> Routing to WIZARD");
+	if ($useWizard) {
 		handleWaveWizardStart($client, $callback, $args);
 	} else {
-		$log->info("-> Routing to SETTINGS");
-		$callback->({ items => _getWaveSettingsItems($client) });
+		handleWaveSettings($client, $callback, $args);
 	}
+}
+
+sub handleWaveSettings {
+	my ($client, $callback, $args) = @_;
+	$callback->({ items => _getWaveSettingsItems($client) });
 }
 
 sub handleWaveWizardStart {
@@ -811,13 +821,36 @@ sub _getWizardStep {
 	}
 }
 
+sub _getWizardStepLabel {
+	my ($client, $step, $value) = @_;
+
+	return unless defined $value;
+
+	if ($step == 1) {  # Popularity
+		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_UNKNOWN'); }
+		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_POPULAR'); }
+		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_POPULAR_FAVORITES'); }
+	} elsif ($step == 2) {  # Energy
+		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_CALM'); }
+		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_NEUTRAL'); }
+		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_ENERGY_ENERGETIC'); }
+	} elsif ($step == 3) {  # Fun
+		if ($value < 0.33) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_SAD'); }
+		elsif ($value < 0.66) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_NEUTRAL'); }
+		else { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_HAPPY'); }
+	}
+
+	return sprintf('%.1f', $value);
+}
+
 sub _getWizardPopularityStep {
 	my ($client, $state) = @_;
 	my @items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
+		my $label = _getWizardStepLabel($client, 1, $val);
 		push @items, {
-			name        => sprintf("%.1f", $val),
+			name        => sprintf("%.1f", $val) . ' - ' . $label,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 1, value => $val, state => $state }],
@@ -838,8 +871,9 @@ sub _getWizardEnergyStep {
 	my @items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
+		my $label = _getWizardStepLabel($client, 2, $val);
 		push @items, {
-			name        => sprintf("%.1f", $val),
+			name        => sprintf("%.1f", $val) . ' - ' . $label,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 2, value => $val, state => $state }],
@@ -860,8 +894,9 @@ sub _getWizardFunStep {
 	my @items;
 	for (my $i = 0; $i <= 10; $i++) {
 		my $val = $i / 10;
+		my $label = _getWizardStepLabel($client, 3, $val);
 		push @items, {
-			name        => sprintf("%.1f", $val),
+			name        => sprintf("%.1f", $val) . ' - ' . $label,
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
 			passthrough => [{ step => 3, value => $val, state => $state }],
