@@ -722,26 +722,31 @@ sub _getWaveMenuItems {
 		url  => 'zvuk://wave',
 	};
 
+	# For web/material: use wizard
+	# For jive/classic: use traditional settings menu
 	push @items, {
-		name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-		type => 'link',
-		url  => \&handleWaveWizardStart,
+		name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+		type  => 'link',
+		url   => \&handleWaveSettings,
 	};
 
 	return \@items;
 }
 
-sub handleWaveWizardStart {
+sub handleWaveSettings {
 	my ($client, $callback, $args) = @_;
 
-	# Debug: log what we receive in $args
-	if ($args) {
-		$log->info("DEBUG handleWaveWizardStart - args keys: " . join(", ", keys %$args));
-		foreach my $key (keys %$args) {
-			$log->info("DEBUG   $key => " . (ref $args->{$key} ? ref($args->{$key}) : $args->{$key}));
-		}
+	if ($args && $args->{isWeb}) {
+		# Web/Material UI: use wizard
+		handleWaveWizardStart($client, $callback, $args);
+	} else {
+		# Jive/Classic: traditional settings menu
+		$callback->({ items => _getWaveSettingsItems($client) });
 	}
+}
 
+sub handleWaveWizardStart {
+	my ($client, $callback, $args) = @_;
 	my $state = {
 		popular  => undef,
 		energy   => undef,
