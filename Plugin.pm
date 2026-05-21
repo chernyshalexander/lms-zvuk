@@ -578,6 +578,11 @@ sub _getWaveSettingsItems {
 			type => 'link',
 			url  => \&handleGenresMenu,
 		},
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type => 'link',
+			url  => \&handleWaveMenu,
+		},
 	];
 }
 
@@ -626,6 +631,24 @@ sub _updateSetting {
 	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
 
 	$log->info("Wave setting updated: $key = $value");
+}
+
+sub handleWaveMenu {
+	my ($client, $callback) = @_;
+	$callback->({
+		items => [
+			{
+				name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
+				type => 'audio',
+				url  => 'zvuk://wave',
+			},
+			{
+				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+				type  => 'outline',
+				items => _getWaveSettingsItems($client),
+			},
+		],
+	});
 }
 
 sub handleGenresMenu {
