@@ -130,18 +130,7 @@ sub _buildRootMenu {
 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
 			type  => 'link',
 			image => 'plugins/zvuk/html/images/radio.png',
-			items => [
-				{
-					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
-					type => 'audio',
-					url  => 'zvuk://wave',
-				},
-				{
-					name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-					type  => 'outline',
-					items => _getWaveSettingsItems($client),
-				},
-			],
+			items => _getWaveMenuItems($client),
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
@@ -721,6 +710,304 @@ sub handleSlider {
 	return unless $params;
 	my $key = $params->{key};
 	$callback->(_getSliderItems($client, $key));
+}
+
+sub _isWebClient {
+	my ($client) = @_;
+	return $client && $client->model() eq 'http';
+}
+
+sub _getWaveMenuItems {
+	my ($client) = @_;
+	my @items;
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
+		type => 'audio',
+		url  => 'zvuk://wave',
+	};
+
+	# Web/Material UI: wizard approach
+	if (_isWebClient($client)) {
+		push @items, {
+			name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			type => 'link',
+			url  => \&handleWaveWizardStart,
+		};
+	} else {
+		# Jive/Classic: traditional settings menu
+		push @items, {
+			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			type  => 'outline',
+			items => _getWaveSettingsItems($client),
+		};
+	}
+
+	return \@items;
+}
+
+sub handleWaveWizardStart {
+	my ($client, $callback) = @_;
+	my $state = {
+		popular  => undef,
+		energy   => undef,
+		fun      => undef,
+		language => undef,
+		vocal    => undef,
+		genres   => [],
+	};
+	$callback->(_getWizardStep($client, 1, $state));
+}
+
+sub _getWizardStep {
+	my ($client, $step, $state) = @_;
+
+	if ($step == 1) {
+		return _getWizardPopularityStep($client, $state);
+	} elsif ($step == 2) {
+		return _getWizardEnergyStep($client, $state);
+	} elsif ($step == 3) {
+		return _getWizardFunStep($client, $state);
+	} elsif ($step == 4) {
+		return _getWizardLanguageStep($client, $state);
+	} elsif ($step == 5) {
+		return _getWizardVocalStep($client, $state);
+	} elsif ($step == 6) {
+		return _getWizardGenresStep($client, $state);
+	} else {
+		return _getWizardLaunch($client, $state);
+	}
+}
+
+sub _getWizardPopularityStep {
+	my ($client, $state) = @_;
+	my @items;
+	for (my $i = 0; $i <= 10; $i++) {
+		my $val = $i / 10;
+		push @items, {
+			name        => sprintf("%.1f", $val),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 1, value => $val, state => $state }],
+		};
+	}
+
+	push @items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
+	};
+
+	return { items => \@items };
+}
+
+sub _getWizardEnergyStep {
+	my ($client, $state) = @_;
+	my @items;
+	for (my $i = 0; $i <= 10; $i++) {
+		my $val = $i / 10;
+		push @items, {
+			name        => sprintf("%.1f", $val),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 2, value => $val, state => $state }],
+		};
+	}
+
+	push @items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
+	};
+
+	return { items => \@items };
+}
+
+sub _getWizardFunStep {
+	my ($client, $state) = @_;
+	my @items;
+	for (my $i = 0; $i <= 10; $i++) {
+		my $val = $i / 10;
+		push @items, {
+			name        => sprintf("%.1f", $val),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 3, value => $val, state => $state }],
+		};
+	}
+
+	push @items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
+	};
+
+	return { items => \@items };
+}
+
+sub _getWizardLanguageStep {
+	my ($client, $state) = @_;
+	my @lang_items = (
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 4, value => 'all', state => $state }],
+		},
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 4, value => 'foreign', state => $state }],
+		},
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 4, value => 'russian', state => $state }],
+		},
+		{
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
+		},
+	);
+
+	return { items => \@lang_items };
+}
+
+sub _getWizardVocalStep {
+	my ($client, $state) = @_;
+	my @vocal_items = (
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 5, value => 1, state => $state }],
+		},
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
+			type        => 'link',
+			url         => \&handleWizardStepSelect,
+			passthrough => [{ step => 5, value => 0, state => $state }],
+		},
+		{
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
+		},
+	);
+
+	return { items => \@vocal_items };
+}
+
+sub _getWizardGenresStep {
+	my ($client, $state) = @_;
+	my @genre_items;
+
+	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
+		my $is_selected = grep { $_ eq $genre->{name} } @{$state->{genres}};
+		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
+		push @genre_items, {
+			name        => "$checkbox_char " . cstring($client, $genre->{label}),
+			type        => 'link',
+			url         => \&handleWizardGenreToggle,
+			passthrough => [{ genre => $genre->{name}, state => $state }],
+			nextWindow  => 'refresh',
+		};
+	}
+
+	push @genre_items, (
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_WIZARD_NEXT'),
+			type        => 'link',
+			url         => \&handleWizardGenresDone,
+			passthrough => [{ state => $state }],
+		},
+		{
+			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+			type       => 'link',
+			nextWindow => 'parent',
+		},
+	);
+
+	return { items => \@genre_items };
+}
+
+sub handleWizardStepSelect {
+	my ($client, $callback, $args, $params) = @_;
+	my $step = $params->{step};
+	my $value = $params->{value};
+	my $state = $params->{state};
+
+	# Update state based on step
+	if ($step == 1) { $state->{popular} = $value; }
+	elsif ($step == 2) { $state->{energy} = $value; }
+	elsif ($step == 3) { $state->{fun} = $value; }
+	elsif ($step == 4) { $state->{language} = $value; }
+	elsif ($step == 5) { $state->{vocal} = $value; }
+
+	# Move to next step
+	$callback->(_getWizardStep($client, $step + 1, $state));
+}
+
+sub handleWizardGenreToggle {
+	my ($client, $callback, $args, $params) = @_;
+	my $genre = $params->{genre};
+	my $state = $params->{state};
+
+	# Toggle genre
+	my @genres = @{$state->{genres}};
+	if (grep { $_ eq $genre } @genres) {
+		@genres = grep { $_ ne $genre } @genres;
+	} else {
+		push @genres, $genre;
+	}
+	$state->{genres} = \@genres;
+
+	# Refresh genres menu with updated checkmarks
+	$callback->(_getWizardGenresStep($client, $state));
+}
+
+sub handleWizardGenresDone {
+	my ($client, $callback, $args, $params) = @_;
+	my $state = $params->{state};
+
+	# Move to launch screen
+	$callback->(_getWizardLaunch($client, $state));
+}
+
+sub _getWizardLaunch {
+	my ($client, $state) = @_;
+
+	# Save settings to prefs
+	my $api = _getAPIHandler($client);
+	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+
+	my $settings = {
+		popular  => $state->{popular} // 0.5,
+		energy   => $state->{energy} // 0.5,
+		fun      => $state->{fun} // 0.5,
+		language => $state->{language} // 'all',
+		vocal    => defined $state->{vocal} ? $state->{vocal} : 1,
+		genres   => $state->{genres} || [],
+	};
+	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
+
+	return {
+		items => [
+			{
+				name => cstring($client, 'PLUGIN_ZVUK_WIZARD_LAUNCH'),
+				type => 'audio',
+				url  => 'zvuk://wave',
+			},
+			{
+				name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+				type       => 'link',
+				nextWindow => 'parent',
+			},
+		],
+	};
 }
 
 sub _getSliderItems {
