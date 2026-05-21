@@ -712,11 +712,6 @@ sub handleSlider {
 	$callback->(_getSliderItems($client, $key));
 }
 
-sub _isWebClient {
-	my ($client) = @_;
-	return $client && $client->model() eq 'http';
-}
-
 sub _getWaveMenuItems {
 	my ($client) = @_;
 	my @items;
@@ -727,21 +722,11 @@ sub _getWaveMenuItems {
 		url  => 'zvuk://wave',
 	};
 
-	# Web/Material UI: wizard approach
-	if (_isWebClient($client)) {
-		push @items, {
-			name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-			type => 'link',
-			url  => \&handleWaveWizardStart,
-		};
-	} else {
-		# Jive/Classic: traditional settings menu
-		push @items, {
-			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-			type  => 'outline',
-			items => _getWaveSettingsItems($client),
-		};
-	}
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+		type => 'link',
+		url  => \&handleWaveWizardStart,
+	};
 
 	return \@items;
 }
