@@ -132,75 +132,99 @@ PLUGIN_ZVUK_LOAD_MORE_WAVE
 
 PLUGIN_ZVUK_MENU_WAVE_START
 	EN	Start Wave
+	RU	Запустить Волну
 
 PLUGIN_ZVUK_MENU_WAVE_SETTINGS
 	EN	Settings
+	RU	Настройки
 
 PLUGIN_ZVUK_SETTING_POPULAR
 	EN	Popularity
+	RU	Популярность
 
 PLUGIN_ZVUK_SETTING_ENERGY
 	EN	Mood: Energy
+	RU	Настроение: Энергия
 
 PLUGIN_ZVUK_SETTING_FUN
 	EN	Mood: Fun
+	RU	Настроение: Веселье
 
 PLUGIN_ZVUK_SETTING_LANGUAGE
 	EN	Language
+	RU	Язык
 
 PLUGIN_ZVUK_LANGUAGE_ALL
 	EN	All Languages
+	RU	Все языки
 
 PLUGIN_ZVUK_LANGUAGE_FOREIGN
 	EN	Foreign
+	RU	Иностранные
 
 PLUGIN_ZVUK_LANGUAGE_RUSSIAN
 	EN	Russian
+	RU	Русский
 
 PLUGIN_ZVUK_SETTING_VOCAL
 	EN	Vocal
+	RU	Вокал
 
 PLUGIN_ZVUK_VOCAL_WITH
 	EN	With Vocals
+	RU	С вокалом
 
 PLUGIN_ZVUK_VOCAL_WITHOUT
 	EN	Instrumental
+	RU	Инструментальные
 
 PLUGIN_ZVUK_SETTING_GENRES
 	EN	Genres
+	RU	Жанры
 
 PLUGIN_ZVUK_GENRE_EASY_LISTENING
 	EN	Easy Listening / Ambient
+	RU	Лёгкая музыка / Ambient
 
 PLUGIN_ZVUK_GENRE_ELECTRONIC
 	EN	Electronic
+	RU	Электроника
 
 PLUGIN_ZVUK_GENRE_CLASSICAL
 	EN	Classical
+	RU	Классика
 
 PLUGIN_ZVUK_GENRE_FOLK
 	EN	Folk / World / Country
+	RU	Фольклор / Мир / Country
 
 PLUGIN_ZVUK_GENRE_HIP_HOP
 	EN	Hip-Hop
+	RU	Хип-Хоп
 
 PLUGIN_ZVUK_GENRE_INDIE
 	EN	Indie
+	RU	Инди
 
 PLUGIN_ZVUK_GENRE_INSTRUMENTAL
 	EN	Instrumental / Acoustic
+	RU	Инструментальная / Акустика
 
 PLUGIN_ZVUK_GENRE_METAL
 	EN	Metal
+	RU	Метал
 
 PLUGIN_ZVUK_GENRE_POP
 	EN	Pop
+	RU	Поп
 
 PLUGIN_ZVUK_GENRE_ROCK
 	EN	Rock
+	RU	Рок
 
 PLUGIN_ZVUK_GENRE_SOUNDTRACK
 	EN	Soundtrack
+	RU	Саундтрек
 
 PLUGIN_ZVUK_BACK
 	EN	Back
