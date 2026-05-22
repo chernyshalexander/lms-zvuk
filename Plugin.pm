@@ -1268,7 +1268,7 @@ sub handleWaveSettingsWebUI {
 	my ($httpClient, $response) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
-	require Template;
+	require Slim::Web::HTTP;
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
 
 	# Build genres list for JavaScript
@@ -1288,19 +1288,11 @@ sub handleWaveSettingsWebUI {
 		webroot => '/html/',
 	};
 
-	my $htmlDir = Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN';
-	my $tt = Template->new({ INCLUDE_PATH => $htmlDir });
-	my $output = '';
+	my $output = Slim::Web::HTTP::filltemplatefile('plugins/zvuk/waveSettings.html', $vars);
 
-	if ($tt->process('plugins/zvuk/waveSettings.html', $vars, \$output)) {
-		$response->code(200);
-		$response->header('Content-Type' => 'text/html; charset=utf-8');
-		$response->body($output);
-	} else {
-		$log->error("Error processing waveSettings.html: " . $tt->error);
-		$response->code(500);
-		$response->body('Error rendering page');
-	}
+	$response->code(200);
+	$response->content_type('text/html; charset=utf-8');
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output);
 }
 
 # Web AJAX handler for saving wave settings from web interface
@@ -1320,8 +1312,9 @@ sub handleSaveWaveSettingsWeb {
 	if ($@ || !$data) {
 		$log->error("Wave Settings Web: Failed to parse JSON: $@");
 		$response->code(400);
-		$response->header('Content-Type' => 'application/json');
-		$response->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Invalid JSON' });
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
 	}
 
@@ -1342,8 +1335,9 @@ sub handleSaveWaveSettingsWeb {
 	$log->info("Wave settings saved from web interface for account $account_id");
 
 	$response->code(200);
-	$response->header('Content-Type' => 'application/json');
-	$response->body(encode_json({ success => 1 }));
+	$response->content_type('application/json');
+	my $json = encode_json({ success => 1 });
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 }
 
 1;
