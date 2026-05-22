@@ -43,10 +43,10 @@
 	</select>
 [% END %]
 
-[% WRAPPER setting title="PLUGIN_ZVUK_WAVE_SLIDERS" desc="PLUGIN_ZVUK_WAVE_SLIDERS_DESC" %]
-	<div>
-		<a href="/plugins/zvuk/waveSettings" target="_blank" class="stdbutton">[% "PLUGIN_ZVUK_OPEN_SLIDERS" | string %]</a>
-	</div>
-[% END %]
+<div style="margin-top:20px; padding:10px; background-color:#f9f9f9; border-radius:4px;">
+	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</div>
+	<div style="font-size:12px; color:#666; margin-bottom:10px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS_DESC" | string %]</div>
+	<a href="/plugins/zvuk/waveSettings" target="_blank" class="stdbutton">[% "PLUGIN_ZVUK_OPEN_SLIDERS" | string %]</a>
+</div>
 
 [% PROCESS settings/footer.html %]
