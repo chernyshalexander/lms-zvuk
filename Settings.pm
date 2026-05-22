@@ -92,6 +92,24 @@ sub beforeRender {
 		};
 	}
 	$params->{accounts} = \@accounts_list;
+
+	# Add wave settings for modal sliders
+	require Plugins::Zvuk::WaveSettings;
+	require JSON;
+
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
+	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+	my @genre_list;
+	my %genre_labels;
+	foreach my $genre (@$genres) {
+		push @genre_list, { name => $genre->{name} };
+		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+	}
+
+	$params->{wave_settings} = $wave_settings;
+	$params->{genres_json} = JSON::encode_json(\@genre_list);
+	$params->{genres_labels_json} = JSON::encode_json(\%genre_labels);
+	$params->{selected_genres_json} = JSON::encode_json($wave_settings->{genres} || []);
 }
 
 1;
