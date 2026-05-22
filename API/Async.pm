@@ -475,16 +475,18 @@ sub getPersonalWave {
 	# Use provided settings or defaults
 	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings('default');
 
-	my $mood_str = sprintf("energy:%g,fun:%g",
-		$wave_settings->{energy} // 0.5,
-		$wave_settings->{fun} // 0.5
-	);
+	# Ensure all numeric values are proper floats for GraphQL NormalizedFloat type
+	my $popular = 0.0 + ($wave_settings->{popular} // 0.5);
+	my $energy = 0.0 + ($wave_settings->{energy} // 0.5);
+	my $fun = 0.0 + ($wave_settings->{fun} // 0.5);
+
+	my $mood_str = sprintf("energy:%g,fun:%g", $energy, $fun);
 
 	my $vars = {
 		waveSrc => "AMAZME",
 		first   => 3,
 		options => {
-			popular  => $wave_settings->{popular} // 0.5,
+			popular  => $popular,
 			mood     => $mood_str,
 		},
 	};
@@ -492,8 +494,11 @@ sub getPersonalWave {
 	# Add optional settings if provided
 	$vars->{options}->{language} = $wave_settings->{language}
 		if defined $wave_settings->{language};
-	$vars->{options}->{vocal} = $wave_settings->{vocal}
-		if defined $wave_settings->{vocal};
+
+	# Convert vocal to proper float type for NormalizedFloat
+	if (defined $wave_settings->{vocal}) {
+		$vars->{options}->{vocal} = 0.0 + $wave_settings->{vocal};
+	}
 
 	# Add genres if provided
 	if ($wave_settings->{genres} && @{$wave_settings->{genres}}) {
