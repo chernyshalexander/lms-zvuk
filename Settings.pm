@@ -106,11 +106,25 @@ sub beforeRender {
 		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
 	}
 
+	# Cleanup invalid genres from old preferences - filter out template variables
+	my @valid_genres;
+	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
+		foreach my $g (@{$wave_settings->{genres}}) {
+			# Only keep valid genre names (not template variables like '${genre.name}')
+			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
+				push @valid_genres, $g;
+			}
+		}
+	}
+
+	# Use valid genres if we have any, otherwise empty array (will use defaults later)
+	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
+
 	my $genres_json = JSON::encode_json(\@genre_list);
 	my $genres_labels_json = JSON::encode_json(\%genre_labels);
-	my $selected_genres_json = JSON::encode_json($wave_settings->{genres} || []);
+	my $selected_genres_json = JSON::encode_json($selected_genres);
 
-	$log->debug("Wave Settings - Genres JSON: $genres_json");
+	$log->debug("Wave Settings - Loaded genres: " . join(',', @{$selected_genres || []}));
 	$log->debug("Wave Settings - Genre Labels JSON: $genres_labels_json");
 
 	$params->{wave_settings} = $wave_settings;

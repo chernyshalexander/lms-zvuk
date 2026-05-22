@@ -41,15 +41,26 @@ sub loadSettings {
 
     # Return saved settings or defaults
     if ($settings && ref $settings eq 'HASH') {
+        # Clean up invalid genres (e.g., template variables from old saves)
+        my $saved_genres = $settings->{genres};
+        my @cleaned_genres;
+
+        if ($saved_genres && ref $saved_genres eq 'ARRAY') {
+            foreach my $g (@$saved_genres) {
+                # Filter out template variables like '${genre.name}' and empty values
+                if ($g && $g !~ /^\$\{/ && length($g) > 0) {
+                    push @cleaned_genres, $g;
+                }
+            }
+        }
+
         return {
             popular  => $settings->{popular} // DEFAULT_POPULAR,
             energy   => $settings->{energy} // DEFAULT_ENERGY,
             fun      => $settings->{fun} // DEFAULT_FUN,
             language => $settings->{language} // DEFAULT_LANGUAGE,
             vocal    => defined $settings->{vocal} ? $settings->{vocal} : DEFAULT_VOCAL,
-            genres   => $settings->{genres} && ref $settings->{genres} eq 'ARRAY'
-                        ? $settings->{genres}
-                        : _getDefaultGenres(),
+            genres   => @cleaned_genres > 0 ? \@cleaned_genres : _getDefaultGenres(),
         };
     }
 
