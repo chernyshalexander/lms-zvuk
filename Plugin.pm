@@ -1472,41 +1472,9 @@ sub handleOAuthCallback {
 	$log->info("OAuth Callback: Token from params: " . ($token ? "found (${token})" : "not found"));
 
 	if (!$token) {
-		# If no token in params, fetch from Zvuk API (for browsers with auth cookies)
-		$log->info("OAuth Callback: Token not in params, attempting to fetch from Zvuk API");
-
-		require LWP::UserAgent;
-		require HTTP::Cookies;
-
-		my $ua = LWP::UserAgent->new;
-		my $jar = HTTP::Cookies->new;
-		$ua->cookie_jar($jar);
-
-		# Try to get profile from Zvuk API
-		my $ua_response = $ua->get('https://zvuk.com/api/tiny/profile');
-
-		if ($ua_response->is_success) {
-			$log->info("OAuth Callback: Successfully fetched from Zvuk API");
-			my $content = $ua_response->content;
-			$log->debug("OAuth Callback: API response: " . substr($content, 0, 200));
-
-			eval {
-				my $profile = decode_json($content);
-				if ($profile && $profile->{token}) {
-					$token = $profile->{token};
-					$log->info("OAuth Callback: Found token in API response");
-				} else {
-					$log->warn("OAuth Callback: API response missing token or id");
-					$log->debug("OAuth Callback: Full response: $content");
-				}
-			};
-			if ($@) {
-				$log->error("OAuth Callback: Failed to parse API response: $@");
-			}
-		} else {
-			$log->error("OAuth Callback: API request failed: " . $ua_response->status_line);
-			$log->debug("OAuth Callback: Response: " . $ua_response->content);
-		}
+		# If no token in params, show instructions for manual flow
+		# The browser needs to fetch this from zvuk.com/api/tiny/profile after logging in
+		$log->info("OAuth Callback: Token not in params - browser should have made the fetch");
 	}
 
 	if (!$token) {

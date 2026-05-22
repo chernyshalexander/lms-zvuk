@@ -110,7 +110,15 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 <!-- OAuth Authentication Section -->
 <div style="margin-top:20px; padding:15px; background-color:#f0f0f0; border-radius:4px; border-left:4px solid #b8a6db;">
 	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:12px;">[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]</div>
+	<div style="font-size:12px; color:#666; margin-bottom:12px;">
+		[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]
+		<br><br>
+		<strong>Инструкция:</strong><br>
+		1. <a href="https://zvuk.com/api/tiny/profile" target="_blank" style="color:#1976d2;">Откройте эту ссылку</a> в новом окне<br>
+		2. Авторизуйтесь на zvuk.com если нужно<br>
+		3. Скопируйте значение поля <code style="background:#fff; padding:2px 4px; border-radius:2px;">"token"</code> из JSON<br>
+		4. Вставьте в поле "Token" выше и нажмите Save
+	</div>
 	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
 	<div id="oauthStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
 </div>
@@ -118,62 +126,26 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 <script>
 function openZvukOAuthWindow() {
 	var statusDiv = document.getElementById('oauthStatus');
-	statusDiv.textContent = 'Opening authorization window...';
+	statusDiv.textContent = 'Opening Zvuk profile page... Copy the token and paste it in the "Token" field above.';
 	statusDiv.style.backgroundColor = '#e3f2fd';
 	statusDiv.style.color = '#1976d2';
 	statusDiv.style.display = 'block';
 
-	var width = 500;
+	var width = 800;
 	var height = 600;
 	var left = (screen.width - width) / 2;
 	var top = (screen.height - height) / 2;
 
-	// Use plugin callback URL instead of Zvuk API endpoint
-	var callbackUrl = encodeURIComponent(window.location.protocol + '//' + window.location.host + '/plugins/zvuk/oauthCallback');
-	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + callbackUrl;
-
 	window.zvukOAuthWindow = window.open(
-		loginUrl,
+		'https://zvuk.com/api/tiny/profile',
 		'zvukOAuth',
 		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top
 	);
 
 	if (!window.zvukOAuthWindow) {
-		showOAuthError('Failed to open authorization window. Please allow popups.');
+		showOAuthError('Failed to open window. Please allow popups and try again.');
 		return;
 	}
-
-	// Listen for postMessage events from the popup
-	window.addEventListener('message', function(event) {
-		// For security, only accept messages from our own origin
-		if (event.origin !== window.location.origin) {
-			return;
-		}
-
-		if (event.data && event.data.type === 'zvukOAuthSuccess') {
-			statusDiv.textContent = 'Account successfully added! Refreshing page...';
-			statusDiv.style.backgroundColor = '#d4edda';
-			statusDiv.style.color = '#155724';
-			statusDiv.style.display = 'block';
-			setTimeout(function() {
-				location.reload();
-			}, 1500);
-		} else if (event.data && event.data.type === 'zvukOAuthError') {
-			showOAuthError('Authentication error: ' + (event.data.error || 'Unknown error'));
-		}
-	});
-
-	// Fallback: check if popup is closed every 2 seconds
-	var checkInterval = setInterval(function() {
-		if (!window.zvukOAuthWindow || window.zvukOAuthWindow.closed) {
-			clearInterval(checkInterval);
-		}
-	}, 2000);
-
-	// Stop checking after 15 minutes
-	setTimeout(function() {
-		clearInterval(checkInterval);
-	}, 900000);
 }
 
 function showOAuthError(message) {
