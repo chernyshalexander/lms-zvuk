@@ -17,55 +17,41 @@
 var waveModalInitialized = false;
 
 function openWaveSliderModal() {
-	console.log('openWaveSliderModal called');
 	var modal = document.getElementById('waveSliderModal');
-	console.log('Modal element:', modal);
 	if (modal) {
 		modal.style.display = 'block';
-		console.log('Modal display set to block');
 	}
 }
 
 function closeWaveSliderModal() {
-	console.log('closeWaveSliderModal called');
 	var modal = document.getElementById('waveSliderModal');
 	if (modal) {
 		modal.style.display = 'none';
-		console.log('Modal display set to none');
 	}
 }
 
 // Initialize modal event handlers only once
 function initWaveSliderModal() {
 	if (waveModalInitialized) {
-		console.log('Wave modal already initialized, skipping');
 		return;
 	}
 
-	console.log('Initializing wave modal handlers');
 	var modal = document.getElementById('waveSliderModal');
 	var modalBox = document.getElementById('waveSliderBox');
 
-	console.log('Modal:', modal);
-	console.log('ModalBox:', modalBox);
-
 	if (modal && modalBox) {
 		modal.addEventListener('click', function(e) {
-			console.log('Modal clicked. Target:', e.target);
 			// Only close if clicking on modal background, not on the modal content
 			if (e.target === modal) {
-				console.log('Closing modal - clicked on background');
 				closeWaveSliderModal();
 			}
 		});
 
 		modalBox.addEventListener('click', function(e) {
-			console.log('ModalBox clicked - stopping propagation');
 			e.stopPropagation();
 		});
 
 		waveModalInitialized = true;
-		console.log('Wave modal handlers initialized');
 	}
 }
 
