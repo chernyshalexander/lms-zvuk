@@ -790,8 +790,9 @@ sub handleWaveSettingsRouter {
 	if ($useWebUI) {
 		# For web/material clients: return link to web settings page
 		# Construct proper HTTP URL for the web page
-		my $hostPort = Slim::Utils::Network::serverAddr() . ':' . Slim::Utils::Network::serverPort();
-		my $webUrl = 'http://' . $hostPort . '/plugins/zvuk/waveSettings';
+		my $host = Slim::Utils::Network::hostaddr() || 'localhost';
+		my $port = main::HTTPPORT || 9000;
+		my $webUrl = 'http://' . $host . ':' . $port . '/plugins/zvuk/waveSettings';
 
 		$log->info("Web Settings URL: $webUrl");
 
