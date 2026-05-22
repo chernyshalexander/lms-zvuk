@@ -43,14 +43,14 @@ sub initPlugin {
 		Plugins::Zvuk::Settings->new();
 
 		# Register web routes for AJAX and web pages
-		Slim::Web::Pages->addPageFunction(
-			'/plugins/zvuk/saveWaveSettings',
-			\&Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/waveSettings',
+			\&Plugins::Zvuk::Plugin::handleWaveSettingsWebUI
 		);
 
-		Slim::Web::Pages->addPageFunction(
-			'/plugins/zvuk/waveSettings',
-			\&Plugins::Zvuk::Plugin::handleWaveSettingsWebUI
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/saveWaveSettings',
+			\&Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb
 		);
 	}
 
@@ -1264,7 +1264,7 @@ sub _getVocalMenu {
 
 # Web UI handler for displaying wave settings page
 sub handleWaveSettingsWebUI {
-	my ($client, $params, $callback, $httpClient, $response) = @_;
+	my ($httpClient, $response) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
 	require Template;
@@ -1304,10 +1304,12 @@ sub handleWaveSettingsWebUI {
 
 # Web AJAX handler for saving wave settings from web interface
 sub handleSaveWaveSettingsWeb {
-	my ($client, $params, $callback, $httpClient, $response) = @_;
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
 
 	# Get JSON payload from request body
-	my $body = $httpClient->contentRef ? ${$httpClient->contentRef} : '';
+	my $body = $request->content_ref ? ${$request->content_ref} : '';
 	my $data;
 
 	eval {
@@ -1324,10 +1326,6 @@ sub handleSaveWaveSettingsWeb {
 
 	# Get current account ID (default for web UI)
 	my $account_id = 'default';
-	if ($client) {
-		my $api = _getAPIHandler($client);
-		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
-	}
 
 	# Validate and save settings
 	my $settings = {
