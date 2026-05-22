@@ -545,46 +545,58 @@ sub _renderEpisode {
 
 sub _getWaveSettingsItems {
 	my ($client) = @_;
-	return [
-		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR') . ': ' . _getSliderLabel($client, 'popular'),
-			type => 'link',
-			url  => \&handleSlider,
-			passthrough => [{ key => 'popular' }],
-		},
-		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY') . ': ' . _getSliderLabel($client, 'energy'),
-			type => 'link',
-			url  => \&handleSlider,
-			passthrough => [{ key => 'energy' }],
-		},
-		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN') . ': ' . _getSliderLabel($client, 'fun'),
-			type => 'link',
-			url  => \&handleSlider,
-			passthrough => [{ key => 'fun' }],
-		},
-		{
+	my @items;
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_SETTING_POPULAR') . ': ' . _getSliderLabel($client, 'popular'),
+		type => 'link',
+		url  => \&handleSlider,
+		passthrough => [{ key => 'popular' }],
+	};
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_SETTING_ENERGY') . ': ' . _getSliderLabel($client, 'energy'),
+		type => 'link',
+		url  => \&handleSlider,
+		passthrough => [{ key => 'energy' }],
+	};
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_SETTING_FUN') . ': ' . _getSliderLabel($client, 'fun'),
+		type => 'link',
+		url  => \&handleSlider,
+		passthrough => [{ key => 'fun' }],
+	};
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL') . ': ' . _getVocalLabel($client),
+		type => 'link',
+		url  => \&handleVocalMenu,
+	};
+
+	# Only show language if vocal=1 (with vocals)
+	my $vocal = _getSettingValue($client, 'vocal', 1);
+	if ($vocal == 1) {
+		push @items, {
 			name => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE') . ': ' . _getLangLabel($client),
 			type => 'link',
 			url  => \&handleLanguageMenu,
-		},
-		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL') . ': ' . _getVocalLabel($client),
-			type => 'link',
-			url  => \&handleVocalMenu,
-		},
-		{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-			type => 'link',
-			url  => \&handleGenresMenu,
-		},
-		{
-			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
-			type       => 'link',
-			nextWindow => 'parent',
-		},
-	];
+		};
+	}
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+		type => 'link',
+		url  => \&handleGenresMenu,
+	};
+
+	push @items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		nextWindow => 'parent',
+	};
+
+	return \@items;
 }
 
 sub _getSliderLabel {
