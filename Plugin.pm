@@ -788,27 +788,9 @@ sub handleWaveSettingsRouter {
 	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
 	$log->info("=== End Router Decision ===");
 
-	if ($useWebUI) {
-		# For web/material clients: return link to web settings page
-		require Slim::Utils::Network;
-		my $baseUrl = Slim::Utils::Network::serverURL();
-		my $webUrl = $baseUrl . '/plugins/zvuk/waveSettings';
-
-		$log->info("Web Settings URL: $webUrl");
-
-		$callback->({
-			items => [
-				{
-					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-					type => 'link',
-					url => $webUrl,
-				}
-			]
-		});
-	} else {
-		# For Jive/SqueezePlay: show OPML wizard
-		handleWaveWizardStart($client, $callback, $args);
-	}
+	# Show OPML wizard for all clients (web and native)
+	# TODO: Add dedicated web UI with sliders for Material UI in future
+	handleWaveWizardStart($client, $callback, $args);
 }
 
 sub handleWaveSettings {
