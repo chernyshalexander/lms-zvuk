@@ -16,15 +16,30 @@
 <script>
 function openWaveSliderModal() {
 	document.getElementById('waveSliderModal').style.display = 'block';
-	document.getElementById('waveSliderContent').innerHTML = '<div style="text-align:center;"><img src="/html/images/loading.gif" alt="Loading..."></div>';
+	document.getElementById('waveSliderContent').innerHTML = '<div style="text-align:center; padding:20px;"><p>Loading...</p></div>';
 
-	fetch('/plugins/zvuk/waveSettings?ajax=1')
-		.then(response => response.text())
+	fetch('/plugins/zvuk/waveSettings')
+		.then(response => {
+			console.log('Response status:', response.status);
+			if (!response.ok) {
+				throw new Error('HTTP error, status = ' + response.status);
+			}
+			return response.text();
+		})
 		.then(html => {
+			console.log('Content loaded, length:', html.length);
 			document.getElementById('waveSliderContent').innerHTML = html;
+			// Re-execute scripts in the loaded HTML
+			const scripts = document.getElementById('waveSliderContent').querySelectorAll('script');
+			scripts.forEach(script => {
+				const newScript = document.createElement('script');
+				newScript.textContent = script.textContent;
+				document.getElementById('waveSliderContent').appendChild(newScript);
+			});
 		})
 		.catch(error => {
-			document.getElementById('waveSliderContent').innerHTML = '<div style="color:red;">Error loading settings</div>';
+			console.error('Error loading settings:', error);
+			document.getElementById('waveSliderContent').innerHTML = '<div style="color:red; padding:20px;"><strong>Error loading settings:</strong><br>' + error.message + '</div>';
 		});
 }
 
