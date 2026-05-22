@@ -307,8 +307,8 @@ PLUGIN_ZVUK_OAUTH_TITLE
 	RU	Авторизация через браузер
 
 PLUGIN_ZVUK_OAUTH_DESC
-	EN	Log in to zvuk.com and the plugin will automatically capture your authentication token
-	RU	Войдите на zvuk.com и плагин автоматически получит ваш токен авторизации
+	EN	Click below to authorize with Zvuk. Your browser will open a login window, and after you sign in, the plugin will automatically capture your authentication token.
+	RU	Нажмите ниже для авторизации в Звуке. Откроется окно входа, и после того как вы войдёте, плагин автоматически получит ваш токен авторизации.
 
 PLUGIN_ZVUK_OAUTH_BUTTON
 	EN	Login with Zvuk

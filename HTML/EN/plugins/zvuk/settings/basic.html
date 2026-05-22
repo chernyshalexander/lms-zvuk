@@ -122,13 +122,16 @@ function openZvukOAuthWindow() {
 	var left = (screen.width - width) / 2;
 	var top = (screen.height - height) / 2;
 
+	var returnUrl = encodeURIComponent('https://zvuk.com/api/tiny/profile');
+	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + returnUrl;
+
 	window.zvukOAuthWindow = window.open(
-		'https://zvuk.com/login',
+		loginUrl,
 		'zvukOAuth',
 		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top
 	);
 
-	// Poll for token in URL every 500ms
+	// Poll for successful login and token retrieval every 1000ms
 	var pollInterval = setInterval(function() {
 		try {
 			if (!window.zvukOAuthWindow || window.zvukOAuthWindow.closed) {
@@ -137,19 +140,16 @@ function openZvukOAuthWindow() {
 			}
 
 			var url = window.zvukOAuthWindow.location.href;
-			if (url.includes('zvuk.com') && url.includes('token')) {
-				var match = url.match(/token[=:]([a-f0-9]{32})/i);
-				if (match && match[1]) {
-					var token = match[1];
-					window.zvukOAuthWindow.close();
-					clearInterval(pollInterval);
-					saveTokenFromOAuth(token);
-				}
+			// Check if redirected to profile endpoint
+			if (url.includes('/api/tiny/profile')) {
+				// Fetch profile data to get token
+				fetchZvukProfile();
+				clearInterval(pollInterval);
 			}
 		} catch (e) {
-			// Ignore cross-origin errors
+			// Ignore cross-origin errors when accessing popup URL
 		}
-	}, 500);
+	}, 1000);
 
 	// Stop polling after 15 minutes
 	setTimeout(function() {
@@ -157,10 +157,58 @@ function openZvukOAuthWindow() {
 	}, 900000);
 }
 
+function fetchZvukProfile() {
+	var statusDiv = document.getElementById('oauthStatus');
+	statusDiv.textContent = 'Retrieving token...';
+	statusDiv.style.backgroundColor = '#e3f2fd';
+	statusDiv.style.color = '#1976d2';
+	statusDiv.style.display = 'block';
+
+	// Fetch profile from Zvuk API to get the token
+	fetch('https://zvuk.com/api/tiny/profile', {
+		credentials: 'include',  // Send cookies if available
+		headers: {
+			'Accept': 'application/json'
+		}
+	})
+	.then(function(response) {
+		if (response.ok) {
+			return response.json();
+		}
+		throw new Error('Failed to fetch profile: ' + response.status);
+	})
+	.then(function(profile) {
+		if (window.zvukOAuthWindow) {
+			window.zvukOAuthWindow.close();
+		}
+
+		if (profile && profile.token) {
+			saveTokenFromOAuth(profile.token);
+		} else {
+			showOAuthError('No token found in profile response');
+		}
+	})
+	.catch(function(error) {
+		if (window.zvukOAuthWindow) {
+			window.zvukOAuthWindow.close();
+		}
+		showOAuthError('Failed to retrieve token: ' + error.message);
+	});
+}
+
+function showOAuthError(message) {
+	var statusDiv = document.getElementById('oauthStatus');
+	statusDiv.textContent = message;
+	statusDiv.style.backgroundColor = '#f8d7da';
+	statusDiv.style.color = '#721c24';
+	statusDiv.style.display = 'block';
+}
+
 function saveTokenFromOAuth(token) {
 	var statusDiv = document.getElementById('oauthStatus');
 	statusDiv.textContent = 'Saving token...';
-	statusDiv.className = '';
+	statusDiv.style.backgroundColor = '#e3f2fd';
+	statusDiv.style.color = '#1976d2';
 	statusDiv.style.display = 'block';
 
 	fetch('/plugins/zvuk/saveOAuthToken', {
@@ -181,17 +229,11 @@ function saveTokenFromOAuth(token) {
 				location.reload();
 			}, 1500);
 		} else {
-			statusDiv.textContent = 'Error: ' + (data.error || 'Unknown error');
-			statusDiv.style.backgroundColor = '#f8d7da';
-			statusDiv.style.color = '#721c24';
-			statusDiv.style.display = 'block';
+			showOAuthError(data.error || 'Unknown error');
 		}
 	})
 	.catch(function(error) {
-		statusDiv.textContent = 'Error: ' + error.message;
-		statusDiv.style.backgroundColor = '#f8d7da';
-		statusDiv.style.color = '#721c24';
-		statusDiv.style.display = 'block';
+		showOAuthError('Network error: ' + error.message);
 	});
 }
 </script>
