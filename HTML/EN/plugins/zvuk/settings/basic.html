@@ -117,13 +117,20 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 
 <script>
 function openZvukOAuthWindow() {
+	var statusDiv = document.getElementById('oauthStatus');
+	statusDiv.textContent = 'Opening authorization window...';
+	statusDiv.style.backgroundColor = '#e3f2fd';
+	statusDiv.style.color = '#1976d2';
+	statusDiv.style.display = 'block';
+
 	var width = 500;
 	var height = 600;
 	var left = (screen.width - width) / 2;
 	var top = (screen.height - height) / 2;
 
-	var returnUrl = encodeURIComponent('https://zvuk.com/api/tiny/profile');
-	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + returnUrl;
+	// Use plugin callback URL instead of Zvuk API endpoint
+	var callbackUrl = encodeURIComponent(window.location.protocol + '//' + window.location.host + '/plugins/zvuk/oauthCallback');
+	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + callbackUrl;
 
 	window.zvukOAuthWindow = window.open(
 		loginUrl,
@@ -131,69 +138,42 @@ function openZvukOAuthWindow() {
 		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top
 	);
 
-	// Poll for successful login and token retrieval every 1000ms
-	var pollInterval = setInterval(function() {
-		try {
-			if (!window.zvukOAuthWindow || window.zvukOAuthWindow.closed) {
-				clearInterval(pollInterval);
-				return;
-			}
+	if (!window.zvukOAuthWindow) {
+		showOAuthError('Failed to open authorization window. Please allow popups.');
+		return;
+	}
 
-			var url = window.zvukOAuthWindow.location.href;
-			// Check if redirected to profile endpoint
-			if (url.includes('/api/tiny/profile')) {
-				// Fetch profile data to get token
-				fetchZvukProfile();
-				clearInterval(pollInterval);
-			}
-		} catch (e) {
-			// Ignore cross-origin errors when accessing popup URL
-		}
-	}, 1000);
-
-	// Stop polling after 15 minutes
-	setTimeout(function() {
-		clearInterval(pollInterval);
-	}, 900000);
-}
-
-function fetchZvukProfile() {
-	var statusDiv = document.getElementById('oauthStatus');
-	statusDiv.textContent = 'Retrieving token...';
-	statusDiv.style.backgroundColor = '#e3f2fd';
-	statusDiv.style.color = '#1976d2';
-	statusDiv.style.display = 'block';
-
-	// Fetch profile from Zvuk API to get the token
-	fetch('https://zvuk.com/api/tiny/profile', {
-		credentials: 'include',  // Send cookies if available
-		headers: {
-			'Accept': 'application/json'
-		}
-	})
-	.then(function(response) {
-		if (response.ok) {
-			return response.json();
-		}
-		throw new Error('Failed to fetch profile: ' + response.status);
-	})
-	.then(function(profile) {
-		if (window.zvukOAuthWindow) {
-			window.zvukOAuthWindow.close();
+	// Listen for postMessage events from the popup
+	window.addEventListener('message', function(event) {
+		// For security, only accept messages from our own origin
+		if (event.origin !== window.location.origin) {
+			return;
 		}
 
-		if (profile && profile.token) {
-			saveTokenFromOAuth(profile.token);
-		} else {
-			showOAuthError('No token found in profile response');
+		if (event.data && event.data.type === 'zvukOAuthSuccess') {
+			statusDiv.textContent = 'Account successfully added! Refreshing page...';
+			statusDiv.style.backgroundColor = '#d4edda';
+			statusDiv.style.color = '#155724';
+			statusDiv.style.display = 'block';
+			setTimeout(function() {
+				location.reload();
+			}, 1500);
+		} else if (event.data && event.data.type === 'zvukOAuthError') {
+			showOAuthError('Authentication error: ' + (event.data.error || 'Unknown error'));
 		}
-	})
-	.catch(function(error) {
-		if (window.zvukOAuthWindow) {
-			window.zvukOAuthWindow.close();
-		}
-		showOAuthError('Failed to retrieve token: ' + error.message);
 	});
+
+	// Fallback: check if popup is closed every 2 seconds
+	var checkInterval = setInterval(function() {
+		if (!window.zvukOAuthWindow || window.zvukOAuthWindow.closed) {
+			clearInterval(checkInterval);
+		}
+	}, 2000);
+
+	// Stop checking after 15 minutes
+	setTimeout(function() {
+		clearInterval(checkInterval);
+	}, 900000);
 }
 
 function showOAuthError(message) {
@@ -202,39 +182,6 @@ function showOAuthError(message) {
 	statusDiv.style.backgroundColor = '#f8d7da';
 	statusDiv.style.color = '#721c24';
 	statusDiv.style.display = 'block';
-}
-
-function saveTokenFromOAuth(token) {
-	var statusDiv = document.getElementById('oauthStatus');
-	statusDiv.textContent = 'Saving token...';
-	statusDiv.style.backgroundColor = '#e3f2fd';
-	statusDiv.style.color = '#1976d2';
-	statusDiv.style.display = 'block';
-
-	fetch('/plugins/zvuk/saveOAuthToken', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({ token: token })
-	})
-	.then(function(response) { return response.json(); })
-	.then(function(data) {
-		if (data.success) {
-			statusDiv.textContent = 'Token saved! Please refresh the page.';
-			statusDiv.style.backgroundColor = '#d4edda';
-			statusDiv.style.color = '#155724';
-			statusDiv.style.display = 'block';
-			setTimeout(function() {
-				location.reload();
-			}, 1500);
-		} else {
-			showOAuthError(data.error || 'Unknown error');
-		}
-	})
-	.catch(function(error) {
-		showOAuthError('Network error: ' + error.message);
-	});
 }
 </script>
 

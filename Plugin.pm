@@ -58,6 +58,11 @@ sub initPlugin {
 			'plugins/zvuk/saveOAuthToken',
 			\&Plugins::Zvuk::Plugin::handleSaveOAuthToken
 		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/oauthCallback',
+			\&Plugins::Zvuk::Plugin::handleOAuthCallback
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -1435,6 +1440,207 @@ sub handleSaveOAuthToken {
 				$response->content_type('application/json');
 				my $json = encode_json({ success => 0, error => 'Token validation failed' });
 				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			}
+		},
+		$token
+	);
+}
+
+sub handleOAuthCallback {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $uri = $request->uri;
+	my %params;
+
+	# Parse query parameters from URI
+	if ($uri->query) {
+		foreach my $param (split /&/, $uri->query) {
+			my ($key, $val) = split /=/, $param, 2;
+			$val = Slim::Utils::Misc::unescape($val) if defined $val;
+			$params{$key} = $val;
+		}
+	}
+
+	# Try to get token from query parameter first
+	my $token = $params{token};
+
+	if (!$token) {
+		# If no token in params, fetch from Zvuk API (for browsers with auth cookies)
+		require LWP::UserAgent;
+		require HTTP::Cookies;
+
+		my $ua = LWP::UserAgent->new;
+		my $jar = HTTP::Cookies->new;
+		$ua->cookie_jar($jar);
+
+		# Try to get profile from Zvuk API
+		my $ua_response = $ua->get('https://zvuk.com/api/tiny/profile');
+
+		if ($ua_response->is_success) {
+			my $profile = decode_json($ua_response->content);
+			if ($profile && $profile->{token}) {
+				$token = $profile->{token};
+			}
+		}
+	}
+
+	if (!$token) {
+		$log->error("OAuth Callback: No token provided and unable to fetch from API");
+		my $html = qq{
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="UTF-8">
+				<title>Zvuk OAuth - Error</title>
+				<style>
+					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+					h1 { color: #d32f2f; margin-bottom: 20px; }
+					p { color: #666; line-height: 1.6; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h1>Authentication Error</h1>
+					<p>Unable to retrieve authentication token. Please try again or use the manual token input method.</p>
+				</div>
+			</body>
+			</html>
+		};
+		$response->code(400);
+		$response->content_type('text/html; charset=utf-8');
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+		return;
+	}
+
+	# Validate token format
+	if ($token !~ /^[0-9a-f]{32}$/i) {
+		$log->error("OAuth Callback: Invalid token format");
+		my $html = qq{
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="UTF-8">
+				<title>Zvuk OAuth - Error</title>
+				<style>
+					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+					h1 { color: #d32f2f; margin-bottom: 20px; }
+					p { color: #666; line-height: 1.6; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h1>Invalid Token</h1>
+					<p>The token format is invalid. Please try again.</p>
+				</div>
+			</body>
+			</html>
+		};
+		$response->code(400);
+		$response->content_type('text/html; charset=utf-8');
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+		return;
+	}
+
+	# Verify token by fetching profile
+	require Plugins::Zvuk::API::Async;
+	Plugins::Zvuk::API::Async->getProfile(
+		sub {
+			my $profile = shift;
+
+			if ($profile && $profile->{id} && !$profile->{error}) {
+				my $userId = $profile->{id};
+				my $prefs = preferences('plugin.zvuk');
+				my $accounts = $prefs->get('accounts') || {};
+				$accounts->{$userId} = {
+					token => $token,
+					name  => $profile->{name} || "Account $userId",
+				};
+				$prefs->set('accounts', $accounts);
+				$log->info("OAuth Callback: Account added via browser: userId=$userId");
+
+				my $html = qq{
+					<!DOCTYPE html>
+					<html>
+					<head>
+						<meta charset="UTF-8">
+						<title>Zvuk OAuth - Success</title>
+						<style>
+							body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+							.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+							h1 { color: #388e3c; margin-bottom: 20px; }
+							p { color: #666; line-height: 1.6; margin-bottom: 20px; }
+							.closing { font-size: 12px; color: #999; margin-top: 15px; }
+						</style>
+					</head>
+					<body>
+						<div class="container">
+							<h1>✓ Successfully Authenticated</h1>
+							<p>Your Zvuk account has been successfully added to the plugin.</p>
+							<p>This window will close automatically in 2 seconds...</p>
+							<div class="closing">If it doesn't close, you can safely close this window.</div>
+						</div>
+						<script>
+							// Send message to parent window that OAuth was successful
+							if (window.opener) {
+								window.opener.postMessage({
+									type: 'zvukOAuthSuccess',
+									token: '$token',
+									userId: '$userId'
+								}, '*');
+							}
+
+							// Close window after 2 seconds
+							setTimeout(function() {
+								window.close();
+							}, 2000);
+						</script>
+					</body>
+					</html>
+				};
+				$response->code(200);
+				$response->content_type('text/html; charset=utf-8');
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+			}
+			else {
+				$log->error("OAuth Callback: Profile validation failed");
+				my $html = qq{
+					<!DOCTYPE html>
+					<html>
+					<head>
+						<meta charset="UTF-8">
+						<title>Zvuk OAuth - Error</title>
+						<style>
+							body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+							.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+							h1 { color: #d32f2f; margin-bottom: 20px; }
+							p { color: #666; line-height: 1.6; }
+						</style>
+					</head>
+					<body>
+						<div class="container">
+							<h1>Authentication Failed</h1>
+							<p>Failed to verify your Zvuk account. Please try again.</p>
+						</div>
+						<script>
+							setTimeout(function() {
+								if (window.opener) {
+									window.opener.postMessage({
+										type: 'zvukOAuthError',
+										error: 'Token validation failed'
+									}, '*');
+								}
+								window.close();
+							}, 3000);
+						</script>
+					</body>
+					</html>
+				};
+				$response->code(401);
+				$response->content_type('text/html; charset=utf-8');
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
 			}
 		},
 		$token

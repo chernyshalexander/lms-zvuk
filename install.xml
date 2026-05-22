@@ -3,7 +3,7 @@
     <name>PLUGIN_ZVUK</name>
     <id>zvuk</id>
     <module>Plugins::Zvuk::Plugin</module>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <description>PLUGIN_ZVUK_DESC</description>
     <defaultState>enabled</defaultState>
     <targetApplication>
