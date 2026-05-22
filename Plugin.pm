@@ -1271,12 +1271,13 @@ sub _getVocalMenu {
 	return \@vocal_items;
 }
 
-# Web UI handler for displaying wave settings page
+# Web UI handler for displaying wave settings (AJAX or standalone)
 sub handleWaveSettingsWebUI {
 	my ($httpClient, $response) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
 	require Slim::Web::HTTP;
+	my $request = $response->request;
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
 
 	# Build genres list for JavaScript
@@ -1296,7 +1297,10 @@ sub handleWaveSettingsWebUI {
 		webroot => '/html/',
 	};
 
-	my $output = Slim::Web::HTTP::filltemplatefile('plugins/zvuk/waveSettings.html', $vars);
+	# Use waveSliders.html for AJAX modal content, waveSettings.html for standalone
+	my $template = 'plugins/zvuk/waveSliders.html';
+
+	my $output = Slim::Web::HTTP::filltemplatefile($template, $vars);
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
