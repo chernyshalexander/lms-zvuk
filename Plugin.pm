@@ -41,6 +41,12 @@ sub initPlugin {
 	
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
+
+		# Register web routes for AJAX handlers
+		Slim::Web::Pages->addPageFunction(
+			'/plugins/zvuk/saveWaveSettings',
+			\&Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -1233,6 +1239,51 @@ sub _getVocalMenu {
 	);
 
 	return \@vocal_items;
+}
+
+# Web AJAX handler for saving wave settings from web interface
+sub handleSaveWaveSettingsWeb {
+	my ($client, $params, $callback, $httpClient, $response) = @_;
+
+	# Get JSON payload from request body
+	my $body = $httpClient->contentRef ? ${$httpClient->contentRef} : '';
+	my $data;
+
+	eval {
+		$data = decode_json($body);
+	};
+
+	if ($@ || !$data) {
+		$log->error("Wave Settings Web: Failed to parse JSON: $@");
+		$response->code(400);
+		$response->header('Content-Type' => 'application/json');
+		$response->body(encode_json({ success => 0, error => 'Invalid JSON' }));
+		return;
+	}
+
+	# Get current account ID (default for web UI)
+	my $account_id = 'default';
+	if ($client) {
+		my $api = _getAPIHandler($client);
+		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	}
+
+	# Validate and save settings
+	my $settings = {
+		popular  => defined $data->{popular} ? 0.0 + $data->{popular} : 0.5,
+		energy   => defined $data->{energy} ? 0.0 + $data->{energy} : 0.5,
+		fun      => defined $data->{fun} ? 0.0 + $data->{fun} : 0.5,
+		language => $data->{language} || 'all',
+		vocal    => defined $data->{vocal} ? 0 + $data->{vocal} : 1,
+		genres   => $data->{genres} && ref $data->{genres} eq 'ARRAY' ? $data->{genres} : [],
+	};
+
+	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
+	$log->info("Wave settings saved from web interface for account $account_id");
+
+	$response->code(200);
+	$response->header('Content-Type' => 'application/json');
+	$response->body(encode_json({ success => 1 }));
 }
 
 1;
