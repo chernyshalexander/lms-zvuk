@@ -60,7 +60,7 @@ sub loadSettings {
             fun      => $settings->{fun} // DEFAULT_FUN,
             language => $settings->{language} // DEFAULT_LANGUAGE,
             vocal    => defined $settings->{vocal} ? $settings->{vocal} : DEFAULT_VOCAL,
-            genres   => @cleaned_genres > 0 ? \@cleaned_genres : _getDefaultGenres(),
+            genres   => \@cleaned_genres,  # Return only selected genres, empty if none
         };
     }
 
@@ -123,7 +123,7 @@ sub _getDefaults {
         fun      => DEFAULT_FUN,
         language => DEFAULT_LANGUAGE,
         vocal    => DEFAULT_VOCAL,
-        genres   => _getDefaultGenres(),
+        genres   => [],  # No genres selected by default - user must choose
     };
 }
 
