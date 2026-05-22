@@ -106,10 +106,17 @@ sub beforeRender {
 		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
 	}
 
+	my $genres_json = JSON::encode_json(\@genre_list);
+	my $genres_labels_json = JSON::encode_json(\%genre_labels);
+	my $selected_genres_json = JSON::encode_json($wave_settings->{genres} || []);
+
+	$log->debug("Wave Settings - Genres JSON: $genres_json");
+	$log->debug("Wave Settings - Genre Labels JSON: $genres_labels_json");
+
 	$params->{wave_settings} = $wave_settings;
-	$params->{genres_json} = JSON::encode_json(\@genre_list);
-	$params->{genres_labels_json} = JSON::encode_json(\%genre_labels);
-	$params->{selected_genres_json} = JSON::encode_json($wave_settings->{genres} || []);
+	$params->{genres_json} = $genres_json;
+	$params->{genres_labels_json} = $genres_labels_json;
+	$params->{selected_genres_json} = $selected_genres_json;
 }
 
 1;

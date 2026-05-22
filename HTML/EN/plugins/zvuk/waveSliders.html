@@ -6,7 +6,7 @@
 .wave-setting-group {
 	margin-bottom: 20px;
 	padding: 15px;
-	background-color: #f5f0ff;
+	background-color: #f5f5f5;
 	border-radius: 8px;
 	border-left: 4px solid #b8a6db;
 }
@@ -113,6 +113,17 @@
 	user-select: none;
 }
 
+.wave-setting-group label {
+	color: #333;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.wave-setting-group label span {
+	color: #333;
+	font-weight: 500;
+}
+
 .button-group {
 	margin-top: 20px;
 	display: flex;
@@ -213,8 +224,8 @@
 		</div>
 	</div>
 
-	<!-- Language Radio Buttons -->
-	<div class="wave-setting-group">
+	<!-- Language Radio Buttons (visible only if vocal=1) -->
+	<div id="languageGroup" class="wave-setting-group" style="display: none;">
 		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_LANGUAGE" | string %]</div>
 		<div style="margin-top: 8px;">
 			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
@@ -256,22 +267,32 @@ function initializeGenres() {
 	const genreLabels = [% genres_labels_json %];
 	const container = document.getElementById('genreList');
 
+	console.log('Raw genres_labels_json type:', typeof genreLabels);
 	console.log('Initializing genres:', genres);
-	console.log('Genre labels:', genreLabels);
+	console.log('Genre labels object:', genreLabels);
 	console.log('Selected genres:', selectedGenres);
 
-	genres.forEach(genre => {
-		const isChecked = selectedGenres.includes(genre.name);
-		const label = genreLabels[genre.name] || genre.name;
+	if (!genres || genres.length === 0) {
+		console.error('No genres loaded!');
+		container.innerHTML = '<p>Error: No genres available</p>';
+		return;
+	}
 
-		console.log('Genre ' + genre.name + ': label=' + label);
+	genres.forEach(genre => {
+		const isChecked = selectedGenres && selectedGenres.includes(genre.name);
+		let label = genre.name;
+
+		if (genreLabels && typeof genreLabels === 'object' && genreLabels[genre.name]) {
+			label = genreLabels[genre.name];
+		}
+
+		console.log('Processing genre: ' + genre.name + ', label: ' + label + ', checked: ' + isChecked);
 
 		const item = document.createElement('div');
 		item.className = 'genre-item';
-		item.innerHTML = `
-			<input type="checkbox" id="genre_\${genre.name}" name="genre" value="\${genre.name}" \${isChecked ? 'checked' : ''}>
-			<label for="genre_\${genre.name}">\${label}</label>
-		`;
+		const checkboxHTML = `<input type="checkbox" id="genre_\${genre.name}" name="genre" value="\${genre.name}" \${isChecked ? 'checked' : ''}>`;
+		const labelHTML = `<label for="genre_\${genre.name}">\${label}</label>`;
+		item.innerHTML = checkboxHTML + labelHTML;
 		container.appendChild(item);
 	});
 }
@@ -287,6 +308,29 @@ document.getElementById('energy').addEventListener('input', function() {
 
 document.getElementById('fun').addEventListener('input', function() {
 	document.getElementById('funValue').textContent = this.value;
+});
+
+// Handle vocal selection to show/hide language group
+function updateLanguageVisibility() {
+	const vocalRadio = document.querySelector('input[name="vocal"]:checked');
+	const languageGroup = document.getElementById('languageGroup');
+	if (languageGroup) {
+		if (vocalRadio && parseInt(vocalRadio.value) === 1) {
+			languageGroup.style.display = 'block';
+		} else {
+			languageGroup.style.display = 'none';
+		}
+	}
+}
+
+document.querySelectorAll('input[name="vocal"]').forEach(radio => {
+	radio.addEventListener('change', updateLanguageVisibility);
+});
+
+// Initialize language visibility on page load
+document.addEventListener('DOMContentLoaded', function() {
+	initializeGenres();
+	updateLanguageVisibility();
 });
 
 // Save settings via AJAX
