@@ -5,6 +5,7 @@ use warnings;
 
 use base qw(Slim::Plugin::OPMLBased);
 
+use JSON qw(encode_json decode_json);
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::PluginManager;
