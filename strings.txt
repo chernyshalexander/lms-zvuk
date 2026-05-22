@@ -70,6 +70,18 @@ PLUGIN_ZVUK_QUALITY_FLAC
 	EN	Lossless (FLAC)
 	RU	Максимальное (FLAC / Hi-Fi)
 
+PLUGIN_ZVUK_WAVE_SLIDERS
+	EN	Wave Settings (Sliders)
+	RU	Настройки Волны (Слайдеры)
+
+PLUGIN_ZVUK_WAVE_SLIDERS_DESC
+	EN	Open Wave Settings interface with sliders
+	RU	Открыть интерфейс настроек Волны со слайдерами
+
+PLUGIN_ZVUK_OPEN_SLIDERS
+	EN	Open Settings
+	RU	Открыть настройки
+
 PLUGIN_ZVUK_MY_MUSIC
 	EN	My Music
 	RU	Моя музыка
@@ -137,10 +149,6 @@ PLUGIN_ZVUK_MENU_WAVE_START
 PLUGIN_ZVUK_MENU_WAVE_SETTINGS
 	EN	Settings
 	RU	Настройки
-
-PLUGIN_ZVUK_MENU_WAVE_SETTINGS_ALT
-	EN	Settings (Sliders)
-	RU	Настройки (Слайдеры)
 
 PLUGIN_ZVUK_SETTING_POPULAR
 	EN	Popularity
