@@ -15,29 +15,50 @@
 
 <script>
 function openWaveSliderModal() {
-	document.getElementById('waveSliderModal').style.display = 'block';
+	console.log('openWaveSliderModal called');
+	var modal = document.getElementById('waveSliderModal');
+	console.log('Modal element:', modal);
+	if (modal) {
+		modal.style.display = 'block';
+		console.log('Modal display set to block');
+	}
 }
 
 function closeWaveSliderModal() {
-	document.getElementById('waveSliderModal').style.display = 'none';
+	console.log('closeWaveSliderModal called');
+	var modal = document.getElementById('waveSliderModal');
+	if (modal) {
+		modal.style.display = 'none';
+		console.log('Modal display set to none');
+	}
 }
 
 // Close modal when clicking outside (on the background)
 document.addEventListener('DOMContentLoaded', function() {
+	console.log('DOMContentLoaded event fired');
 	var modal = document.getElementById('waveSliderModal');
 	var modalBox = document.getElementById('waveSliderBox');
 
-	modal.addEventListener('click', function(e) {
-		// Only close if clicking on modal background, not on the modal content
-		if (e.target === modal) {
-			closeWaveSliderModal();
-		}
-	});
+	console.log('Modal:', modal);
+	console.log('ModalBox:', modalBox);
 
-	// Prevent closing when clicking inside the modal content
-	modalBox.addEventListener('click', function(e) {
-		e.stopPropagation();
-	});
+	if (modal) {
+		modal.addEventListener('click', function(e) {
+			console.log('Modal clicked. Target:', e.target, 'Modal:', modal, 'Equal:', e.target === modal);
+			// Only close if clicking on modal background, not on the modal content
+			if (e.target === modal) {
+				console.log('Closing modal - clicked on background');
+				closeWaveSliderModal();
+			}
+		});
+	}
+
+	if (modalBox) {
+		modalBox.addEventListener('click', function(e) {
+			console.log('ModalBox clicked - stopping propagation');
+			e.stopPropagation();
+		});
+	}
 });
 </script>
 
