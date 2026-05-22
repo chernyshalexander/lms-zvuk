@@ -788,9 +788,13 @@ sub handleWaveSettingsRouter {
 	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
 	$log->info("=== End Router Decision ===");
 
-	# Show OPML wizard for all clients (web and native)
-	# TODO: Add dedicated web UI with sliders for Material UI in future
-	handleWaveWizardStart($client, $callback, $args);
+	if ($useWebUI) {
+		# For Web/Material UI: show paging wizard (in future will be web UI with sliders)
+		handleWaveWizardStart($client, $callback, $args);
+	} else {
+		# For Jive/SqueezePlay: show standard list settings
+		handleWaveSettings($client, $callback, $args);
+	}
 }
 
 sub handleWaveSettings {
