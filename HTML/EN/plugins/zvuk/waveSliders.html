@@ -6,9 +6,9 @@
 .wave-setting-group {
 	margin-bottom: 20px;
 	padding: 15px;
-	background-color: #f9f9f9;
+	background-color: #f5f0ff;
 	border-radius: 8px;
-	border-left: 4px solid #5a7fd4;
+	border-left: 4px solid #b8a6db;
 }
 
 .wave-setting-title {
@@ -41,7 +41,7 @@
 	width: 18px;
 	height: 18px;
 	border-radius: 50%;
-	background: #5a7fd4;
+	background: #a8d5ba;
 	cursor: pointer;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
@@ -50,7 +50,7 @@
 	width: 18px;
 	height: 18px;
 	border-radius: 50%;
-	background: #5a7fd4;
+	background: #a8d5ba;
 	cursor: pointer;
 	border: none;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -60,7 +60,7 @@
 	min-width: 60px;
 	text-align: right;
 	font-weight: bold;
-	color: #5a7fd4;
+	color: #a8d5ba;
 	font-size: 13px;
 }
 
@@ -98,7 +98,7 @@
 }
 
 .genre-item:hover {
-	border-color: #5a7fd4;
+	border-color: #b8a6db;
 	background-color: #f0f4ff;
 }
 
@@ -131,12 +131,12 @@
 }
 
 .btn-primary {
-	background-color: #5a7fd4;
+	background-color: #b8a6db;
 	color: white;
 }
 
 .btn-primary:hover {
-	background-color: #4a6fb4;
+	background-color: #a898c8;
 }
 
 .btn-secondary {
@@ -198,26 +198,37 @@
 		</div>
 	</div>
 
-	<!-- Language Select -->
+	<!-- Vocal Radio Buttons -->
 	<div class="wave-setting-group">
-		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_LANGUAGE" | string %]</div>
-		<div class="select-container">
-			<select id="language">
-				<option value="all" [% IF wave_settings.language == 'all' %]selected[% END %]>[% "PLUGIN_ZVUK_LANGUAGE_ALL" | string %]</option>
-				<option value="foreign" [% IF wave_settings.language == 'foreign' %]selected[% END %]>[% "PLUGIN_ZVUK_LANGUAGE_FOREIGN" | string %]</option>
-				<option value="russian" [% IF wave_settings.language == 'russian' %]selected[% END %]>[% "PLUGIN_ZVUK_LANGUAGE_RUSSIAN" | string %]</option>
-			</select>
+		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_VOCAL" | string %]</div>
+		<div style="margin-top: 8px;">
+			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
+				<input type="radio" name="vocal" value="1" [% IF wave_settings.vocal == 1 %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
+				<span>[% "PLUGIN_ZVUK_VOCAL_WITH" | string %]</span>
+			</label>
+			<label style="display: flex; align-items: center; cursor: pointer;">
+				<input type="radio" name="vocal" value="0" [% IF wave_settings.vocal == 0 %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
+				<span>[% "PLUGIN_ZVUK_VOCAL_WITHOUT" | string %]</span>
+			</label>
 		</div>
 	</div>
 
-	<!-- Vocal Select -->
+	<!-- Language Radio Buttons -->
 	<div class="wave-setting-group">
-		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_VOCAL" | string %]</div>
-		<div class="select-container">
-			<select id="vocal">
-				<option value="1" [% IF wave_settings.vocal == 1 %]selected[% END %]>[% "PLUGIN_ZVUK_VOCAL_WITH" | string %]</option>
-				<option value="0" [% IF wave_settings.vocal == 0 %]selected[% END %]>[% "PLUGIN_ZVUK_VOCAL_WITHOUT" | string %]</option>
-			</select>
+		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_LANGUAGE" | string %]</div>
+		<div style="margin-top: 8px;">
+			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
+				<input type="radio" name="language" value="all" [% IF wave_settings.language == 'all' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
+				<span>[% "PLUGIN_ZVUK_LANGUAGE_ALL" | string %]</span>
+			</label>
+			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
+				<input type="radio" name="language" value="foreign" [% IF wave_settings.language == 'foreign' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
+				<span>[% "PLUGIN_ZVUK_LANGUAGE_FOREIGN" | string %]</span>
+			</label>
+			<label style="display: flex; align-items: center; cursor: pointer;">
+				<input type="radio" name="language" value="russian" [% IF wave_settings.language == 'russian' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
+				<span>[% "PLUGIN_ZVUK_LANGUAGE_RUSSIAN" | string %]</span>
+			</label>
 		</div>
 	</div>
 
@@ -229,8 +240,8 @@
 
 	<!-- Buttons -->
 	<div class="button-group">
-		<button class="btn btn-primary" onclick="saveWaveSettings()">[% "PLUGIN_ZVUK_WIZARD_LAUNCH" | string %]</button>
-		<button class="btn btn-secondary" onclick="closeWaveSliderModal()">[% "PLUGIN_ZVUK_BACK" | string %]</button>
+		<button class="btn btn-primary" onclick="saveWaveSettings()">[% "PLUGIN_ZVUK_SAVE" | string %]</button>
+		<button class="btn btn-secondary" onclick="closeWaveSliderModal()">[% "PLUGIN_ZVUK_CANCEL" | string %]</button>
 	</div>
 
 	<!-- Status Message -->
@@ -242,11 +253,18 @@
 function initializeGenres() {
 	const genres = [% genres_json %];
 	const selectedGenres = [% selected_genres_json %];
+	const genreLabels = [% genres_labels_json %];
 	const container = document.getElementById('genreList');
+
+	console.log('Initializing genres:', genres);
+	console.log('Genre labels:', genreLabels);
+	console.log('Selected genres:', selectedGenres);
 
 	genres.forEach(genre => {
 		const isChecked = selectedGenres.includes(genre.name);
-		const label = [% genres_labels_json %][genre.name] || genre.name;
+		const label = genreLabels[genre.name] || genre.name;
+
+		console.log('Genre ' + genre.name + ': label=' + label);
 
 		const item = document.createElement('div');
 		item.className = 'genre-item';
@@ -273,12 +291,15 @@ document.getElementById('fun').addEventListener('input', function() {
 
 // Save settings via AJAX
 function saveWaveSettings() {
+	const vocalRadio = document.querySelector('input[name="vocal"]:checked');
+	const languageRadio = document.querySelector('input[name="language"]:checked');
+
 	const settings = {
 		popular: parseFloat(document.getElementById('popular').value),
 		energy: parseFloat(document.getElementById('energy').value),
 		fun: parseFloat(document.getElementById('fun').value),
-		language: document.getElementById('language').value,
-		vocal: parseInt(document.getElementById('vocal').value),
+		language: languageRadio ? languageRadio.value : 'all',
+		vocal: vocalRadio ? parseInt(vocalRadio.value) : 1,
 		genres: Array.from(document.querySelectorAll('input[name="genre"]:checked')).map(el => el.value)
 	};
 
@@ -302,7 +323,6 @@ function saveWaveSettings() {
 			showMessage('[% "PLUGIN_ZVUK_SETTINGS_SAVED" | string %]', 'success');
 			setTimeout(() => {
 				closeWaveSliderModal();
-				window.location.href = 'zvuk://wave';
 			}, 1000);
 		} else {
 			showMessage('Error: ' + (data.error || 'Unknown error'), 'error');

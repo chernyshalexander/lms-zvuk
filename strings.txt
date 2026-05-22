@@ -289,3 +289,11 @@ PLUGIN_ZVUK_WIZARD_FUN_HAPPY
 PLUGIN_ZVUK_SETTINGS_SAVED
 	EN	Settings saved! Starting Wave...
 	RU	Настройки сохранены! Запуск Волны...
+
+PLUGIN_ZVUK_SAVE
+	EN	Save
+	RU	Сохранить
+
+PLUGIN_ZVUK_CANCEL
+	EN	Cancel
+	RU	Отмена
