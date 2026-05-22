@@ -821,9 +821,15 @@ sub _getWizardStep {
 	} elsif ($step == 3) {
 		return _getWizardFunStep($client, $state);
 	} elsif ($step == 4) {
-		return _getWizardLanguageStep($client, $state);
-	} elsif ($step == 5) {
 		return _getWizardVocalStep($client, $state);
+	} elsif ($step == 5) {
+		# Only show language step if vocal is selected (vocal=1)
+		if ($state->{vocal} == 1) {
+			return _getWizardLanguageStep($client, $state);
+		} else {
+			# Skip language, go to genres
+			return _getWizardGenresStep($client, $state);
+		}
 	} elsif ($step == 6) {
 		return _getWizardGenresStep($client, $state);
 	} else {
@@ -849,6 +855,9 @@ sub _getWizardStepLabel {
 		if (abs($value - 0.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_SAD'); }
 		elsif (abs($value - 0.5) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_NEUTRAL'); }
 		elsif (abs($value - 1.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_WIZARD_FUN_HAPPY'); }
+	} elsif ($step == 4) {  # Vocal
+		if (abs($value - 0.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'); }
+		elsif (abs($value - 1.0) < 0.01) { return cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'); }
 	}
 
 	return '';
@@ -936,19 +945,19 @@ sub _getWizardLanguageStep {
 			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_ALL'),
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
-			passthrough => [{ step => 4, value => 'all', state => $state }],
+			passthrough => [{ step => 5, value => 'all', state => $state }],
 		},
 		{
 			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_FOREIGN'),
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
-			passthrough => [{ step => 4, value => 'foreign', state => $state }],
+			passthrough => [{ step => 5, value => 'foreign', state => $state }],
 		},
 		{
 			name        => cstring($client, 'PLUGIN_ZVUK_LANGUAGE_RUSSIAN'),
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
-			passthrough => [{ step => 4, value => 'russian', state => $state }],
+			passthrough => [{ step => 5, value => 'russian', state => $state }],
 		},
 		{
 			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
@@ -967,13 +976,13 @@ sub _getWizardVocalStep {
 			name        => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITH'),
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
-			passthrough => [{ step => 5, value => 1, state => $state }],
+			passthrough => [{ step => 4, value => 1, state => $state }],
 		},
 		{
 			name        => cstring($client, 'PLUGIN_ZVUK_VOCAL_WITHOUT'),
 			type        => 'link',
 			url         => \&handleWizardStepSelect,
-			passthrough => [{ step => 5, value => 0, state => $state }],
+			passthrough => [{ step => 4, value => 0, state => $state }],
 		},
 		{
 			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
@@ -1028,8 +1037,8 @@ sub handleWizardStepSelect {
 	if ($step == 1) { $state->{popular} = $value; }
 	elsif ($step == 2) { $state->{energy} = $value; }
 	elsif ($step == 3) { $state->{fun} = $value; }
-	elsif ($step == 4) { $state->{language} = $value; }
-	elsif ($step == 5) { $state->{vocal} = $value; }
+	elsif ($step == 4) { $state->{vocal} = $value; }
+	elsif ($step == 5) { $state->{language} = $value; }
 
 	# Move to next step
 	$callback->(_getWizardStep($client, $step + 1, $state));
