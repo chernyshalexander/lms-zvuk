@@ -794,7 +794,7 @@ sub handleWaveSettingsRouter {
 				{
 					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 					type => 'link',
-					url => Slim::Web::HTTP::getServerPath() . '/plugins/zvuk/waveSettings',
+					url => '/plugins/zvuk/waveSettings',
 				}
 			]
 		});
@@ -1261,6 +1261,7 @@ sub handleWaveSettingsWebUI {
 	my ($client, $params, $callback, $httpClient, $response) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
+	require Template;
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
 
 	# Build genres list for JavaScript
@@ -1277,11 +1278,11 @@ sub handleWaveSettingsWebUI {
 		genres_json => encode_json(\@genre_list),
 		genres_labels_json => encode_json(\%genre_labels),
 		selected_genres_json => encode_json($wave_settings->{genres} || []),
-		webroot => Slim::Web::HTTP::getServerPath(),
+		webroot => '/html/',
 	};
 
-	my $template = Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN/plugins/zvuk/waveSettings.html';
-	my $tt = Template->new({ INCLUDE_PATH => Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN' });
+	my $htmlDir = Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN';
+	my $tt = Template->new({ INCLUDE_PATH => $htmlDir });
 	my $output = '';
 
 	if ($tt->process('plugins/zvuk/waveSettings.html', $vars, \$output)) {
