@@ -1,7 +1,8 @@
 <style>
 .wave-settings-container {
 	font-family: Arial, sans-serif;
-	background: white !important;
+	background: white;
+	color: #333;
 }
 
 .wave-setting-group {
@@ -27,13 +28,22 @@
 
 .slider-input {
 	flex: 1;
-	height: 6px;
+	height: 20px;
 	-webkit-appearance: none;
 	appearance: none;
-	background: linear-gradient(to right, #e0e0e0 0%, #e0e0e0 100%);
+	background: transparent;
 	outline: none;
-	border-radius: 3px;
 	cursor: pointer;
+	width: 100%;
+	padding: 0;
+	margin: 0;
+}
+
+.slider-input::-webkit-slider-runnable-track {
+	background-color: #d0d0d0;
+	border-radius: 5px;
+	height: 6px;
+	border: none;
 }
 
 .slider-input::-webkit-slider-thumb {
@@ -44,7 +54,16 @@
 	border-radius: 50%;
 	background: #a8d5ba;
 	cursor: pointer;
+	margin-top: -6px;
+	border: none;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-input::-moz-range-track {
+	background-color: #d0d0d0;
+	border-radius: 5px;
+	height: 6px;
+	border: none;
 }
 
 .slider-input::-moz-range-thumb {
@@ -54,7 +73,14 @@
 	background: #a8d5ba;
 	cursor: pointer;
 	border: none;
+	margin-top: 0;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-input::-moz-range-progress {
+	background-color: #a8d5ba;
+	height: 6px;
+	border-radius: 5px;
 }
 
 .slider-value {
@@ -65,19 +91,6 @@
 	font-size: 13px;
 }
 
-.select-container {
-	margin-top: 8px;
-}
-
-.select-container select {
-	width: 100%;
-	padding: 6px 8px;
-	border: 1px solid #ddd;
-	border-radius: 4px;
-	font-size: 13px;
-	background-color: white;
-	cursor: pointer;
-}
 
 .genre-list {
 	display: grid;
