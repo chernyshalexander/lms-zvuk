@@ -1,12 +1,13 @@
 <style>
 .wave-settings-container {
 	font-family: Arial, sans-serif;
+	background: white !important;
 }
 
 .wave-setting-group {
 	margin-bottom: 20px;
 	padding: 15px;
-	background-color: #f5f5f5 !important;
+	background-color: #efefef !important;
 	border-radius: 8px;
 	border-left: 4px solid #b8a6db;
 }
@@ -274,6 +275,9 @@ function initializeGenres() {
 	const genreLabels = [% genres_labels_json %];
 	const container = document.getElementById('genreList');
 
+	// Clear any previous content
+	container.innerHTML = '';
+
 	console.log('Raw genres_labels_json type:', typeof genreLabels);
 	console.log('Initializing genres:', genres);
 	console.log('Genre labels object:', genreLabels);
@@ -297,10 +301,24 @@ function initializeGenres() {
 
 		const item = document.createElement('div');
 		item.className = 'genre-item';
-		item.innerHTML = `
-			<input type="checkbox" id="genre_\${genre.name}" name="genre" value="\${genre.name}" \${isChecked ? 'checked' : ''}>
-			<label for="genre_\${genre.name}" style="margin: 0; padding: 0; color: #333; font-weight: normal;">\${label}</label>
-		`;
+
+		const checkbox = document.createElement('input');
+		checkbox.type = 'checkbox';
+		checkbox.id = 'genre_' + genre.name;
+		checkbox.name = 'genre';
+		checkbox.value = genre.name;
+		checkbox.checked = isChecked;
+
+		const labelEl = document.createElement('label');
+		labelEl.htmlFor = 'genre_' + genre.name;
+		labelEl.textContent = label;
+		labelEl.style.margin = '0';
+		labelEl.style.padding = '0';
+		labelEl.style.color = '#333';
+		labelEl.style.fontWeight = 'normal';
+
+		item.appendChild(checkbox);
+		item.appendChild(labelEl);
 		container.appendChild(item);
 	});
 }
