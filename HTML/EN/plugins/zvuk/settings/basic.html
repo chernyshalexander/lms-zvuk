@@ -110,50 +110,98 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 <!-- OAuth Authentication Section -->
 <div style="margin-top:20px; padding:15px; background-color:#f0f0f0; border-radius:4px; border-left:4px solid #b8a6db;">
 	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:12px;">
-		[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]
-		<br><br>
-		<strong>Инструкция:</strong><br>
-		1. <a href="https://zvuk.com/api/tiny/profile" target="_blank" style="color:#1976d2;">Откройте эту ссылку</a> в новом окне<br>
-		2. Авторизуйтесь на zvuk.com если нужно<br>
-		3. Скопируйте значение поля <code style="background:#fff; padding:2px 4px; border-radius:2px;">"token"</code> из JSON<br>
-		4. Вставьте в поле "Token" выше и нажмите Save
-	</div>
+	<div style="font-size:12px; color:#666; margin-bottom:12px;">[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]</div>
 	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
 	<div id="oauthStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
+</div>
+
+<!-- Anonymous Access Section -->
+<div style="margin-top:12px; padding:15px; background-color:#f9f9f9; border-radius:4px; border-left:4px solid #aaa;">
+	<div style="font-weight:bold; margin-bottom:6px;">Анонимный доступ</div>
+	<div style="font-size:12px; color:#666; margin-bottom:12px;">
+		Доступ без авторизации. Только качество 128kbps, без коллекции и лайков.
+	</div>
+	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">Войти анонимно</button>
+	<div id="anonStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
 </div>
 
 <script>
 function openZvukOAuthWindow() {
 	var statusDiv = document.getElementById('oauthStatus');
-	statusDiv.textContent = 'Opening Zvuk profile page... Copy the token and paste it in the "Token" field above.';
-	statusDiv.style.backgroundColor = '#e3f2fd';
-	statusDiv.style.color = '#1976d2';
-	statusDiv.style.display = 'block';
+	setDivStatus(statusDiv, 'Открываем окно авторизации...', 'info');
 
-	var width = 800;
-	var height = 600;
-	var left = (screen.width - width) / 2;
-	var top = (screen.height - height) / 2;
-
-	window.zvukOAuthWindow = window.open(
-		'https://zvuk.com/api/tiny/profile',
-		'zvukOAuth',
-		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top
+	var callbackUrl = encodeURIComponent(
+		window.location.protocol + '//' + window.location.host + '/plugins/zvuk/oauthCallback'
 	);
+	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + callbackUrl;
 
-	if (!window.zvukOAuthWindow) {
-		showOAuthError('Failed to open window. Please allow popups and try again.');
+	var width = 520, height = 620;
+	var left = (screen.width  - width)  / 2;
+	var top  = (screen.height - height) / 2;
+
+	var popup = window.open(loginUrl, 'zvukOAuth',
+		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top);
+
+	if (!popup) {
+		setDivStatus(statusDiv, 'Не удалось открыть окно. Разрешите всплывающие окна.', 'error');
 		return;
 	}
+
+	// Listen for result from popup via postMessage
+	var handler = function(event) {
+		if (event.origin !== window.location.origin) return;
+		if (!event.data || !event.data.type) return;
+
+		window.removeEventListener('message', handler);
+
+		if (event.data.type === 'zvukOAuthSuccess') {
+			setDivStatus(statusDiv, 'Аккаунт добавлен! Обновляем страницу...', 'ok');
+			setTimeout(function() { location.reload(); }, 1500);
+		} else if (event.data.type === 'zvukOAuthError') {
+			setDivStatus(statusDiv, 'Ошибка: ' + (event.data.error || 'неизвестная'), 'error');
+		}
+	};
+	window.addEventListener('message', handler);
+
+	// Clean up handler if popup closes without sending message
+	var check = setInterval(function() {
+		if (!popup || popup.closed) {
+			clearInterval(check);
+			window.removeEventListener('message', handler);
+		}
+	}, 1000);
 }
 
-function showOAuthError(message) {
-	var statusDiv = document.getElementById('oauthStatus');
-	statusDiv.textContent = message;
-	statusDiv.style.backgroundColor = '#f8d7da';
-	statusDiv.style.color = '#721c24';
-	statusDiv.style.display = 'block';
+function getAnonymousToken() {
+	var statusDiv = document.getElementById('anonStatus');
+	setDivStatus(statusDiv, 'Получаем анонимный токен...', 'info');
+
+	fetch('/plugins/zvuk/getAnonymousToken', { method: 'POST' })
+	.then(function(r) { return r.json(); })
+	.then(function(data) {
+		if (data.success) {
+			setDivStatus(statusDiv, 'Анонимный доступ активирован! Обновляем...', 'ok');
+			setTimeout(function() { location.reload(); }, 1500);
+		} else {
+			setDivStatus(statusDiv, 'Ошибка: ' + (data.error || 'unknown'), 'error');
+		}
+	})
+	.catch(function(e) {
+		setDivStatus(statusDiv, 'Ошибка сети: ' + e.message, 'error');
+	});
+}
+
+function setDivStatus(div, text, type) {
+	var colors = {
+		info:  { bg: '#e3f2fd', fg: '#1976d2' },
+		ok:    { bg: '#d4edda', fg: '#155724' },
+		error: { bg: '#f8d7da', fg: '#721c24' },
+	};
+	var c = colors[type] || colors.info;
+	div.textContent = text;
+	div.style.backgroundColor = c.bg;
+	div.style.color = c.fg;
+	div.style.display = 'block';
 }
 </script>
 

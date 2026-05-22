@@ -63,6 +63,11 @@ sub initPlugin {
 			'plugins/zvuk/oauthCallback',
 			\&Plugins::Zvuk::Plugin::handleOAuthCallback
 		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/getAnonymousToken',
+			\&Plugins::Zvuk::Plugin::handleGetAnonymousToken
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -1449,225 +1454,246 @@ sub handleSaveOAuthToken {
 sub handleOAuthCallback {
 	my ($httpClient, $response) = @_;
 
-	my $request = $response->request;
-	my $uri = $request->uri;
-	my %params;
+	$log->info("OAuth Callback: Serving browser-side fetch page");
 
-	$log->info("OAuth Callback: Received request from " . $request->uri->as_string);
-
-	# Parse query parameters from URI
-	if ($uri->query) {
-		foreach my $param (split /&/, $uri->query) {
-			my ($key, $val) = split /=/, $param, 2;
-			$val = Slim::Utils::Misc::unescape($val) if defined $val;
-			$params{$key} = $val;
-			$log->debug("OAuth Callback: param $key = $val");
+	# Return an HTML page that uses JS to fetch the token from zvuk.com
+	# The browser has zvuk.com session cookies, so fetch with credentials:include
+	# will return the authenticated profile. If CORS blocks it, manual paste is shown.
+	my $html = <<'END_HTML';
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Zvuk — Авторизация</title>
+	<style>
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body {
+			font-family: Arial, sans-serif;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 100vh;
+			background: #f5f5f5;
+			padding: 20px;
 		}
-	} else {
-		$log->info("OAuth Callback: No query parameters in URL");
+		.container {
+			background: white;
+			padding: 40px;
+			border-radius: 8px;
+			text-align: center;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+			max-width: 480px;
+			width: 100%;
+		}
+		h2 { color: #333; margin-bottom: 24px; font-size: 20px; }
+		.spinner {
+			border: 3px solid #eee;
+			border-top: 3px solid #b8a6db;
+			border-radius: 50%;
+			width: 44px;
+			height: 44px;
+			animation: spin 0.8s linear infinite;
+			margin: 0 auto 16px;
+		}
+		@keyframes spin { to { transform: rotate(360deg); } }
+		.status { color: #666; font-size: 14px; line-height: 1.5; }
+		.status.ok  { color: #388e3c; font-weight: bold; }
+		.status.err { color: #d32f2f; }
+		#manualSection { display: none; margin-top: 24px; text-align: left; }
+		#manualSection p { font-size: 13px; color: #555; margin-bottom: 12px; line-height: 1.6; }
+		#manualSection a { color: #b8a6db; }
+		code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+		input[type=text] {
+			width: 100%;
+			padding: 10px 12px;
+			border: 1px solid #ddd;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-bottom: 10px;
+			font-family: monospace;
+		}
+		input[type=text]:focus { outline: none; border-color: #b8a6db; }
+		button {
+			background: #b8a6db;
+			color: white;
+			border: none;
+			padding: 10px 24px;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 14px;
+			width: 100%;
+		}
+		button:hover { background: #a594cc; }
+		#manualStatus { font-size: 12px; margin-top: 8px; }
+	</style>
+</head>
+<body>
+<div class="container">
+	<h2>Zvuk — Авторизация</h2>
+	<div id="autoSection">
+		<div class="spinner" id="spinner"></div>
+		<div class="status" id="statusText">Получаем токен авторизации...</div>
+	</div>
+	<div id="manualSection">
+		<p>
+			Автоматическое получение токена недоступно (CORS).
+			<br>
+			<a href="https://zvuk.com/api/tiny/profile" target="_blank">Откройте профиль</a>,
+			скопируйте значение поля <code>"token"</code> и вставьте ниже:
+		</p>
+		<input type="text" id="tokenInput" placeholder="Вставьте token...">
+		<button onclick="saveManualToken()">Сохранить</button>
+		<div class="status" id="manualStatus"></div>
+	</div>
+</div>
+<script>
+function setStatus(text, cls) {
+	var el = document.getElementById('statusText');
+	el.textContent = text;
+	el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function notifyAndClose(success, error) {
+	if (window.opener) {
+		window.opener.postMessage(
+			success
+				? { type: 'zvukOAuthSuccess' }
+				: { type: 'zvukOAuthError', error: error || 'Unknown error' },
+			'*'
+		);
 	}
+	setTimeout(function() { window.close(); }, 2000);
+}
 
-	# Try to get token from query parameter first
-	my $token = $params{token};
-	$log->info("OAuth Callback: Token from params: " . ($token ? "found (${token})" : "not found"));
-
-	if (!$token) {
-		# If no token in params, show instructions for manual flow
-		# The browser needs to fetch this from zvuk.com/api/tiny/profile after logging in
-		$log->info("OAuth Callback: Token not in params - browser should have made the fetch");
-	}
-
-	if (!$token) {
-		$log->error("OAuth Callback: No token provided and unable to fetch from API");
-
-		# Debug mode: show all parameters received
-		my $paramsDebug = '';
-		if (keys %params) {
-			$paramsDebug = '<div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px; text-align: left; font-size: 12px; color: #666;">';
-			$paramsDebug .= '<strong>Received parameters:</strong><br>';
-			foreach my $key (sort keys %params) {
-				my $val = $params{$key};
-				$val =~ s/</&lt;/g;
-				$val =~ s/>/&gt;/g;
-				$val = substr($val, 0, 50) . '...' if length($val) > 50;
-				$paramsDebug .= "$key = $val<br>";
-			}
-			$paramsDebug .= '</div>';
+function saveToken(token) {
+	return fetch('/plugins/zvuk/saveOAuthToken', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token: token })
+	})
+	.then(function(r) { return r.json(); })
+	.then(function(data) {
+		if (data.success) {
+			document.getElementById('spinner').style.display = 'none';
+			setStatus('Авторизация успешна! Окно закроется...', 'ok');
+			notifyAndClose(true);
 		} else {
-			$paramsDebug = '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 4px; text-align: left; font-size: 12px; color: #856404;">';
-			$paramsDebug .= '<strong>No parameters received</strong><br>';
-			$paramsDebug .= 'Full URL: ' . $request->uri->as_string;
-			$paramsDebug .= '</div>';
+			throw new Error(data.error || 'Server error');
 		}
+	});
+}
 
-		my $html = qq{
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="UTF-8">
-				<title>Zvuk OAuth - Error</title>
-				<style>
-					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; padding: 20px; }
-					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; }
-					h1 { color: #d32f2f; margin-bottom: 20px; }
-					p { color: #666; line-height: 1.6; }
-					code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
-				</style>
-			</head>
-			<body>
-				<div class="container">
-					<h1>Authentication Error</h1>
-					<p>Unable to retrieve authentication token.</p>
-					<p>Please verify that:</p>
-					<ul style="text-align: left; display: inline-block; color: #666;">
-						<li>You are logged in at <code>zvuk.com</code></li>
-						<li>Browser cookies are enabled</li>
-						<li>Pop-up window did not encounter errors</li>
-					</ul>
-					$paramsDebug
-					<p style="margin-top: 20px; font-size: 12px; color: #999;">
-						You can still use the manual token input method below.
-					</p>
-				</div>
-			</body>
-			</html>
-		};
-		$response->code(400);
-		$response->content_type('text/html; charset=utf-8');
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
-		return;
-	}
+function tryAutoFetch() {
+	fetch('https://zvuk.com/api/tiny/profile', {
+		credentials: 'include',
+		headers: {
+			'Accept': 'application/json',
+			'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+		}
+	})
+	.then(function(r) {
+		if (!r.ok) throw new Error('HTTP ' + r.status);
+		return r.json();
+	})
+	.then(function(data) {
+		var result = data && data.result || data;
+		var token = result && result.token;
+		var isAnon = result && result.is_anonymous;
 
-	# Validate token format
-	if ($token !~ /^[0-9a-f]{32}$/i) {
-		$log->error("OAuth Callback: Invalid token format");
-		my $html = qq{
-			<!DOCTYPE html>
-			<html>
-			<head>
-				<meta charset="UTF-8">
-				<title>Zvuk OAuth - Error</title>
-				<style>
-					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
-					h1 { color: #d32f2f; margin-bottom: 20px; }
-					p { color: #666; line-height: 1.6; }
-				</style>
-			</head>
-			<body>
-				<div class="container">
-					<h1>Invalid Token</h1>
-					<p>The token format is invalid. Please try again.</p>
-				</div>
-			</body>
-			</html>
-		};
-		$response->code(400);
-		$response->content_type('text/html; charset=utf-8');
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
-		return;
-	}
+		if (!token) throw new Error('no_token');
+		if (isAnon) throw new Error('anonymous');
 
-	# Verify token by fetching profile
-	require Plugins::Zvuk::API::Async;
-	Plugins::Zvuk::API::Async->getProfile(
+		setStatus('Токен получен, сохраняем...');
+		return saveToken(token);
+	})
+	.catch(function(e) {
+		document.getElementById('spinner').style.display = 'none';
+		if (e.message === 'anonymous') {
+			setStatus('Вы не авторизованы. Войдите на zvuk.com и повторите.', 'err');
+		} else {
+			// CORS or network error — show manual fallback
+			setStatus('Автоматическое получение недоступно.', 'err');
+			document.getElementById('manualSection').style.display = 'block';
+		}
+	});
+}
+
+function saveManualToken() {
+	var token = document.getElementById('tokenInput').value.trim();
+	if (!token) return;
+	var ms = document.getElementById('manualStatus');
+	ms.textContent = 'Сохраняем...';
+	ms.className = 'status';
+	saveToken(token).catch(function(e) {
+		ms.textContent = 'Ошибка: ' + e.message;
+		ms.className = 'status err';
+	});
+}
+
+tryAutoFetch();
+</script>
+</body>
+</html>
+END_HTML
+
+	$response->code(200);
+	$response->content_type('text/html; charset=utf-8');
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+}
+
+sub handleGetAnonymousToken {
+	my ($httpClient, $response) = @_;
+
+	$log->info("Anonymous Token: Requesting from Zvuk API");
+
+	require Slim::Networking::SimpleAsyncHTTP;
+
+	my $http = Slim::Networking::SimpleAsyncHTTP->new(
 		sub {
-			my $profile = shift;
+			my $resp = shift;
+			my $data = eval { decode_json($resp->content) };
+			my $token = $data && $data->{result} && $data->{result}{token};
 
-			if ($profile && $profile->{id} && !$profile->{error}) {
-				my $userId = $profile->{id};
+			if ($token) {
 				my $prefs = preferences('plugin.zvuk');
 				my $accounts = $prefs->get('accounts') || {};
-				$accounts->{$userId} = {
+				$accounts->{anonymous} = {
 					token => $token,
-					name  => $profile->{name} || "Account $userId",
+					name  => 'Анонимный (128kbps)',
 				};
 				$prefs->set('accounts', $accounts);
-				$log->info("OAuth Callback: Account added via browser: userId=$userId");
+				$log->info("Anonymous Token: Saved token");
 
-				my $html = qq{
-					<!DOCTYPE html>
-					<html>
-					<head>
-						<meta charset="UTF-8">
-						<title>Zvuk OAuth - Success</title>
-						<style>
-							body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-							.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
-							h1 { color: #388e3c; margin-bottom: 20px; }
-							p { color: #666; line-height: 1.6; margin-bottom: 20px; }
-							.closing { font-size: 12px; color: #999; margin-top: 15px; }
-						</style>
-					</head>
-					<body>
-						<div class="container">
-							<h1>✓ Successfully Authenticated</h1>
-							<p>Your Zvuk account has been successfully added to the plugin.</p>
-							<p>This window will close automatically in 2 seconds...</p>
-							<div class="closing">If it doesn't close, you can safely close this window.</div>
-						</div>
-						<script>
-							// Send message to parent window that OAuth was successful
-							if (window.opener) {
-								window.opener.postMessage({
-									type: 'zvukOAuthSuccess',
-									token: '$token',
-									userId: '$userId'
-								}, '*');
-							}
-
-							// Close window after 2 seconds
-							setTimeout(function() {
-								window.close();
-							}, 2000);
-						</script>
-					</body>
-					</html>
-				};
 				$response->code(200);
-				$response->content_type('text/html; charset=utf-8');
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+				$response->content_type('application/json');
+				my $json = encode_json({ success => 1 });
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 			}
 			else {
-				$log->error("OAuth Callback: Profile validation failed");
-				my $html = qq{
-					<!DOCTYPE html>
-					<html>
-					<head>
-						<meta charset="UTF-8">
-						<title>Zvuk OAuth - Error</title>
-						<style>
-							body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-							.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
-							h1 { color: #d32f2f; margin-bottom: 20px; }
-							p { color: #666; line-height: 1.6; }
-						</style>
-					</head>
-					<body>
-						<div class="container">
-							<h1>Authentication Failed</h1>
-							<p>Failed to verify your Zvuk account. Please try again.</p>
-						</div>
-						<script>
-							setTimeout(function() {
-								if (window.opener) {
-									window.opener.postMessage({
-										type: 'zvukOAuthError',
-										error: 'Token validation failed'
-									}, '*');
-								}
-								window.close();
-							}, 3000);
-						</script>
-					</body>
-					</html>
-				};
-				$response->code(401);
-				$response->content_type('text/html; charset=utf-8');
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+				$log->error("Anonymous Token: No token in response: " . $resp->content);
+				$response->code(500);
+				$response->content_type('application/json');
+				my $json = encode_json({ success => 0, error => 'No token in response' });
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 			}
 		},
-		$token
+		sub {
+			my ($http, $error) = @_;
+			$log->error("Anonymous Token: HTTP error: $error");
+			$response->code(500);
+			$response->content_type('application/json');
+			my $json = encode_json({ success => 0, error => $error });
+			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		}
+	);
+
+	$http->get(
+		Plugins::Zvuk::API::PROFILE_URL,
+		'User-Agent'      => Plugins::Zvuk::API::USER_AGENT,
+		'Accept'          => 'application/json, text/plain, */*',
+		'Accept-Language' => 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+		'Referer'         => 'https://zvuk.com/',
+		'Origin'          => 'https://zvuk.com',
 	);
 }
 
