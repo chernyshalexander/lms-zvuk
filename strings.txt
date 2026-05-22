@@ -301,3 +301,15 @@ PLUGIN_ZVUK_CANCEL
 PLUGIN_ZVUK_SETTINGS_IN_PLUGIN_PAGE
 	EN	Settings are available on the plugin settings page via "Open Settings" button
 	RU	Настройки доступны на странице параметров плагина через кнопку "Открыть настройки"
+
+PLUGIN_ZVUK_OAUTH_TITLE
+	EN	Browser Authorization
+	RU	Авторизация через браузер
+
+PLUGIN_ZVUK_OAUTH_DESC
+	EN	Log in to zvuk.com and the plugin will automatically capture your authentication token
+	RU	Войдите на zvuk.com и плагин автоматически получит ваш токен авторизации
+
+PLUGIN_ZVUK_OAUTH_BUTTON
+	EN	Login with Zvuk
+	RU	Войти через Звук

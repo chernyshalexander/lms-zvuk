@@ -53,6 +53,11 @@ sub initPlugin {
 			'plugins/zvuk/saveWaveSettings',
 			\&Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb
 		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/saveOAuthToken',
+			\&Plugins::Zvuk::Plugin::handleSaveOAuthToken
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -1368,6 +1373,72 @@ sub handleSaveWaveSettingsWeb {
 	$response->content_type('application/json');
 	my $json = encode_json({ success => 1 });
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+}
+
+sub handleSaveOAuthToken {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $body = $request->content_ref ? ${$request->content_ref} : '';
+	my $data;
+
+	eval {
+		$data = decode_json($body);
+	};
+
+	if ($@ || !$data || !$data->{token}) {
+		$log->error("OAuth: Failed to parse token request: $@");
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Missing token' });
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	my $token = $data->{token};
+
+	# Validate token format (32 hex characters)
+	if ($token !~ /^[0-9a-f]{32}$/i) {
+		$log->error("OAuth: Invalid token format: $token");
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Invalid token format' });
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	# Verify token by fetching profile
+	require Plugins::Zvuk::API::Async;
+	Plugins::Zvuk::API::Async->getProfile(
+		sub {
+			my $profile = shift;
+
+			if ($profile && $profile->{id} && !$profile->{error}) {
+				my $userId = $profile->{id};
+				my $prefs = preferences('plugin.zvuk');
+				my $accounts = $prefs->get('accounts') || {};
+				$accounts->{$userId} = {
+					token => $token,
+					name  => $profile->{name} || "Account $userId",
+				};
+				$prefs->set('accounts', $accounts);
+				$log->info("OAuth: Account added via browser: userId=$userId");
+
+				$response->code(200);
+				$response->content_type('application/json');
+				my $json = encode_json({ success => 1 });
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			}
+			else {
+				$log->error("OAuth: Profile validation failed");
+				$response->code(401);
+				$response->content_type('application/json');
+				my $json = encode_json({ success => 0, error => 'Token validation failed' });
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			}
+		},
+		$token
+	);
 }
 
 1;
