@@ -20,7 +20,7 @@
 
 ## Быстрый старт (15 мин)
 
-1. **Клонируй репо:**
+1. **Используй репо:**
    ```bash
    cd /home/chernysh/Projects/lms-zvuk
    git status  # Clean (все коммичено)
