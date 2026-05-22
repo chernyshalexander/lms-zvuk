@@ -138,6 +138,10 @@ PLUGIN_ZVUK_MENU_WAVE_SETTINGS
 	EN	Settings
 	RU	Настройки
 
+PLUGIN_ZVUK_MENU_WAVE_SETTINGS_ALT
+	EN	Settings (Sliders)
+	RU	Настройки (Слайдеры)
+
 PLUGIN_ZVUK_SETTING_POPULAR
 	EN	Popularity
 	RU	Популярность

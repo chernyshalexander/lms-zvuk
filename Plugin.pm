@@ -801,8 +801,27 @@ sub handleWaveSettingsRouter {
 	$log->info("=== End Router Decision ===");
 
 	if ($useWebUI) {
-		# For Web/Material UI: show paging wizard (in future will be web UI with sliders)
-		handleWaveWizardStart($client, $callback, $args);
+		# For Web/Material UI: show menu with wizard and alternative sliders interface
+		require Slim::Utils::Network;
+		my $baseUrl = Slim::Utils::Network::serverURL();
+		my $webUrl = $baseUrl . '/plugins/zvuk/waveSettings';
+
+		$log->info("Wave Settings menu for Web/Material UI. Sliders URL: $webUrl");
+
+		$callback->({
+			items => [
+				{
+					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+					type => 'link',
+					url  => \&handleWaveWizardStart,
+				},
+				{
+					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS_ALT'),
+					type => 'link',
+					url  => $webUrl,
+				}
+			]
+		});
 	} else {
 		# For Jive/SqueezePlay: show standard list settings
 		handleWaveSettings($client, $callback, $args);
