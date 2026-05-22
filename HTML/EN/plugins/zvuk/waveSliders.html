@@ -149,11 +149,19 @@
 
 .wave-setting-group input[type="radio"] {
 	cursor: pointer;
-	accent-color: #b8a6db;
+	accent-color: #b8a6db !important;
 	margin-right: 8px;
 	vertical-align: middle;
 	width: auto;
 	height: auto;
+	caret-color: #b8a6db;
+	-webkit-accent-color: #b8a6db;
+}
+
+/* Material UI specific overrides */
+.wave-setting-group input[type="radio"]:checked {
+	accent-color: #b8a6db !important;
+	-webkit-accent-color: #b8a6db !important;
 }
 
 .button-group {
