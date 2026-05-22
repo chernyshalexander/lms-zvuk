@@ -6,7 +6,7 @@
 .wave-setting-group {
 	margin-bottom: 20px;
 	padding: 15px;
-	background-color: #f5f5f5;
+	background-color: #f5f5f5 !important;
 	border-radius: 8px;
 	border-left: 4px solid #b8a6db;
 }
@@ -88,29 +88,36 @@
 .genre-item {
 	display: flex;
 	align-items: center;
-	padding: 6px;
-	background: white;
-	border: 1px solid #ddd;
+	padding: 8px 10px;
+	background: white !important;
+	border: 1px solid #d0d0d0 !important;
 	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.2s ease;
-	font-size: 12px;
+	font-size: 13px;
+	margin-bottom: 6px;
 }
 
 .genre-item:hover {
-	border-color: #b8a6db;
-	background-color: #f0f4ff;
+	border-color: #b8a6db !important;
+	background-color: #f9f9f9 !important;
 }
 
 .genre-item input[type="checkbox"] {
-	margin-right: 6px;
+	margin-right: 10px;
 	cursor: pointer;
+	flex-shrink: 0;
 }
 
 .genre-item label {
 	cursor: pointer;
 	flex: 1;
 	user-select: none;
+	color: #333 !important;
+	font-weight: normal;
+	display: block;
+	margin: 0;
+	padding: 0;
 }
 
 .wave-setting-group label {
@@ -290,9 +297,10 @@ function initializeGenres() {
 
 		const item = document.createElement('div');
 		item.className = 'genre-item';
-		const checkboxHTML = `<input type="checkbox" id="genre_\${genre.name}" name="genre" value="\${genre.name}" \${isChecked ? 'checked' : ''}>`;
-		const labelHTML = `<label for="genre_\${genre.name}">\${label}</label>`;
-		item.innerHTML = checkboxHTML + labelHTML;
+		item.innerHTML = `
+			<input type="checkbox" id="genre_\${genre.name}" name="genre" value="\${genre.name}" \${isChecked ? 'checked' : ''}>
+			<label for="genre_\${genre.name}" style="margin: 0; padding: 0; color: #333; font-weight: normal;">\${label}</label>
+		`;
 		container.appendChild(item);
 	});
 }
