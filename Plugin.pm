@@ -1453,20 +1453,28 @@ sub handleOAuthCallback {
 	my $uri = $request->uri;
 	my %params;
 
+	$log->info("OAuth Callback: Received request from " . $request->uri->as_string);
+
 	# Parse query parameters from URI
 	if ($uri->query) {
 		foreach my $param (split /&/, $uri->query) {
 			my ($key, $val) = split /=/, $param, 2;
 			$val = Slim::Utils::Misc::unescape($val) if defined $val;
 			$params{$key} = $val;
+			$log->debug("OAuth Callback: param $key = $val");
 		}
+	} else {
+		$log->info("OAuth Callback: No query parameters in URL");
 	}
 
 	# Try to get token from query parameter first
 	my $token = $params{token};
+	$log->info("OAuth Callback: Token from params: " . ($token ? "found (${token})" : "not found"));
 
 	if (!$token) {
 		# If no token in params, fetch from Zvuk API (for browsers with auth cookies)
+		$log->info("OAuth Callback: Token not in params, attempting to fetch from Zvuk API");
+
 		require LWP::UserAgent;
 		require HTTP::Cookies;
 
@@ -1478,15 +1486,52 @@ sub handleOAuthCallback {
 		my $ua_response = $ua->get('https://zvuk.com/api/tiny/profile');
 
 		if ($ua_response->is_success) {
-			my $profile = decode_json($ua_response->content);
-			if ($profile && $profile->{token}) {
-				$token = $profile->{token};
+			$log->info("OAuth Callback: Successfully fetched from Zvuk API");
+			my $content = $ua_response->content;
+			$log->debug("OAuth Callback: API response: " . substr($content, 0, 200));
+
+			eval {
+				my $profile = decode_json($content);
+				if ($profile && $profile->{token}) {
+					$token = $profile->{token};
+					$log->info("OAuth Callback: Found token in API response");
+				} else {
+					$log->warn("OAuth Callback: API response missing token or id");
+					$log->debug("OAuth Callback: Full response: $content");
+				}
+			};
+			if ($@) {
+				$log->error("OAuth Callback: Failed to parse API response: $@");
 			}
+		} else {
+			$log->error("OAuth Callback: API request failed: " . $ua_response->status_line);
+			$log->debug("OAuth Callback: Response: " . $ua_response->content);
 		}
 	}
 
 	if (!$token) {
 		$log->error("OAuth Callback: No token provided and unable to fetch from API");
+
+		# Debug mode: show all parameters received
+		my $paramsDebug = '';
+		if (keys %params) {
+			$paramsDebug = '<div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px; text-align: left; font-size: 12px; color: #666;">';
+			$paramsDebug .= '<strong>Received parameters:</strong><br>';
+			foreach my $key (sort keys %params) {
+				my $val = $params{$key};
+				$val =~ s/</&lt;/g;
+				$val =~ s/>/&gt;/g;
+				$val = substr($val, 0, 50) . '...' if length($val) > 50;
+				$paramsDebug .= "$key = $val<br>";
+			}
+			$paramsDebug .= '</div>';
+		} else {
+			$paramsDebug = '<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 4px; text-align: left; font-size: 12px; color: #856404;">';
+			$paramsDebug .= '<strong>No parameters received</strong><br>';
+			$paramsDebug .= 'Full URL: ' . $request->uri->as_string;
+			$paramsDebug .= '</div>';
+		}
+
 		my $html = qq{
 			<!DOCTYPE html>
 			<html>
@@ -1494,16 +1539,27 @@ sub handleOAuthCallback {
 				<meta charset="UTF-8">
 				<title>Zvuk OAuth - Error</title>
 				<style>
-					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+					body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; padding: 20px; }
+					.container { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; }
 					h1 { color: #d32f2f; margin-bottom: 20px; }
 					p { color: #666; line-height: 1.6; }
+					code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
 				</style>
 			</head>
 			<body>
 				<div class="container">
 					<h1>Authentication Error</h1>
-					<p>Unable to retrieve authentication token. Please try again or use the manual token input method.</p>
+					<p>Unable to retrieve authentication token.</p>
+					<p>Please verify that:</p>
+					<ul style="text-align: left; display: inline-block; color: #666;">
+						<li>You are logged in at <code>zvuk.com</code></li>
+						<li>Browser cookies are enabled</li>
+						<li>Pop-up window did not encounter errors</li>
+					</ul>
+					$paramsDebug
+					<p style="margin-top: 20px; font-size: 12px; color: #999;">
+						You can still use the manual token input method below.
+					</p>
 				</div>
 			</body>
 			</html>
