@@ -8,7 +8,7 @@
 .wave-setting-group {
 	margin-bottom: 20px;
 	padding: 15px;
-	background-color: #efefef !important;
+	background-color: #f8f8f8 !important;
 	border-radius: 8px;
 	border-left: 4px solid #b8a6db;
 }
@@ -16,8 +16,9 @@
 .wave-setting-title {
 	font-size: 14px;
 	font-weight: bold;
-	color: #333;
+	color: #222 !important;
 	margin-bottom: 10px;
+	text-shadow: none;
 }
 
 .slider-container {
@@ -143,6 +144,30 @@
 .wave-setting-group label span {
 	color: #333;
 	font-weight: 500;
+}
+
+.wave-setting-group input[type="radio"] {
+	width: 18px;
+	height: 18px;
+	cursor: pointer;
+	accent-color: #b8a6db;
+	border: 2px solid #999;
+	appearance: none;
+	-webkit-appearance: none;
+	border-radius: 50%;
+	background: white;
+	display: inline-block;
+	position: relative;
+}
+
+.wave-setting-group input[type="radio"]:hover {
+	border-color: #b8a6db;
+	box-shadow: 0 0 5px rgba(184, 166, 219, 0.5);
+}
+
+.wave-setting-group input[type="radio"]:checked {
+	background: #b8a6db;
+	border-color: #b8a6db;
 }
 
 .button-group {
