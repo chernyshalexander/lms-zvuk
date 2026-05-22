@@ -14,6 +14,8 @@
 </div>
 
 <script>
+var waveModalInitialized = false;
+
 function openWaveSliderModal() {
 	console.log('openWaveSliderModal called');
 	var modal = document.getElementById('waveSliderModal');
@@ -33,33 +35,47 @@ function closeWaveSliderModal() {
 	}
 }
 
-// Close modal when clicking outside (on the background)
-document.addEventListener('DOMContentLoaded', function() {
-	console.log('DOMContentLoaded event fired');
+// Initialize modal event handlers only once
+function initWaveSliderModal() {
+	if (waveModalInitialized) {
+		console.log('Wave modal already initialized, skipping');
+		return;
+	}
+
+	console.log('Initializing wave modal handlers');
 	var modal = document.getElementById('waveSliderModal');
 	var modalBox = document.getElementById('waveSliderBox');
 
 	console.log('Modal:', modal);
 	console.log('ModalBox:', modalBox);
 
-	if (modal) {
+	if (modal && modalBox) {
 		modal.addEventListener('click', function(e) {
-			console.log('Modal clicked. Target:', e.target, 'Modal:', modal, 'Equal:', e.target === modal);
+			console.log('Modal clicked. Target:', e.target);
 			// Only close if clicking on modal background, not on the modal content
 			if (e.target === modal) {
 				console.log('Closing modal - clicked on background');
 				closeWaveSliderModal();
 			}
 		});
-	}
 
-	if (modalBox) {
 		modalBox.addEventListener('click', function(e) {
 			console.log('ModalBox clicked - stopping propagation');
 			e.stopPropagation();
 		});
+
+		waveModalInitialized = true;
+		console.log('Wave modal handlers initialized');
 	}
-});
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initWaveSliderModal);
+
+// Also initialize immediately in case DOMContentLoaded already fired
+if (document.readyState === 'interactive' || document.readyState === 'complete') {
+	initWaveSliderModal();
+}
 </script>
 
 [% IF accounts.size > 0 %]
