@@ -6,7 +6,6 @@ use base qw(Slim::Web::Settings);
 use Slim::Utils::Strings qw(string);
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
-use JSON::XS;
 
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
@@ -16,13 +15,6 @@ sub name {
 }
 
 sub page {
-	my ($class, $client, $params) = @_;
-
-	# Check if this is a request for wave settings
-	if ($params && $params->{wave}) {
-		return 'plugins/zvuk/settings/wave.html';
-	}
-
 	return 'plugins/zvuk/settings/basic.html';
 }
 
@@ -100,24 +92,6 @@ sub beforeRender {
 		};
 	}
 	$params->{accounts} = \@accounts_list;
-
-	# Load wave settings for current account (default for web UI)
-	require Plugins::Zvuk::WaveSettings;
-	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
-	$params->{wave_settings} = $wave_settings;
-
-	# Build genres list for JavaScript
-	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
-	my @genre_list;
-	my %genre_labels;
-	foreach my $genre (@$genres) {
-		push @genre_list, { name => $genre->{name} };
-		$genre_labels{$genre->{name}} = string($genre->{label});
-	}
-
-	$params->{genres_json} = encode_json(\@genre_list);
-	$params->{genres_labels_json} = encode_json(\%genre_labels);
-	$params->{selected_genres_json} = encode_json($wave_settings->{genres} || []);
 }
 
 1;

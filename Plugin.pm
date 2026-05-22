@@ -42,10 +42,15 @@ sub initPlugin {
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
 
-		# Register web routes for AJAX handlers
+		# Register web routes for AJAX and web pages
 		Slim::Web::Pages->addPageFunction(
 			'/plugins/zvuk/saveWaveSettings',
 			\&Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb
+		);
+
+		Slim::Web::Pages->addPageFunction(
+			'/plugins/zvuk/waveSettings',
+			\&Plugins::Zvuk::Plugin::handleWaveSettingsWebUI
 		);
 	}
 
@@ -763,29 +768,39 @@ sub handleWaveSettingsRouter {
 		}
 	}
 
-	my $useWizard = 0;
+	my $useWebUI = 0;
 	my $reason = '';
 
 	if ($isWeb) {
-		$useWizard = 1;
-		$reason = 'isWeb=1';
+		$useWebUI = 1;
+		$reason = 'isWeb=1 - show web sliders';
 	} elsif (!defined $isControl) {
-		$useWizard = 1;
-		$reason = 'isControl undefined';
+		$useWebUI = 1;
+		$reason = 'isControl undefined - web-like client';
 	} elsif ($isControl && (!defined $quantity || $quantity > 5000)) {
-		$useWizard = 1;
-		$reason = 'isControl=1 AND (quantity undef OR quantity > 5000)';
+		$useWebUI = 1;
+		$reason = 'isControl=1 AND (quantity undef OR quantity > 5000) - Material UI';
 	} else {
-		$reason = 'isControl=1 AND quantity <= 5000';
+		$reason = 'isControl=1 AND quantity <= 5000 - Jive/SqueezePlay';
 	}
 
-	$log->info("Decision: useWizard=$useWizard (Reason: $reason)");
+	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
 	$log->info("=== End Router Decision ===");
 
-	if ($useWizard) {
-		handleWaveWizardStart($client, $callback, $args);
+	if ($useWebUI) {
+		# For web/material clients: return link to web settings page
+		$callback->({
+			items => [
+				{
+					name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+					type => 'link',
+					url => Slim::Web::HTTP::getServerPath() . '/plugins/zvuk/waveSettings',
+				}
+			]
+		});
 	} else {
-		handleWaveSettings($client, $callback, $args);
+		# For Jive/SqueezePlay: show OPML wizard
+		handleWaveWizardStart($client, $callback, $args);
 	}
 }
 
@@ -1239,6 +1254,45 @@ sub _getVocalMenu {
 	);
 
 	return \@vocal_items;
+}
+
+# Web UI handler for displaying wave settings page
+sub handleWaveSettingsWebUI {
+	my ($client, $params, $callback, $httpClient, $response) = @_;
+
+	require Plugins::Zvuk::WaveSettings;
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
+
+	# Build genres list for JavaScript
+	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+	my @genre_list;
+	my %genre_labels;
+	foreach my $genre (@$genres) {
+		push @genre_list, { name => $genre->{name} };
+		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+	}
+
+	my $vars = {
+		wave_settings => $wave_settings,
+		genres_json => encode_json(\@genre_list),
+		genres_labels_json => encode_json(\%genre_labels),
+		selected_genres_json => encode_json($wave_settings->{genres} || []),
+		webroot => Slim::Web::HTTP::getServerPath(),
+	};
+
+	my $template = Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN/plugins/zvuk/waveSettings.html';
+	my $tt = Template->new({ INCLUDE_PATH => Slim::Utils::Misc::getPlaylistDir() . '/../HTML/EN' });
+	my $output = '';
+
+	if ($tt->process('plugins/zvuk/waveSettings.html', $vars, \$output)) {
+		$response->code(200);
+		$response->header('Content-Type' => 'text/html; charset=utf-8');
+		$response->body($output);
+	} else {
+		$log->error("Error processing waveSettings.html: " . $tt->error);
+		$response->code(500);
+		$response->body('Error rendering page');
+	}
 }
 
 # Web AJAX handler for saving wave settings from web interface
