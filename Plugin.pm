@@ -746,11 +746,16 @@ sub _getWaveMenuItems {
 		url  => 'zvuk://wave',
 	};
 
-	push @items, {
-		name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-		type  => 'link',
-		url   => \&handleWaveSettingsRouter,
-	};
+	# Settings removed from Web/Material UI menu
+	# Web/Material UI users access settings via "Open Settings" button in plugin settings page (basic.html)
+	# OPML clients (Jive, Classic) can be configured through separate OPML menu if needed
+	# For future: may restore Settings option or create a dedicated OPML menu for Jive settings
+	#
+	# push @items, {
+	#	name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+	#	type  => 'link',
+	#	url   => \&handleWaveSettingsRouter,
+	# };
 
 	return \@items;
 }
@@ -814,6 +819,20 @@ sub handleWaveSettings {
 	my ($client, $callback, $args) = @_;
 	$callback->({ items => _getWaveSettingsItems($client) });
 }
+
+# =====================================================================
+# WAVE SETTINGS WIZARD - NOT CURRENTLY USED
+# =====================================================================
+# The wizard interface below was originally designed for OPML menu navigation
+# but has been replaced with a modal-based slider form (waveSliders.html) in
+# the Web UI settings page for better user experience.
+#
+# The wizard code is preserved here for future experimentation and can be
+# re-enabled if needed by modifying handleWaveSettingsRouter to route
+# Web/Material UI clients to handleWaveWizardStart instead of the web UI.
+#
+# For OPML clients (Jive, SqueezePlay), use handleWaveSettings instead.
+# =====================================================================
 
 sub handleWaveWizardStart {
 	my ($client, $callback, $args) = @_;
