@@ -3,6 +3,7 @@ package Plugins::Zvuk::Settings;
 use strict;
 use base qw(Slim::Web::Settings);
 
+use JSON::XS::VersionOneAndTwo;
 use Slim::Utils::Strings qw(string);
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;
@@ -95,7 +96,6 @@ sub beforeRender {
 
 	# Add wave settings for modal sliders
 	require Plugins::Zvuk::WaveSettings;
-	require JSON;
 
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
 	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
@@ -120,9 +120,9 @@ sub beforeRender {
 	# Use valid genres if we have any, otherwise empty array (will use defaults later)
 	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
 
-	my $genres_json = JSON::encode_json(\@genre_list);
-	my $genres_labels_json = JSON::encode_json(\%genre_labels);
-	my $selected_genres_json = JSON::encode_json($selected_genres);
+	my $genres_json = encode_json(\@genre_list);
+	my $genres_labels_json = encode_json(\%genre_labels);
+	my $selected_genres_json = encode_json($selected_genres);
 
 	$log->debug("Wave Settings - Loaded genres: " . join(',', @{$selected_genres || []}));
 	$log->debug("Wave Settings - Genre Labels JSON: $genres_labels_json");
