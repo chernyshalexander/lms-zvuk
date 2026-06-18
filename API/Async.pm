@@ -709,4 +709,180 @@ sub getUserPlaylists {
 	}, 'getUserPlaylists', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
+# Shared track fragment for GigaMix (AI playlist generator) operations
+my $GIGAMIX_TRACK_FIELDS = q{
+	id
+	title
+	duration
+	availability
+	artistTemplate
+	explicit
+	hasFlac
+	condition
+	artists {
+		id
+		title
+		image { src }
+	}
+	release {
+		id
+		title
+		image { src }
+		date
+	}
+};
+
+# Generate a new AI playlist (GigaMix) from a free-text prompt
+sub getGenerativePlaylist {
+	my ($self, $cb, $args) = @_;
+	$args ||= {};
+
+	my $queryText  = $args->{queryText};
+	my $promptUuid = $args->{promptUuid};
+
+	my $gql = qq{
+		query getGenerativePlaylist(\$queryText: String!, \$promptUuid: String) {
+			getGenerativePlaylist(queryText: \$queryText, promptUuid: \$promptUuid) {
+				cursor
+				playlistName
+				genId
+				tracks {
+					$GIGAMIX_TRACK_FIELDS
+				}
+			}
+		}
+	};
+
+	my $vars = {
+		queryText  => $queryText,
+		promptUuid => $promptUuid,
+	};
+
+	$log->info("GigaMix: getGenerativePlaylist queryText='" . ($queryText // '') . "'");
+
+	$self->_graphql(sub {
+		my $data = shift;
+
+		if ($data->{error}) {
+			$log->error("GigaMix: getGenerativePlaylist failed: $data->{error}");
+			$cb->($data);
+			return;
+		}
+
+		my $result = $data->{getGenerativePlaylist} || {};
+		my $tracks = $result->{tracks} || [];
+
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		$cb->({
+			playlistName => $result->{playlistName},
+			tracks       => $tracks,
+			cursor       => $result->{cursor},
+			genId        => $result->{genId},
+		});
+	}, 'getGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Fetch the next page of an existing GigaMix playlist via cursor
+sub getGenerativePlaylistPage {
+	my ($self, $cb, $args) = @_;
+	$args ||= {};
+
+	my $limit  = int($args->{limit} || 20);
+	my $cursor = $args->{cursor};
+
+	if (!$cursor) {
+		$log->error("GigaMix: getGenerativePlaylistPage called without cursor");
+		$cb->({ error => 'no_cursor' });
+		return;
+	}
+
+	my $gql = qq{
+		query getGenerativePlaylistPage(\$limit: Int!, \$cursor: Cursor!) {
+			getGenerativePlaylistPagination(limit: \$limit, cursor: \$cursor) {
+				cursor
+				tracks {
+					$GIGAMIX_TRACK_FIELDS
+				}
+			}
+		}
+	};
+
+	my $vars = {
+		limit  => $limit,
+		cursor => $cursor,
+	};
+
+	$log->info("GigaMix: getGenerativePlaylistPage cursor='$cursor' limit=$limit");
+
+	$self->_graphql(sub {
+		my $data = shift;
+
+		if ($data->{error}) {
+			$log->error("GigaMix: getGenerativePlaylistPage failed: $data->{error}");
+			$cb->($data);
+			return;
+		}
+
+		my $result = $data->{getGenerativePlaylistPagination} || {};
+		my $tracks = $result->{tracks} || [];
+
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		$cb->({
+			tracks => $tracks,
+			cursor => $result->{cursor},
+		});
+	}, 'getGenerativePlaylistPagination', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Regenerate (reshuffle) a GigaMix playlist for the same prompt
+sub remakeGenerativePlaylist {
+	my ($self, $cb, $args) = @_;
+	$args ||= {};
+
+	my $queryText = $args->{queryText};
+
+	my $gql = qq{
+		query remakeGenerativePlaylist(\$queryText: String!) {
+			remakeGenerativePlaylist(queryText: \$queryText) {
+				cursor
+				playlistName
+				genId
+				tracks {
+					$GIGAMIX_TRACK_FIELDS
+				}
+			}
+		}
+	};
+
+	my $vars = {
+		queryText => $queryText,
+	};
+
+	$log->info("GigaMix: remakeGenerativePlaylist queryText='" . ($queryText // '') . "'");
+
+	$self->_graphql(sub {
+		my $data = shift;
+
+		if ($data->{error}) {
+			$log->error("GigaMix: remakeGenerativePlaylist failed: $data->{error}");
+			$cb->($data);
+			return;
+		}
+
+		my $result = $data->{remakeGenerativePlaylist} || {};
+		my $tracks = $result->{tracks} || [];
+
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		$cb->({
+			playlistName => $result->{playlistName},
+			tracks       => $tracks,
+			cursor       => $result->{cursor},
+			genId        => $result->{genId},
+		});
+	}, 'remakeGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
 1;

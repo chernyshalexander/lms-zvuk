@@ -15,4 +15,21 @@ sub debug {
     # Suppress debug output in tests
 }
 
+sub info {
+    my ($self, $msg) = @_;
+    # Suppress info output in tests
+}
+
+sub warn {
+    my ($self, $msg) = @_;
+    # Suppress warn output in tests
+}
+
+sub error {
+    my ($self, $msg) = @_;
+    # Suppress error output in tests
+}
+
+sub is_debug { return 0; }
+
 1;
