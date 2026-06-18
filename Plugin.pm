@@ -467,6 +467,137 @@ sub handleUserPlaylists {
 	});
 }
 
+# --- GigaMix AI Playlist Generator ---
+
+sub handleGigaMix {
+	my ($client, $cb) = @_;
+
+	$cb->({ items => [
+		{
+			name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_PROMPT'),
+			type => 'search',
+			url  => \&handleGigaMixSearch,
+		},
+	]});
+}
+
+sub handleGigaMixSearch {
+	my ($client, $cb, $args) = @_;
+
+	my $prompt = $args->{search};
+	unless ($prompt && length($prompt)) {
+		$cb->({ items => [
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_EMPTY_PROMPT'), type => 'text' },
+		]});
+		return;
+	}
+
+	my $api = _get_api_client($client);
+
+	$log->info("GigaMix: generating playlist for: $prompt");
+
+	$api->getGenerativePlaylist(sub {
+		my $result = shift || {};
+		_renderGigaMixPlaylist($client, $cb, $result, $prompt);
+	}, { queryText => $prompt });
+}
+
+sub handleGigaMixRemake {
+	my ($client, $cb, $args, $params) = @_;
+	my $api = _get_api_client($client);
+
+	my $prompt = $params->{prompt};
+	$log->info("GigaMix: remixing playlist for: $prompt");
+
+	$api->remakeGenerativePlaylist(sub {
+		my $result = shift || {};
+		_renderGigaMixPlaylist($client, $cb, $result, $prompt);
+	}, { queryText => $prompt });
+}
+
+sub handleGigaMixNextPage {
+	my ($client, $cb, $args, $params) = @_;
+
+	my $cursor = $params->{cursor};
+	my $prompt = $params->{prompt};
+
+	unless ($cursor) {
+		$cb->({ items => [
+			{ name => 'Error: No cursor for pagination', type => 'text' },
+		]});
+		return;
+	}
+
+	my $api = _get_api_client($client);
+
+	$log->info("GigaMix: loading next page");
+
+	$api->getGenerativePlaylistPage(sub {
+		my $result = shift || {};
+		my $tracks = $result->{tracks} || [];
+		my $nextCursor = $result->{cursor};
+
+		my @items = map { _renderTrack($_, 1) } @$tracks;
+
+		if ($nextCursor) {
+			push @items, {
+				name        => cstring($client, 'NEXT_PAGE'),
+				type        => 'link',
+				url         => \&handleGigaMixNextPage,
+				passthrough => [{ cursor => $nextCursor, prompt => $prompt }],
+			};
+		}
+
+		$cb->({ items => \@items });
+	}, { limit => 20, cursor => $cursor });
+}
+
+sub _renderGigaMixPlaylist {
+	my ($client, $cb, $result, $prompt) = @_;
+
+	my $playlistName = $result->{playlistName};
+	my $tracks       = $result->{tracks} || [];
+	my $cursor       = $result->{cursor};
+
+	unless (@$tracks) {
+		$cb->({ items => [
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_NO_RESULTS'), type => 'text' },
+		]});
+		return;
+	}
+
+	my @items;
+
+	push @items, {
+		name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_PLAYLIST_TITLE') . ": $playlistName",
+		type => 'text',
+	};
+
+	push @items, { name => '', type => 'separator' };
+
+	push @items, map { _renderTrack($_, 1) } @$tracks;
+
+	push @items, { name => '', type => 'separator' };
+
+	push @items, {
+		name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_REMAKE'),
+		type        => 'link',
+		url         => \&handleGigaMixRemake,
+		passthrough => [{ prompt => $prompt }],
+	};
+
+	if ($cursor) {
+		push @items, {
+			name        => cstring($client, 'NEXT_PAGE'),
+			type        => 'link',
+			url         => \&handleGigaMixNextPage,
+			passthrough => [{ cursor => $cursor, prompt => $prompt }],
+		};
+	}
+
+	$cb->({ items => \@items });
+}
+
 # --- Rendering Helpers ---
 
 sub _renderTrack {
