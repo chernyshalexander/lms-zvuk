@@ -534,6 +534,15 @@ sub handleGigaMixNextPage {
 
 	$api->getGenerativePlaylistPage(sub {
 		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("GigaMix: getGenerativePlaylistPage failed: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE'), type => 'text' },
+			]});
+			return;
+		}
+
 		my $tracks = $result->{tracks} || [];
 		my $nextCursor = $result->{cursor};
 
