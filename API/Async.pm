@@ -37,6 +37,11 @@ sub new {
 	return $self;
 }
 
+sub accountId {
+	my $self = shift;
+	return $self->{userId} // 'default';
+}
+
 sub _graphql {
 	my ($self, $cb, $operationName, $query, $variables, $opts) = @_;
 	$opts ||= {};
@@ -85,9 +90,10 @@ sub _graphql {
 		sub {
 			my $response = shift;
 			my $content = $response->content;
+			my $code = $response->code;
 
 			if (!$content || length($content) == 0) {
-				$log->error("GraphQL: Empty response for $operationName");
+				$log->error("GraphQL: Empty response for $operationName (HTTP $code)");
 				$cb->({ error => 'empty_response' });
 				return;
 			}
@@ -100,15 +106,24 @@ sub _graphql {
 			}
 
 			if ($result->{errors}) {
-				my $msg = $result->{errors}->[0]->{message} || 'Unknown API error';
-				$log->error("GraphQL API error ($operationName): $msg");
+				my $errors = $result->{errors};
+				my @error_msgs;
+				foreach my $err (@$errors) {
+					if (ref $err eq 'HASH') {
+						push @error_msgs, $err->{message} || 'Unknown error';
+					} else {
+						push @error_msgs, $err;
+					}
+				}
+				my $msg = join('; ', @error_msgs);
+				$log->error("GraphQL API error ($operationName, HTTP $code): $msg");
 				$cb->({ error => $msg });
 				return;
 			}
 
 			my $data = $result->{data};
 			if (!$data) {
-				$log->warn("GraphQL: No data in response for $operationName");
+				$log->warn("GraphQL: No data in response for $operationName (HTTP $code)");
 				$cb->({ error => 'no_data' });
 				return;
 			}

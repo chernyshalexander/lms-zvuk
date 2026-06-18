@@ -641,7 +641,7 @@ sub _getSettingValue {
 	return $default unless $client;
 
 	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	my $account_id = $api ? $api->accountId() : 'default';
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	return $settings->{$key} // $default;
@@ -652,7 +652,7 @@ sub _updateSetting {
 	return unless $client;
 
 	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	my $account_id = $api ? $api->accountId() : 'default';
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	$settings->{$key} = $value;
@@ -668,11 +668,8 @@ sub handleGenresMenu {
 
 sub _getGenresMenu {
 	my ($client) = @_;
-	my $account_id = 'default';
-	if ($client) {
-		my $api = _getAPIHandler($client);
-		$account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
-	}
+	my $api = _getAPIHandler($client);
+	my $account_id = $api ? $api->accountId() : 'default';
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $selected_genres = $settings->{genres} || [];
@@ -707,7 +704,7 @@ sub handleGenreToggle {
 	my $genre_name = $params->{genre};
 
 	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	my $account_id = $api ? $api->accountId() : 'default';
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = $settings->{genres} || [];
@@ -738,7 +735,8 @@ sub _getAPIHandler {
 sub _initAPIHandler {
 	my ($client) = @_;
 	require Plugins::Zvuk::API::Async;
-	my $api = Plugins::Zvuk::API::Async->new();
+	my $userId = _getUserIdForClient($client);
+	my $api = Plugins::Zvuk::API::Async->new({ userId => $userId });
 	$client->pluginData(zvuk_api => $api);
 	return $api;
 }
