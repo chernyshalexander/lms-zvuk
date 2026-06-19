@@ -12,12 +12,18 @@ use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::WaveSettings;
+use Throttle;
+use Retry;
 
 # CRITICAL: We use a centralized cache from Plugins::Zvuk::API.
 # This avoids data isolation and ensures metadata is consistent across the plugin.
 # Centralized cache is used from Plugins::Zvuk::API
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
+
+# Initialize throttler and retry manager at module level
+my $throttler = Throttle->new(5, 1.0);  # 5 req/sec
+my $retry_mgr = Retry->new(5, 0.5);     # 5 attempts, 0.5s backoff
 
 my %apiClients;
 
@@ -42,19 +48,70 @@ sub accountId {
 	return $self->{userId} // 'default';
 }
 
+=head2 _graphql($cb, $operationName, $query, $variables, $opts)
+
+Execute a GraphQL query with rate limiting (5 req/sec) and automatic retry (5 attempts).
+
+This is the core request handler for all API operations. It implements:
+
+1. CACHING: Checks cache before making request (bypasses throttle/retry if hit)
+2. THROTTLING: Enforces 5 requests per second via token bucket algorithm
+3. RETRY LOGIC: Automatic retry on transient errors with exponential backoff
+4. CACHE WRITING: Writes successful results to cache (if cacheable)
+
+THROTTLING:
+  - Enforces maximum 5 requests per second
+  - Queues excess requests for execution when slots become available
+  - Delays logged at DEBUG level if > 0.1s
+  - Uses token bucket algorithm (fair, prevents bursts)
+
+RETRY LOGIC:
+  - Up to 5 attempts per request
+  - Exponential backoff: 0.5s, 1s, 2s, 4s, 8s (with ±25% jitter)
+  - Retries on transient errors:
+    * HTTP 429 (rate limit)
+    * HTTP 502, 503, 504 (server errors)
+    * Timeout (HTTP 0 or "timeout" string)
+    * Network errors (connection refused, reset, etc.)
+  - Does NOT retry on permanent errors:
+    * HTTP 400, 401, 404, 409 (client errors)
+    * GraphQL validation errors
+
+CACHING:
+  - Cache hits bypass throttle/retry entirely (instant response)
+  - Cache key: user ID + operation name + MD5(variables)
+  - Cache written after all retries complete
+  - TTL varies by operation type (see _getCacheTTL)
+
+Parameters:
+  - $cb: Callback to invoke with result (receives data hash or error hash)
+  - $operationName: Name of GraphQL operation (for logging, cache key, TTL)
+  - $query: GraphQL query string
+  - $variables: Hash ref of GraphQL variables
+  - $opts: Optional hash ref with:
+    * ttl: Override cache TTL for this operation (0 = no cache)
+
+Returns:
+  Via callback $cb->({...}):
+  - On success: $cb->($data)  # data hash from GraphQL response
+  - On error: $cb->({error => 'msg', code => HTTP_CODE, details => '...'})
+
+=cut
+
 sub _graphql {
 	my ($self, $cb, $operationName, $query, $variables, $opts) = @_;
 	$opts ||= {};
 
 	my $userId = $self->{userId};
 	my $ttl    = $opts->{ttl} // _getCacheTTL($operationName);
-	
+
 	# Create a unique cache key based on user, operation and variables
 	my $cacheKey;
 	if ($ttl > 0) {
 		my $vars_json = $variables ? encode_json($variables) : '{}';
 		$cacheKey = "zvuk_gql:${userId}:${operationName}:" . md5_hex($vars_json);
-		
+
+		# CACHE HIT: Bypass throttle/retry entirely for instant response
 		if (my $cached = Plugins::Zvuk::API->cache->get($cacheKey)) {
 			$log->debug("Cache hit for $operationName ($userId)");
 			$cb->($cached);
@@ -86,75 +143,159 @@ sub _graphql {
 
 	$log->info("GraphQL Request: $operationName (userId: $userId, cache: " . ($cacheKey ? "TTL=$ttl" : 'off') . ")");
 
-	my $http = Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $response = shift;
-			my $content = $response->content;
-			my $code = $response->code;
+	# THROTTLE: Acquire a rate limit slot (max 5 requests per second)
+	# If all slots are full, the request is queued and executed when a slot becomes available.
+	# This prevents overwhelming the API and respects rate limits automatically.
+	$throttler->acquire(sub {
+		my $throttle_delay = shift;
 
-			if (!$content || length($content) == 0) {
-				$log->error("GraphQL: Empty response for $operationName (HTTP $code)");
-				$cb->({ error => 'empty_response' });
-				return;
-			}
+		# Log significant throttle delays (> 0.1s) for monitoring
+		# High frequency of these indicates hitting the 5 req/sec limit
+		if ($throttle_delay > 0.1) {
+			$log->debug(sprintf("GraphQL: throttled for %.3fs", $throttle_delay));
+		}
 
-			my $result = eval { decode_json($content) };
-			if ($@ || !$result) {
-				$log->error("GraphQL: JSON parse error for $operationName: $@");
-				$cb->({ error => 'parse_error' });
-				return;
-			}
+		# RETRY: Execute operation with automatic retry on transient errors
+		# Up to 5 attempts with exponential backoff (0.5s, 1s, 2s, 4s, 8s + jitter)
+		# Retries on: 429, 502, 503, 504, timeout, network errors
+		# Does NOT retry: 400, 401, 404, 409, GraphQL validation errors
+		$retry_mgr->execute(
+			# CALLBACK 1: on_success - invoked when request succeeds OR all retries exhausted
+			sub {
+				my $result = shift;
 
-			if ($result->{errors}) {
-				my $errors = $result->{errors};
-				my @error_msgs;
-				foreach my $err (@$errors) {
-					if (ref $err eq 'HASH') {
-						push @error_msgs, $err->{message} || 'Unknown error';
+				# Success case: no error occurred
+				if (!$result->{error}) {
+					# CACHE: Write result to cache (if cacheable and TTL > 0)
+					# Future requests for same operation+variables will hit cache instantly
+					if ($cacheKey && $result->{data}) {
+						Plugins::Zvuk::API->cache->set($cacheKey, $result->{data}, $ttl);
+						$log->debug("GraphQL: Cached $operationName for ${ttl}s");
+					}
+					$cb->($result->{data} // $result);
+					return;
+				}
+
+				# Error case: all retries exhausted OR permanent error detected
+				# Log error for debugging and pass to original callback
+				if ($result->{error}) {
+					if ($result->{details}) {
+						$log->error("GraphQL error ($operationName): $result->{error} - $result->{details}");
 					} else {
-						push @error_msgs, $err;
+						$log->error("GraphQL error ($operationName): $result->{error}");
 					}
 				}
-				my $msg = join('; ', @error_msgs);
-				$log->error("GraphQL API error ($operationName, HTTP $code): $msg");
-				$cb->({ error => $msg });
-				return;
+				$cb->($result);
+			},
+
+			# CALLBACK 2: operation - executes the actual HTTP request
+			# Called once initially, then again by retry manager if transient error detected
+			sub {
+				my $op_cb = shift;
+
+				my $http = Slim::Networking::SimpleAsyncHTTP->new(
+					# HTTP SUCCESS HANDLER: Response received (any HTTP code)
+					sub {
+						my $response = shift;
+						my $content = $response->content;
+						my $code = $response->code;
+
+						# Validate response
+						if (!$content || length($content) == 0) {
+							$log->error("GraphQL: Empty response for $operationName (HTTP $code)");
+							$op_cb->({ error => 'empty_response', code => $code });
+							return;
+						}
+
+						# Parse JSON response
+						my $result = eval { decode_json($content) };
+						if ($@ || !$result) {
+							$log->error("GraphQL: JSON parse error for $operationName: $@");
+							$op_cb->({ error => 'parse_error', code => $code });
+							return;
+						}
+
+						# Check for GraphQL errors (even on HTTP 200)
+						if ($result->{errors}) {
+							my $errors = $result->{errors};
+							my @error_msgs;
+							foreach my $err (@$errors) {
+								if (ref $err eq 'HASH') {
+									push @error_msgs, $err->{message} || 'Unknown error';
+								} else {
+									push @error_msgs, $err;
+								}
+							}
+							my $msg = join('; ', @error_msgs);
+							$log->error("GraphQL API error ($operationName, HTTP $code): $msg");
+							# GraphQL validation errors are NOT retryable, return immediately
+							$op_cb->({ error => $msg, code => $code });
+							return;
+						}
+
+						# Extract and validate data field
+						my $data = $result->{data};
+						if (!$data) {
+							$log->warn("GraphQL: No data in response for $operationName (HTTP $code)");
+							$op_cb->({ error => 'no_data', code => $code });
+							return;
+						}
+
+						# SUCCESS: Pass data to retry manager
+						# Retry manager will invoke on_success callback with this result
+						$op_cb->({ data => $data });
+					},
+
+					# HTTP ERROR HANDLER: Network error or timeout
+					sub {
+						my ($http, $error) = @_;
+
+						# Detect HTTP error code from error string for retry classification
+						# This determines whether retry manager will attempt retries
+						my $code = 0;  # default timeout
+						if ($error =~ /timeout|timed out/i) {
+							$code = 0;  # Retryable: timeout
+							$log->warn("GraphQL: Request timeout for $operationName");
+						} elsif ($error =~ /429|too many requests|rate limit/i) {
+							$code = 429;  # Retryable: rate limit
+							$log->warn("GraphQL: Rate limited (429) for $operationName");
+						} elsif ($error =~ /502|bad gateway/i) {
+							$code = 502;  # Retryable: server error
+							$log->warn("GraphQL: Bad gateway (502) for $operationName");
+						} elsif ($error =~ /503|service unavailable/i) {
+							$code = 503;  # Retryable: server error
+							$log->warn("GraphQL: Service unavailable (503) for $operationName");
+						} elsif ($error =~ /504|gateway timeout/i) {
+							$code = 504;  # Retryable: server error
+							$log->warn("GraphQL: Gateway timeout (504) for $operationName");
+						} else {
+							$log->error("GraphQL: Network error for $operationName: $error");
+							# Unknown errors (network) are retryable by default
+						}
+
+						# Pass error to retry manager with HTTP code
+						# Retry manager will check is_retryable() to decide whether to retry
+						$op_cb->({ error => $error, code => $code });
+					},
+
+					{ timeout => 15 }  # 15 second HTTP timeout (per request)
+				);
+
+				$http->post(
+					Plugins::Zvuk::API::GRAPHQL_URL,
+					'x-auth-token' => $token,
+					'x-app-name'   => Plugins::Zvuk::API::APP_NAME,
+					'x-device-id'  => $deviceId,
+					'origin'       => 'https://zvuk.com',
+					'referer'      => 'https://zvuk.com/',
+					'user-agent'   => Plugins::Zvuk::API::USER_AGENT,
+					'content-type' => 'application/json',
+					'accept'       => 'application/graphql-response+json, application/json',
+					encode_json($body)
+				);
 			}
-
-			my $data = $result->{data};
-			if (!$data) {
-				$log->warn("GraphQL: No data in response for $operationName (HTTP $code)");
-				$cb->({ error => 'no_data' });
-				return;
-			}
-
-			if ($cacheKey && $data) {
-				Plugins::Zvuk::API->cache->set($cacheKey, $data, $ttl);
-				$log->debug("GraphQL: Cached $operationName for ${ttl}s");
-			}
-
-			$cb->($data);
-		},
-		sub {
-			my ($http, $error) = @_;
-			$log->error("GraphQL HTTP error ($operationName): $error");
-			$cb->({ error => 'http_error', details => $error });
-		},
-		{ timeout => 15 }
-	);
-
-	$http->post(
-		Plugins::Zvuk::API::GRAPHQL_URL,
-		'x-auth-token' => $token,
-		'x-app-name'   => Plugins::Zvuk::API::APP_NAME,
-		'x-device-id'  => $deviceId,
-		'origin'       => 'https://zvuk.com',
-		'referer'      => 'https://zvuk.com/',
-		'user-agent'   => Plugins::Zvuk::API::USER_AGENT,
-		'content-type' => 'application/json',
-		'accept'       => 'application/graphql-response+json, application/json',
-		encode_json($body)
-	);
+		);
+	});
 }
 
 sub _getCacheTTL {
@@ -883,6 +1024,48 @@ sub remakeGenerativePlaylist {
 			genId        => $result->{genId},
 		});
 	}, 'remakeGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
+# Fetch synthesis playlists (Playlists for You personalization feature)
+sub getSynthesisPlaylists {
+	my ($self, $cb) = @_;
+
+	# Hardcoded synthesis playlist IDs
+	my @playlist_ids = (3, 4, 6, 11, 12, 13, 14, 15);
+	my $ids_str = join(', ', @playlist_ids);
+
+	my $gql = qq{
+		query getSynthesisPlaylists {
+			getSynthesisPlaylists(ids: [$ids_str]) {
+				id
+				title
+				description
+				playlistId
+				release {
+					image {
+						pic: pictureXBig
+					}
+				}
+				trackCount
+			}
+		}
+	};
+
+	$log->info("Personalized Playlists: getSynthesisPlaylists");
+
+	$self->_graphql(sub {
+		my $data = shift;
+
+		if ($data->{error}) {
+			$log->error("Personalized Playlists: getSynthesisPlaylists failed: $data->{error}");
+			$cb->($data);
+			return;
+		}
+
+		my $result = $data->{getSynthesisPlaylists} || [];
+
+		$cb->($result);
+	}, 'getSynthesisPlaylists', $gql, {}, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }
 
 1;

@@ -314,6 +314,10 @@ PLUGIN_ZVUK_OAUTH_BUTTON
 	EN	Login with Zvuk
 	RU	Войти через Звук
 
+PLUGIN_ZVUK_GIGAMIX
+	EN	GigaMix AI
+	RU	GigaMix AI
+
 PLUGIN_ZVUK_GIGAMIX_PROMPT
 	EN	Enter playlist description
 	RU	Введите описание плейлиста
@@ -337,3 +341,23 @@ PLUGIN_ZVUK_GIGAMIX_NO_RESULTS
 PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE
 	EN	Failed to load more tracks
 	RU	Не удалось загрузить больше треков
+
+PLUGIN_ZVUK_GIGAMIX_ERROR_GENERATE
+	EN	Failed to generate playlist
+	RU	Не удалось создать плейлист
+
+PLUGIN_ZVUK_GIGAMIX_ERROR_CURSOR
+	EN	Error: No cursor for pagination
+	RU	Ошибка: нет курсора для навигации
+
+PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS
+	EN	For You
+	RU	Плейлисты для вас
+
+PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_EMPTY
+	EN	No recommendations available
+	RU	Рекомендаций нет
+
+PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_ERROR
+	EN	Failed to load recommendations
+	RU	Не удалось загрузить рекомендации

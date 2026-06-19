@@ -55,7 +55,7 @@ sub getNextTrack {
 	my $client = $song->master();
 	$log->info("Resolving Zvuk stream for track ID: $id");
 
-	# Dozagurka: auto-load next batch of wave tracks when approaching end of queue
+	# auto-load next batch of wave tracks when approaching end of queue
 	if ($client) {
 		my $is_wave = $client->pluginData('zvuk_wave_active');
 		if ($is_wave) {
@@ -334,7 +334,7 @@ sub _loadMoreWaveTracks {
 		my $items = shift || [];
 		return unless $items && @$items;
 
-		$log->info("Dozagurka loaded " . scalar(@$items) . " more tracks");
+		$log->info("automatically loaded " . scalar(@$items) . " more tracks");
 		Plugins::Zvuk::API->cacheTrackMetadata($items);
 
 		for my $track (@$items) {

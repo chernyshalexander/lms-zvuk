@@ -247,6 +247,38 @@ sub make_track {
 	ok($cb_result->{items}->[0]->{name} eq 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE', "handleGigaMixNextPage(API error): error message uses correct string key");
 }
 
+# --- Test 10: handleGigaMixSearch error handling when generation fails ------
+{
+	no warnings 'redefine';
+	my $fake_api = FakeGigaMixAPI->new;
+	$fake_api->{next_result} = { error => 'GraphQL error: Invalid query' };
+	local *Plugins::Zvuk::Plugin::_get_api_client = sub { return $fake_api };
+
+	my $cb_result;
+	Plugins::Zvuk::Plugin::handleGigaMixSearch(undef, sub { $cb_result = shift }, { search => 'test prompt' });
+
+	ok($cb_result && $cb_result->{items}, "handleGigaMixSearch(API error): returns items");
+	ok(@{ $cb_result->{items} } == 1, "handleGigaMixSearch(API error): error response is single item");
+	ok($cb_result->{items}->[0]->{type} eq 'text', "handleGigaMixSearch(API error): error item is type text");
+	ok($cb_result->{items}->[0]->{name} eq 'PLUGIN_ZVUK_GIGAMIX_ERROR_GENERATE', "handleGigaMixSearch(API error): error message uses correct string key");
+}
+
+# --- Test 11: handleGigaMixRemake error handling when regeneration fails ----
+{
+	no warnings 'redefine';
+	my $fake_api = FakeGigaMixAPI->new;
+	$fake_api->{next_result} = { error => 'API timeout' };
+	local *Plugins::Zvuk::Plugin::_get_api_client = sub { return $fake_api };
+
+	my $cb_result;
+	Plugins::Zvuk::Plugin::handleGigaMixRemake(undef, sub { $cb_result = shift }, {}, { prompt => 'original prompt' });
+
+	ok($cb_result && $cb_result->{items}, "handleGigaMixRemake(API error): returns items");
+	ok(@{ $cb_result->{items} } == 1, "handleGigaMixRemake(API error): error response is single item");
+	ok($cb_result->{items}->[0]->{type} eq 'text', "handleGigaMixRemake(API error): error item is type text");
+	ok($cb_result->{items}->[0]->{name} eq 'PLUGIN_ZVUK_GIGAMIX_ERROR_GENERATE', "handleGigaMixRemake(API error): error message uses correct string key");
+}
+
 print "=" x 50 . "\n";
 print "Results: $pass_count / $test_count passed\n";
 

@@ -160,6 +160,18 @@ sub _buildRootMenu {
 			items => _getWaveMenuItems($client),
 		},
 		{
+			name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
+			type  => 'link',
+			image => 'plugins/zvuk/html/images/playlists.png',
+			url   => \&handlePersonalizedPlaylists,
+		},
+		{
+			name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
+			type  => 'link',
+			image => 'plugins/zvuk/html/images/gigamix.png',
+			url   => \&handleGigaMix,
+		},
+		{
 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
 			type  => 'outline',
 			image => 'plugins/zvuk/html/images/favorites.png',
@@ -467,6 +479,36 @@ sub handleUserPlaylists {
 	});
 }
 
+sub handlePersonalizedPlaylists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getSynthesisPlaylists(sub {
+		my $result = shift || [];
+
+		# Handle API error (result is a hash with error field)
+		if (ref $result eq 'HASH' && $result->{error}) {
+			$log->error("Personalized Playlists API error: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		# Handle empty result (result is an array)
+		my $playlists = ref $result eq 'ARRAY' ? $result : [];
+		unless (@$playlists) {
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		# Render playlists
+		$cb->({ items => [ map { _renderPlaylist($_) } @$playlists ] });
+	});
+}
+
 # --- GigaMix AI Playlist Generator ---
 
 sub handleGigaMix {
@@ -523,7 +565,7 @@ sub handleGigaMixNextPage {
 
 	unless ($cursor) {
 		$cb->({ items => [
-			{ name => 'Error: No cursor for pagination', type => 'text' },
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_CURSOR'), type => 'text' },
 		]});
 		return;
 	}
@@ -563,6 +605,14 @@ sub handleGigaMixNextPage {
 
 sub _renderGigaMixPlaylist {
 	my ($client, $cb, $result, $prompt) = @_;
+
+	if ($result->{error}) {
+		$log->error("GigaMix: generation failed: $result->{error}");
+		$cb->({ items => [
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_GENERATE'), type => 'text' },
+		]});
+		return;
+	}
 
 	my $playlistName = $result->{playlistName};
 	my $tracks       = $result->{tracks} || [];
