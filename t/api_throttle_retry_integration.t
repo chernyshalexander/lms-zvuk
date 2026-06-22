@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use lib '.';
+use FindBin;
+use lib "$FindBin::Bin/..";
 use Test::More;
 use Time::HiRes qw(time sleep);
 use JSON::XS;
@@ -19,8 +20,8 @@ BEGIN {
 }
 
 # Now load the modules we're testing
-use Throttle;
-use Retry;
+use Plugins::Zvuk::Throttle;
+use Plugins::Zvuk::Retry;
 use Plugins::Zvuk::API::Async;
 
 # Utility: Create a mock HTTP response object
@@ -58,7 +59,7 @@ sub create_http_mock {
 
 # Test 1: Throttle Prevents Requests > 5/sec
 sub test_1_throttle_prevents_excessive_rate {
-    my $throttle = Throttle->new(5, 1.0);
+    my $throttle = Plugins::Zvuk::Throttle->new(5, 1.0);
     my @delays = ();
     my $start = time();
 
@@ -91,7 +92,7 @@ sub test_1_throttle_prevents_excessive_rate {
 
 # Test 2: Single Failure + Retry = Success
 sub test_2_single_failure_retry_succeeds {
-    my $retry = Retry->new(5, 0.01);  # Shorter backoff for testing
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.01);  # Shorter backoff for testing
     my @results = ();
     my $attempt_count = 0;
 
@@ -125,7 +126,7 @@ sub test_2_single_failure_retry_succeeds {
 
 # Test 3: Max Retries Exhausted
 sub test_3_max_retries_exhausted {
-    my $retry = Retry->new(5, 0.05);  # Very short backoff
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.05);  # Very short backoff
     my @results = ();
     my $attempt_count = 0;
 
@@ -154,7 +155,7 @@ sub test_3_max_retries_exhausted {
 
 # Test 4: Non-Retryable Error (400) Fails Immediately
 sub test_4_non_retryable_error_fails_immediately {
-    my $retry = Retry->new(5, 0.5);
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.5);
     my @results = ();
     my $attempt_count = 0;
     my $start = time();
@@ -186,7 +187,7 @@ sub test_4_non_retryable_error_fails_immediately {
 
 # Test 5: Rate Limit (429) + Retry
 sub test_5_rate_limit_with_retry {
-    my $retry = Retry->new(5, 0.05);
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.05);
     my @results = ();
     my $attempt_count = 0;
     my $start = time();
@@ -224,7 +225,7 @@ sub test_5_rate_limit_with_retry {
 
 # Test 6: Throttle Queue Under Load (20 requests)
 sub test_6_throttle_queue_under_load {
-    my $throttle = Throttle->new(5, 1.0);
+    my $throttle = Plugins::Zvuk::Throttle->new(5, 1.0);
     my @delays = ();
     my $start = time();
 
@@ -257,7 +258,7 @@ sub test_6_throttle_queue_under_load {
 
 # Test 7: Cache Still Works (bypasses throttle/retry)
 sub test_7_cache_bypasses_throttle_retry {
-    my $retry = Retry->new(5, 0.01);
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.01);
     my $cache = {};
     my $http_call_count = 0;
 
@@ -306,7 +307,7 @@ sub test_7_cache_bypasses_throttle_retry {
 
 # Test 8: Error Propagation Through Retry Chain
 sub test_8_error_propagation_through_retry_chain {
-    my $retry = Retry->new(5, 0.05);
+    my $retry = Plugins::Zvuk::Retry->new(5, 0.05);
     my @results = ();
     my $attempt_count = 0;
 

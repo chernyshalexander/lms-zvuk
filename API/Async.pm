@@ -12,8 +12,8 @@ use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::WaveSettings;
-use Throttle;
-use Retry;
+use Plugins::Zvuk::Throttle;
+use Plugins::Zvuk::Retry;
 
 # CRITICAL: We use a centralized cache from Plugins::Zvuk::API.
 # This avoids data isolation and ensures metadata is consistent across the plugin.
@@ -22,8 +22,8 @@ my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
 # Initialize throttler and retry manager at module level
-my $throttler = Throttle->new(5, 1.0);  # 5 req/sec
-my $retry_mgr = Retry->new(5, 0.5);     # 5 attempts, 0.5s backoff
+my $throttler = Plugins::Zvuk::Throttle->new(5, 1.0);  # 5 req/sec
+my $retry_mgr = Plugins::Zvuk::Retry->new(5, 0.5);     # 5 attempts, 0.5s backoff
 
 my %apiClients;
 

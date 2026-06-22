@@ -1,4 +1,4 @@
-package Throttle;
+package Plugins::Zvuk::Throttle;
 
 use strict;
 use warnings;

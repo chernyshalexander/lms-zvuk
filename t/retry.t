@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use lib '.';
+use FindBin;
+use lib "$FindBin::Bin/..";
 use Test::More;
 use Time::HiRes qw(time sleep);
 
@@ -18,38 +19,38 @@ BEGIN {
     };
 }
 
-use Retry;
+use Plugins::Zvuk::Retry;
 
 # Test 1: Constructor sets max_attempts and initial_backoff correctly
-my $retry = Retry->new(5, 0.5);
+my $retry = Plugins::Zvuk::Retry->new(5, 0.5);
 ok(defined $retry, 'Constructor returns a defined object');
 is($retry->{max_attempts}, 5, 'max_attempts is set to 5');
 is($retry->{initial_backoff}, 0.5, 'initial_backoff is set to 0.5');
 
 # Test 2: Constructor with default values
-my $retry_default = Retry->new();
+my $retry_default = Plugins::Zvuk::Retry->new();
 is($retry_default->{max_attempts}, 5, 'max_attempts defaults to 5');
 is($retry_default->{initial_backoff}, 0.5, 'initial_backoff defaults to 0.5');
 
 # Test 3: Constructor validates inputs
 my $invalid_attempts = 0;
 eval {
-    Retry->new(0, 0.5);
+    Plugins::Zvuk::Retry->new(0, 0.5);
 };
 ok($@, 'Constructor dies on zero max_attempts');
 
 eval {
-    Retry->new(-1, 0.5);
+    Plugins::Zvuk::Retry->new(-1, 0.5);
 };
 ok($@, 'Constructor dies on negative max_attempts');
 
 eval {
-    Retry->new(5, 0);
+    Plugins::Zvuk::Retry->new(5, 0);
 };
 ok($@, 'Constructor dies on zero initial_backoff');
 
 eval {
-    Retry->new(5, -0.5);
+    Plugins::Zvuk::Retry->new(5, -0.5);
 };
 ok($@, 'Constructor dies on negative initial_backoff');
 
@@ -126,7 +127,7 @@ my $large_backoff = $retry->_calculate_backoff(20);
 ok($large_backoff <= 120, "Large backoff capped at 120s, got $large_backoff");
 
 # Test 13: execute() succeeds on first attempt
-my $retry_test = Retry->new(5, 0.5);
+my $retry_test = Plugins::Zvuk::Retry->new(5, 0.5);
 my $success_result = undef;
 
 $retry_test->execute(
@@ -146,7 +147,7 @@ is($success_result->{code}, 200, 'execute() preserves HTTP code');
 # Test 14: execute() retries on retryable error
 my $retry_count = 0;
 my $retry_result = undef;
-my $retry_test2 = Retry->new(3, 0.01);
+my $retry_test2 = Plugins::Zvuk::Retry->new(3, 0.01);
 
 $retry_test2->execute(
     sub {
@@ -172,7 +173,7 @@ is($retry_result->{data}, 'success', 'execute() returns final success after retr
 # Test 15: execute() stops on non-retryable error
 my $no_retry_count = 0;
 my $no_retry_result = undef;
-my $retry_test3 = Retry->new(5, 0.01);
+my $retry_test3 = Plugins::Zvuk::Retry->new(5, 0.01);
 
 $retry_test3->execute(
     sub {
@@ -193,7 +194,7 @@ is($no_retry_result->{code}, 404, 'execute() returns non-retryable error');
 # Test 16: execute() exhausts max_attempts and returns error
 my $exhausted_count = 0;
 my $exhausted_result = undef;
-my $retry_test4 = Retry->new(2, 0.01);
+my $retry_test4 = Plugins::Zvuk::Retry->new(2, 0.01);
 
 $retry_test4->execute(
     sub {

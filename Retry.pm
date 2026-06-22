@@ -1,4 +1,4 @@
-package Retry;
+package Plugins::Zvuk::Retry;
 
 use strict;
 use warnings;

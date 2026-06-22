@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use lib '.';
+use FindBin;
+use lib "$FindBin::Bin/..";
 use Test::More;
 use Time::HiRes qw(time sleep);
 
@@ -18,10 +19,10 @@ BEGIN {
     };
 }
 
-use Throttle;
+use Plugins::Zvuk::Throttle;
 
 # Test 1: Constructor sets rate_limit and period correctly
-my $throttle = Throttle->new(5, 1.0);
+my $throttle = Plugins::Zvuk::Throttle->new(5, 1.0);
 ok(defined $throttle, 'Constructor returns a defined object');
 is($throttle->{rate_limit}, 5, 'rate_limit is set to 5');
 is($throttle->{period}, 1.0, 'period is set to 1.0');
@@ -44,7 +45,7 @@ $all_zero = 0 if grep { $_ != 0 } @test3_results;
 ok($all_zero, 'All delays were 0 when under limit');
 
 # Test 4: acquire() schedules callback when at limit
-my $throttle2 = Throttle->new(2, 1.0);
+my $throttle2 = Plugins::Zvuk::Throttle->new(2, 1.0);
 my @test4_results = ();
 
 for my $i (1..3) {
@@ -56,7 +57,7 @@ for my $i (1..3) {
 is(scalar(@test4_results), 3, 'All 3 callbacks were called (some scheduled)');
 
 # Test 5: Backoff delay is reasonable (>= period)
-my $throttle3 = Throttle->new(1, 1.0);
+my $throttle3 = Plugins::Zvuk::Throttle->new(1, 1.0);
 my @test5_delays = ();
 
 # First call should be immediate
