@@ -3,3 +3,8 @@ cookies.txt
 *.bak
 *.swp
 .DS_Store
+/test/
+/t/
+/Plugins/
+/docs/
+CLAUDE.MD
