@@ -564,6 +564,7 @@ sub handleGigaMixNextPage {
 	my $prompt = $params->{prompt};
 
 	unless ($cursor) {
+		$log->warn("GigaMix: next page called without cursor");
 		$cb->({ items => [
 			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_CURSOR'), type => 'text' },
 		]});
@@ -572,15 +573,15 @@ sub handleGigaMixNextPage {
 
 	my $api = _get_api_client($client);
 
-	$log->info("GigaMix: loading next page");
+	$log->info("GigaMix: loading next page with cursor='$cursor'");
 
 	$api->getGenerativePlaylistPage(sub {
 		my $result = shift || {};
 
 		if ($result->{error}) {
-			$log->error("GigaMix: getGenerativePlaylistPage failed: $result->{error}");
+			$log->error("GigaMix: getGenerativePlaylistPage failed with error: $result->{error}");
 			$cb->({ items => [
-				{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE'), type => 'text' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE') . " ($result->{error})", type => 'text' },
 			]});
 			return;
 		}
@@ -617,6 +618,9 @@ sub _renderGigaMixPlaylist {
 	my $playlistName = $result->{playlistName};
 	my $tracks       = $result->{tracks} || [];
 	my $cursor       = $result->{cursor};
+	my $genId        = $result->{genId};
+
+	$log->info("GigaMix: playlist generated - genId=$genId, tracks=" . scalar(@$tracks));
 
 	unless (@$tracks) {
 		$cb->({ items => [
@@ -627,16 +631,7 @@ sub _renderGigaMixPlaylist {
 
 	my @items;
 
-	push @items, {
-		name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_PLAYLIST_TITLE') . ": $playlistName",
-		type => 'text',
-	};
-
-	push @items, { name => '', type => 'separator' };
-
 	push @items, map { _renderTrack($_, 1) } @$tracks;
-
-	push @items, { name => '', type => 'separator' };
 
 	push @items, {
 		name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_REMAKE'),
@@ -645,14 +640,16 @@ sub _renderGigaMixPlaylist {
 		passthrough => [{ prompt => $prompt }],
 	};
 
-	if ($cursor) {
-		push @items, {
-			name        => cstring($client, 'NEXT_PAGE'),
-			type        => 'link',
-			url         => \&handleGigaMixNextPage,
-			passthrough => [{ cursor => $cursor, prompt => $prompt }],
-		};
-	}
+	# TODO: Next page pagination - getGenerativePlaylistPagination returns 500 error
+	# Need to verify correct GraphQL operation name for cursor-based pagination
+	# if ($cursor) {
+	#	push @items, {
+	#		name        => cstring($client, 'NEXT_PAGE'),
+	#		type        => 'link',
+	#		url         => \&handleGigaMixNextPage,
+	#		passthrough => [{ cursor => $cursor, prompt => $prompt }],
+	#	};
+	# }
 
 	$cb->({ items => \@items });
 }

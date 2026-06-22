@@ -925,11 +925,12 @@ sub getGenerativePlaylist {
 }
 
 # Fetch the next page of an existing GigaMix playlist via cursor
+# NOTE: This is currently disabled due to API returning 500 for getGenerativePlaylistPagination
+# The correct GraphQL operation name for pagination needs to be verified with Zvuk API docs
 sub getGenerativePlaylistPage {
 	my ($self, $cb, $args) = @_;
 	$args ||= {};
 
-	my $limit  = int($args->{limit} || 20);
 	my $cursor = $args->{cursor};
 
 	if (!$cursor) {
@@ -938,43 +939,11 @@ sub getGenerativePlaylistPage {
 		return;
 	}
 
-	my $gql = qq{
-		query getGenerativePlaylistPage(\$limit: Int!, \$cursor: Cursor!) {
-			getGenerativePlaylistPagination(limit: \$limit, cursor: \$cursor) {
-				cursor
-				tracks {
-					$GIGAMIX_TRACK_FIELDS
-				}
-			}
-		}
-	};
-
-	my $vars = {
-		limit  => $limit,
-		cursor => $cursor,
-	};
-
-	$log->info("GigaMix: getGenerativePlaylistPage cursor='$cursor' limit=$limit");
-
-	$self->_graphql(sub {
-		my $data = shift;
-
-		if ($data->{error}) {
-			$log->error("GigaMix: getGenerativePlaylistPage failed: $data->{error}");
-			$cb->($data);
-			return;
-		}
-
-		my $result = $data->{getGenerativePlaylistPagination} || {};
-		my $tracks = $result->{tracks} || [];
-
-		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-
-		$cb->({
-			tracks => $tracks,
-			cursor => $result->{cursor},
-		});
-	}, 'getGenerativePlaylistPagination', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	# FIXME: getGenerativePlaylistPagination returns 500 error - operation doesn't exist or wrong name
+	# Need to research correct GraphQL operation for cursor-based pagination in Zvuk API
+	$log->warn("GigaMix: next page pagination not yet implemented - getGenerativePlaylistPagination operation not available");
+	$cb->({ error => 'pagination_not_implemented' });
+	return;
 }
 
 # Regenerate (reshuffle) a GigaMix playlist for the same prompt
@@ -1023,49 +992,24 @@ sub remakeGenerativePlaylist {
 			cursor       => $result->{cursor},
 			genId        => $result->{genId},
 		});
-	}, 'remakeGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	}, 'remakeGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::GIGAMIX_CACHE_TTL });
 }
 
 # Fetch synthesis playlists (Playlists for You personalization feature)
 sub getSynthesisPlaylists {
 	my ($self, $cb) = @_;
 
-	# Hardcoded synthesis playlist IDs
-	my @playlist_ids = (3, 4, 6, 11, 12, 13, 14, 15);
-	my $ids_str = join(', ', @playlist_ids);
+	# FIXME: API operation for fetching synthesis playlists by ID not yet identified
+	# Tried: getPlaylists, getSynthesisPlaylists - both return 400 Bad Request
+	# ma-provider-zvuk-music uses getShortPlaylist but exact GraphQL query format unknown
+	# Hardcoded synthesis playlist IDs (Плейлисты для вас): 3, 4, 6, 11, 12, 13, 14, 15
 
-	my $gql = qq{
-		query getSynthesisPlaylists {
-			getSynthesisPlaylists(ids: [$ids_str]) {
-				id
-				title
-				description
-				playlistId
-				release {
-					image {
-						pic: pictureXBig
-					}
-				}
-				trackCount
-			}
-		}
-	};
+	$log->warn("Personalized Playlists: getSynthesisPlaylists not yet implemented - GraphQL operation not identified");
 
-	$log->info("Personalized Playlists: getSynthesisPlaylists");
-
-	$self->_graphql(sub {
-		my $data = shift;
-
-		if ($data->{error}) {
-			$log->error("Personalized Playlists: getSynthesisPlaylists failed: $data->{error}");
-			$cb->($data);
-			return;
-		}
-
-		my $result = $data->{getSynthesisPlaylists} || [];
-
-		$cb->($result);
-	}, 'getSynthesisPlaylists', $gql, {}, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	$cb->({
+		error => 'not_implemented',
+		message => 'Synthesis playlists API operation not yet identified'
+	});
 }
 
 1;

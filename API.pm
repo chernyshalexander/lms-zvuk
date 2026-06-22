@@ -16,6 +16,7 @@ use constant TINY_API_URL => 'https://zvuk.com/api/tiny';
 use constant DEFAULT_TTL      => 86400;   # 24h  - albums, artists, static content
 use constant DYNAMIC_TTL      => 3600;    # 1h   - playlists, search
 use constant USER_CONTENT_TTL => 300;     # 5m   - user collection, saved tracks
+use constant GIGAMIX_CACHE_TTL => 10;     # 10s  - GigaMix remix (short cache for fresh content)
 use constant STREAM_TTL       => 0;       # no cache for stream URLs
 
 # --- API pagination ---
