@@ -2,6 +2,7 @@ package Plugins::Zvuk::WaveSettings;
 
 use strict;
 use warnings;
+use utf8;
 
 use Slim::Utils::Prefs;
 use Slim::Utils::Log;

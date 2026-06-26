@@ -30,7 +30,6 @@ function closeWaveSliderModal() {
 	}
 }
 
-// Initialize modal event handlers only once
 function initWaveSliderModal() {
 	if (waveModalInitialized) {
 		return;
@@ -41,7 +40,6 @@ function initWaveSliderModal() {
 
 	if (modal && modalBox) {
 		modal.addEventListener('click', function(e) {
-			// Only close if clicking on modal background, not on the modal content
 			if (e.target === modal) {
 				closeWaveSliderModal();
 			}
@@ -55,10 +53,7 @@ function initWaveSliderModal() {
 	}
 }
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', initWaveSliderModal);
-
-// Also initialize immediately in case DOMContentLoaded already fired
 if (document.readyState === 'interactive' || document.readyState === 'complete') {
 	initWaveSliderModal();
 }
@@ -80,8 +75,8 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 						<b>[% acc.name | html %]</b>
 					</td>
 					<td style="padding:6px 8px; text-align:right;">
-						<input type="submit" name="delete_[% acc.userId | html %]" 
-							value="[% 'PLUGIN_ZVUK_DELETE_ACCOUNT' | string %]" 
+						<input type="submit" name="delete_[% acc.userId | html %]"
+							value="[% 'PLUGIN_ZVUK_DELETE_ACCOUNT' | string %]"
 							class="stdbutton"
 							onclick="return confirm('[% 'PLUGIN_ZVUK_DELETE_CONFIRM' | string %]');">
 					</td>
@@ -107,95 +102,61 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 	</select>
 [% END %]
 
+[% WRAPPER setting title="PLUGIN_ZVUK_GIGAMIX_AUTOPLAY" desc="PLUGIN_ZVUK_GIGAMIX_AUTOPLAY_DESC" %]
+	<input type="checkbox" name="pref_gigamix_autoplay" id="pref_gigamix_autoplay" class="stdedit" [% IF prefs.gigamix_autoplay %]checked[% END %]>
+[% END %]
+
 <!-- OAuth Authentication Section -->
 <div style="margin-top:20px; padding:15px; background-color:#f0f0f0; border-radius:4px; border-left:4px solid #b8a6db;">
 	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</div>
 	<div style="font-size:12px; color:#666; margin-bottom:12px;">[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]</div>
-	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
-	<div id="oauthStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
+
+	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton" style="margin-bottom:15px;">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
+	<div id="oauthStatus" style="margin:10px 0; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
+
+	<div style="font-size:11px; color:#666; margin-top:10px; padding:8px; background-color:#fff; border-radius:4px; border:1px solid #ddd;">
+		[% "PLUGIN_ZVUK_OAUTH_INSTRUCTIONS" | string %]
+	</div>
 </div>
 
 <!-- Anonymous Access Section -->
 <div style="margin-top:12px; padding:15px; background-color:#f9f9f9; border-radius:4px; border-left:4px solid #aaa;">
-	<div style="font-weight:bold; margin-bottom:6px;">Anonymous Access</div>
+	<div style="font-weight:bold; margin-bottom:6px;">[% "PLUGIN_ZVUK_ANONYMOUS_TITLE" | string %]</div>
 	<div style="font-size:12px; color:#666; margin-bottom:12px;">
-		Anonymous Access: Limited quality, 30-second previews. No saving, no liking.
+		[% "PLUGIN_ZVUK_ANONYMOUS_DESC" | string %]
 	</div>
-	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">Log in anonymously</button>
+	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_ANONYMOUS_BUTTON" | string %]</button>
 	<div id="anonStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
 </div>
 
+<div style="margin-top:20px; padding:10px; background-color:#f9f9f9; border-radius:4px;">
+	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</div>
+	<div style="font-size:12px; color:#666; margin-bottom:10px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS_DESC" | string %]</div>
+	<button type="button" onclick="openWaveSliderModal(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OPEN_SLIDERS" | string %]</button>
+</div>
+
 <script>
-function openZvukOAuthWindow() {
-	var statusDiv = document.getElementById('oauthStatus');
-	setDivStatus(statusDiv, 'Открываем окно авторизации...', 'info');
-
-	var callbackUrl = encodeURIComponent(
-		window.location.protocol + '//' + window.location.host + '/plugins/zvuk/oauthCallback'
-	);
-	var loginUrl = 'https://id.zvuk.com/?returnUrl=' + callbackUrl;
-
-	var width = 520, height = 620;
-	var left = (screen.width  - width)  / 2;
-	var top  = (screen.height - height) / 2;
-
-	var popup = window.open(loginUrl, 'zvukOAuth',
-		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top);
-
-	if (!popup) {
-		setDivStatus(statusDiv, 'Не удалось открыть окно. Разрешите всплывающие окна.', 'error');
-		return;
-	}
-
-	// Listen for result from popup via postMessage
-	var handler = function(event) {
-		if (event.origin !== window.location.origin) return;
-		if (!event.data || !event.data.type) return;
-
-		window.removeEventListener('message', handler);
-
-		if (event.data.type === 'zvukOAuthSuccess') {
-			setDivStatus(statusDiv, 'Аккаунт добавлен! Обновляем страницу...', 'ok');
-			setTimeout(function() { location.reload(); }, 1500);
-		} else if (event.data.type === 'zvukOAuthError') {
-			setDivStatus(statusDiv, 'Ошибка: ' + (event.data.error || 'неизвестная'), 'error');
-		}
-	};
-	window.addEventListener('message', handler);
-
-	// Clean up handler if popup closes without sending message
-	var check = setInterval(function() {
-		if (!popup || popup.closed) {
-			clearInterval(check);
-			window.removeEventListener('message', handler);
-		}
-	}, 1000);
-}
-
-function getAnonymousToken() {
-	var statusDiv = document.getElementById('anonStatus');
-	setDivStatus(statusDiv, 'Получаем анонимный токен...', 'info');
-
-	fetch('/plugins/zvuk/getAnonymousToken', { method: 'POST' })
-	.then(function(r) { return r.json(); })
-	.then(function(data) {
-		if (data.success) {
-			setDivStatus(statusDiv, 'Анонимный доступ активирован! Обновляем...', 'ok');
-			setTimeout(function() { location.reload(); }, 1500);
-		} else {
-			setDivStatus(statusDiv, 'Ошибка: ' + (data.error || 'unknown'), 'error');
-		}
-	})
-	.catch(function(e) {
-		setDivStatus(statusDiv, 'Ошибка сети: ' + e.message, 'error');
-	});
-}
+var zvukCallbackUrl = window.location.protocol + '//' + window.location.host + '/plugins/zvuk/saveOAuthToken';
+var zvukStatusDiv = null;
+var zvukStrings = {
+	openingWindow: '[% "PLUGIN_ZVUK_OAUTH_OPENING_WINDOW" | string %]',
+	popupError: '[% "PLUGIN_ZVUK_OAUTH_POPUP_ERROR" | string %]',
+	gettingProfile: '[% "PLUGIN_ZVUK_OAUTH_GETTING_PROFILE" | string %]',
+	saving: '[% "PLUGIN_ZVUK_OAUTH_SAVING" | string %]',
+	saved: '[% "PLUGIN_ZVUK_OAUTH_SAVED" | string %]',
+	invalidFormat: '[% "PLUGIN_ZVUK_OAUTH_INVALID_FORMAT" | string %]',
+	notFound: '[% "PLUGIN_ZVUK_OAUTH_NOT_FOUND" | string %]',
+	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string %]',
+	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string %]',
+	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]'
+};
 
 function setDivStatus(div, text, type) {
+	if (!div) return;
 	var colors = {
-		info:  { bg: '#e3f2fd', fg: '#1976d2' },
-		ok:    { bg: '#d4edda', fg: '#155724' },
-		error: { bg: '#f8d7da', fg: '#721c24' },
+		info: { bg: '#e3f2fd', fg: '#1976d2' },
+		ok: { bg: '#d4edda', fg: '#155724' },
+		error: { bg: '#f8d7da', fg: '#721c24' }
 	};
 	var c = colors[type] || colors.info;
 	div.textContent = text;
@@ -203,12 +164,112 @@ function setDivStatus(div, text, type) {
 	div.style.color = c.fg;
 	div.style.display = 'block';
 }
-</script>
 
-<div style="margin-top:20px; padding:10px; background-color:#f9f9f9; border-radius:4px;">
-	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:10px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS_DESC" | string %]</div>
-	<button type="button" onclick="openWaveSliderModal(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OPEN_SLIDERS" | string %]</button>
-</div>
+function openZvukOAuthWindow() {
+	var statusDiv = document.getElementById('oauthStatus');
+	zvukStatusDiv = statusDiv;
+	setDivStatus(statusDiv, zvukStrings.openingWindow, 'info');
+
+	var width = 520, height = 620;
+	var left = (screen.width - width) / 2;
+	var top = (screen.height - height) / 2;
+
+	var loginPopup = window.open('https://id.zvuk.com/', 'zvukOAuthLogin',
+		'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top);
+
+	if (!loginPopup) {
+		setDivStatus(statusDiv, zvukStrings.popupError, 'error');
+		return;
+	}
+
+	var checkClosed = setInterval(function() {
+		if (loginPopup && loginPopup.closed) {
+			clearInterval(checkClosed);
+			setDivStatus(statusDiv, zvukStrings.gettingProfile, 'info');
+			// Open profile window for user to copy token
+			setTimeout(function() {
+				var profilePopup = window.open('https://zvuk.com/api/tiny/profile', 'zvukProfile',
+					'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top);
+				setDivStatus(statusDiv, zvukStrings.copyJsonInstruction, 'info');
+			}, 300);
+		}
+	}, 500);
+}
+
+function saveToken(token) {
+	console.log('saveToken called with URL: ' + zvukCallbackUrl);
+	return fetch(zvukCallbackUrl, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token: token })
+	})
+	.then(function(r) {
+		console.log('Response status: ' + r.status);
+		console.log('Response headers:', r.headers.get('content-type'));
+		if (!r.ok) {
+			console.error('HTTP error: ' + r.status + ' ' + r.statusText);
+			throw new Error('HTTP ' + r.status);
+		}
+		var text = r.text();
+		console.log('Response text (before parse):', text);
+		return text.then(function(txt) {
+			console.log('Response text content:', txt);
+			return JSON.parse(txt);
+		});
+	})
+	.then(function(d) {
+		console.log('Response data (parsed):', d);
+		if (d && d.success) {
+			var message = zvukStrings.saved;
+			if (d.account && d.account.name) {
+				message = zvukStrings.accountAdded.replace('[name]', d.account.name);
+			}
+			setDivStatus(zvukStatusDiv, message, 'ok');
+			// Clear input
+			var input = document.getElementById('zvuk_token_input');
+			if (input) {
+				input.value = '';
+			}
+		} else {
+			setDivStatus(zvukStatusDiv, zvukStrings.networkError.replace('[error]', d.error), 'error');
+		}
+	})
+	.catch(function(e) {
+		console.error('Fetch error:', e);
+		setDivStatus(zvukStatusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
+	})
+	.finally(function() {
+		// Only reload after everything is complete
+		// Wait 2-3 seconds to allow getProfile to complete in background
+		if (zvukStatusDiv && zvukStatusDiv.textContent.includes('✓')) {
+			console.log('Reloading page in 2.5 seconds...');
+			setTimeout(function() {
+				window.location.reload(true);
+			}, 2500);
+		}
+	});
+}
+
+function getAnonymousToken() {
+	var statusDiv = document.getElementById('anonStatus');
+	setDivStatus(statusDiv, 'Получаем анонимный токен...', 'info');
+
+	require('Plugins::Zvuk::API::Async');
+	// This would be called via server-side if available
+	fetch('/plugins/zvuk/getAnonymousToken', { method: 'POST' })
+		.then(r => r.json())
+		.then(d => {
+			if (d.success) {
+				setDivStatus(statusDiv, 'Анонимный доступ активирован!', 'ok');
+				setTimeout(() => { location.reload(); }, 1500);
+			} else {
+				setDivStatus(statusDiv, 'Ошибка: ' + d.error, 'error');
+			}
+		})
+		.catch(e => {
+			setDivStatus(statusDiv, 'Ошибка сети: ' + e.message, 'error');
+		});
+}
+</script>
 
 [% PROCESS settings/footer.html %]

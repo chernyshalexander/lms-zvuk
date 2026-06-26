@@ -71,12 +71,12 @@ PLUGIN_ZVUK_QUALITY_FLAC
 	RU	Максимальное (FLAC / Hi-Fi)
 
 PLUGIN_ZVUK_WAVE_SLIDERS
-	EN	Wave Settings (Sliders)
-	RU	Настройки Волны (Слайдеры)
+	EN	Wave Settings
+	RU	Настройки волны
 
 PLUGIN_ZVUK_WAVE_SLIDERS_DESC
-	EN	Open Wave Settings interface with sliders
-	RU	Открыть интерфейс настроек Волны со слайдерами
+	EN	Open Wave Settings interface
+	RU	Открыть интерфейс настроек волны
 
 PLUGIN_ZVUK_OPEN_SLIDERS
 	EN	Open Settings
@@ -93,6 +93,14 @@ PLUGIN_ZVUK_COLLECTION
 PLUGIN_ZVUK_PLAYLISTS
 	EN	My Playlists
 	RU	Мои плейлисты
+
+PLUGIN_ZVUK_PODCASTS
+	EN	Podcasts
+	RU	Подкасты
+
+PLUGIN_ZVUK_EPISODES
+	EN	Episodes
+	RU	Эпизоды
 
 PLUGIN_ZVUK_WAVE
 	EN	Personal Wave
@@ -307,12 +315,101 @@ PLUGIN_ZVUK_OAUTH_TITLE
 	RU	Авторизация через браузер
 
 PLUGIN_ZVUK_OAUTH_DESC
-	EN	Click below to authorize with Zvuk. Your browser will open a login window, and after you sign in, the plugin will automatically capture your authentication token.
-	RU	Нажмите ниже для авторизации в Звуке. Откроется окно входа, и после того как вы войдёте, плагин автоматически получит ваш токен авторизации.
+	EN	Authorize with your Zvuk account to access the music service.
+	RU	Авторизуйтесь со своим аккаунтом Звука для доступа к сервису музыки.
 
 PLUGIN_ZVUK_OAUTH_BUTTON
 	EN	Login with Zvuk
 	RU	Войти через Звук
+
+
+PLUGIN_ZVUK_OAUTH_PASTE_LABEL
+	EN	Or paste profile JSON manually:
+	RU	Либо вставьте JSON профиля вручную:
+
+PLUGIN_ZVUK_OAUTH_EXTRACT_BUTTON
+	EN	Extract token from JSON
+	RU	Извлечь токен из JSON
+
+PLUGIN_ZVUK_OAUTH_OPENING_WINDOW
+	EN	Opening authorization window...
+	RU	Открываем окно авторизации...
+
+PLUGIN_ZVUK_OAUTH_POPUP_ERROR
+	EN	Could not open window. Please allow popups.
+	RU	Не удалось открыть окно. Разрешите всплывающие окна.
+
+PLUGIN_ZVUK_OAUTH_GETTING_PROFILE
+	EN	Open profile to get token...
+	RU	Откройте профиль для получения токена...
+
+PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION
+	EN	Copy JSON from profile window and paste below
+	RU	Скопируйте JSON из окна профиля и вставьте ниже
+
+PLUGIN_ZVUK_OAUTH_ALGORITHM
+	EN	Steps to authorize:
+	RU	Шаги авторизации:
+
+PLUGIN_ZVUK_OAUTH_STEP_1
+	EN	Click the button above
+	RU	Нажмите кнопку выше
+
+PLUGIN_ZVUK_OAUTH_STEP_2
+	EN	Log in at https://id.zvuk.com
+	RU	Авторизуйтесь на https://id.zvuk.com
+
+PLUGIN_ZVUK_OAUTH_STEP_3
+	EN	Close the login window (click X)
+	RU	Закройте окно авторизации (нажмите X)
+
+PLUGIN_ZVUK_OAUTH_STEP_4
+	EN	Profile window opens automatically
+	RU	Автоматически откроется окно с JSON профилем
+
+PLUGIN_ZVUK_OAUTH_STEP_5
+	EN	JSON displays nicely - find "token" field
+	RU	JSON отображается красиво - найдите поле "token"
+
+PLUGIN_ZVUK_OAUTH_STEP_6
+	EN	Copy "token" value (32 chars without quotes)
+	RU	Скопируйте значение "token" (32 символа без кавычек)
+
+PLUGIN_ZVUK_OAUTH_STEP_7
+	EN	Paste token in field above
+	RU	Вставьте токен в поле выше
+
+PLUGIN_ZVUK_OAUTH_STEP_8
+	EN	Press ENTER or click Apply
+	RU	Нажмите ENTER или кнопку Apply
+
+PLUGIN_ZVUK_OAUTH_INSTRUCTIONS
+	EN	Click Login, sign in, close the window. Profile JSON opens automatically. Find "token" field (32 chars), copy it, paste in the field above, press ENTER.
+	RU	Нажмите Войти, авторизуйтесь, закройте окно. Профиль JSON откроется автоматически. Найдите поле "token" (32 символа), скопируйте его, вставьте в поле выше, нажмите ENTER.
+
+PLUGIN_ZVUK_OAUTH_SAVING
+	EN	Saving token...
+	RU	Сохраняем токен...
+
+PLUGIN_ZVUK_OAUTH_SAVED
+	EN	Token saved! Refreshing...
+	RU	Токен сохранен! Обновляем...
+
+PLUGIN_ZVUK_OAUTH_INVALID_FORMAT
+	EN	Invalid token format
+	RU	Токен имеет неправильный формат
+
+PLUGIN_ZVUK_OAUTH_NOT_FOUND
+	EN	Token not found
+	RU	Токен не найден
+
+PLUGIN_ZVUK_OAUTH_PASTE_PLACEHOLDER
+	EN	Paste JSON here
+	RU	Вставьте JSON: {"result":{"token":"..."}}
+
+PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED
+	EN	Account added: [name] ✓
+	RU	Аккаунт добавлен: [name] ✓
 
 PLUGIN_ZVUK_GIGAMIX
 	EN	GigaMix AI
@@ -333,6 +430,18 @@ PLUGIN_ZVUK_GIGAMIX_PLAYLIST_TITLE
 PLUGIN_ZVUK_GIGAMIX_REMAKE
 	EN	Remix
 	RU	Переделать
+
+PLUGIN_ZVUK_GIGAMIX_ADD_MORE
+	EN	Add More Tracks
+	RU	Подобрать ещё
+
+PLUGIN_ZVUK_GIGAMIX_AUTOPLAY
+	EN	Auto-extend GigaMix
+	RU	Автопродолжение GigaMix
+
+PLUGIN_ZVUK_GIGAMIX_AUTOPLAY_DESC
+	EN	Automatically load more tracks when GigaMix playlist ends
+	RU	Автоматически загружать треки при достижении конца плейлиста
 
 PLUGIN_ZVUK_GIGAMIX_NO_RESULTS
 	EN	No tracks found for your description
@@ -361,3 +470,47 @@ PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_EMPTY
 PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_ERROR
 	EN	Failed to load recommendations
 	RU	Не удалось загрузить рекомендации
+
+PLUGIN_ZVUK_ANONYMOUS_TITLE
+	EN	Anonymous Access
+	RU	Анонимный доступ
+
+PLUGIN_ZVUK_ANONYMOUS_DESC
+	EN	Anonymous Access: Limited quality, 30-second previews. No saving, no liking.
+	RU	Анонимный доступ: Ограниченное качество 128kbps, 30-секундные превью. Без коллекции и лайков.
+
+PLUGIN_ZVUK_ANONYMOUS_BUTTON
+	EN	Log in anonymously
+	RU	Войти анонимно
+
+PLUGIN_ZVUK_OAUTH_OPENING
+	EN	Opening authorization window...
+	RU	Открываем окно авторизации...
+
+PLUGIN_ZVUK_OAUTH_POPUP_BLOCKED
+	EN	Could not open popup. Please allow popups.
+	RU	Не удалось открыть окно. Разрешите всплывающие окна.
+
+PLUGIN_ZVUK_OAUTH_SUCCESS
+	EN	Account added! Refreshing page...
+	RU	Аккаунт добавлен! Обновляем страницу...
+
+PLUGIN_ZVUK_OAUTH_ERROR
+	EN	Error: [error]
+	RU	Ошибка: [error]
+
+PLUGIN_ZVUK_ANONYMOUS_LOADING
+	EN	Getting anonymous token...
+	RU	Получаем анонимный токен...
+
+PLUGIN_ZVUK_ANONYMOUS_SUCCESS
+	EN	Anonymous access activated! Refreshing...
+	RU	Анонимный доступ активирован! Обновляем...
+
+PLUGIN_ZVUK_ANONYMOUS_ERROR
+	EN	Error: [error]
+	RU	Ошибка: [error]
+
+PLUGIN_ZVUK_NETWORK_ERROR
+	EN	Network error: [error]
+	RU	Ошибка сети: [error]

@@ -2,9 +2,12 @@ package Plugins::Zvuk::Plugin;
 
 use strict;
 use warnings;
+use utf8;
 
 use base qw(Slim::Plugin::OPMLBased);
 
+use Encode qw(decode_utf8 encode_utf8);
+use JSON::XS;
 use JSON::XS::VersionOneAndTwo;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
@@ -21,6 +24,7 @@ my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
 my %api_clients;
+my %gigamix_context;  # Store GigaMix state per client: { cursor => ..., prompt => ... }
 
 sub initPlugin {
 	my $class = shift;
@@ -34,8 +38,9 @@ sub initPlugin {
 	$log->info("Initializing Zvuk plugin...");
 
 	$prefs->init({
-		accounts => {},
-		quality  => 'high',
+		accounts           => {},
+		quality            => 'high',
+		gigamix_autoplay   => 0,
 	});
 
 	Plugins::Zvuk::ProtocolHandler->register();
@@ -80,6 +85,9 @@ sub initPlugin {
 	# Subscribe to events to clear wave_active flag when playback stops
 	Slim::Control::Request::subscribe(\&_onStop, [['stop', 'playlist']]);
 
+	# Subscribe to playlist changes to auto-extend GigaMix
+	Slim::Control::Request::subscribe(\&_onPlaylistChanged, [['playlist', 'newmetadata']]);
+
 	# Initialize API clients for all accounts at startup
 	my $accounts = $prefs->get('accounts') || {};
 	foreach my $userId (keys %$accounts) {
@@ -98,6 +106,79 @@ sub _onStop {
 		$client->pluginData(zvuk_wave_active => 0);
 		$log->debug("Cleared zvuk_wave_active flag");
 	}
+}
+
+sub _onPlaylistChanged {
+	my ($request) = @_;
+	my $client = $request->client();
+	return unless $client;
+
+	# Check if GigaMix autoplay is enabled
+	return unless $prefs->get('gigamix_autoplay');
+
+	# Get GigaMix context from global storage
+	my $clientId = $client->id();
+	my $gigamix_data = $gigamix_context{$clientId};
+	return unless $gigamix_data && $gigamix_data->{cursor} && $gigamix_data->{prompt};
+
+	# Get current playlist index
+	my $currentIndex = $client->currentPlaylistIndex();
+	my $playlistSize = $client->playlistLength();
+
+	$log->debug("GigaMix autoplay: index=$currentIndex, size=$playlistSize");
+
+	# Check if we're near the end (last track or close to it)
+	if (defined $currentIndex && defined $playlistSize && $currentIndex >= $playlistSize - 2) {
+		$log->info("GigaMix: at end of playlist, auto-loading more tracks");
+		_gigamixAutoExtend($client, $gigamix_data);
+	}
+}
+
+sub _gigamixAutoExtend {
+	my ($client, $gigamix_data) = @_;
+	my $api = _get_api_client($client);
+	return unless $api;
+
+	my $cursor = $gigamix_data->{cursor};
+	my $prompt = $gigamix_data->{prompt};
+
+	$api->getGenerativePlaylistPage(sub {
+		my $result = shift || {};
+		if ($result->{error}) {
+			$log->error("GigaMix autoplay: failed to load more: $result->{error}");
+			return;
+		}
+
+		my $tracks = $result->{tracks} || [];
+		return unless @$tracks;
+
+		# Update cursor for next extension
+		if ($result->{cursor}) {
+			$gigamix_data->{cursor} = $result->{cursor};
+			my $clientId = $client->id();
+			$gigamix_context{$clientId} = $gigamix_data;
+		}
+
+		# Add tracks to playlist
+		foreach my $track (@$tracks) {
+			my $url = 'zvuk://' . $track->{id};
+			$client->execute("playlist", "addtracks", "singleplay", $url);
+		}
+
+		$log->info("GigaMix: added " . scalar(@$tracks) . " tracks to playlist");
+	}, { cursor => $cursor, limit => 5 });
+}
+
+sub _saveGigamixContext {
+	my ($client, $cursor, $prompt) = @_;
+	return unless $client && $cursor && $prompt;
+
+	my $clientId = $client->id();
+	$gigamix_context{$clientId} = {
+		cursor => $cursor,
+		prompt => $prompt,
+	};
+	$log->debug("GigaMix: saved context for client $clientId");
 }
 
 sub _init_api_client {
@@ -180,8 +261,8 @@ sub _buildRootMenu {
 				{ name => cstring($client, 'ALBUMS'),                  type => 'link', url => \&handleFavoriteAlbums,  image => 'plugins/zvuk/html/images/albums.png' },
 				{ name => cstring($client, 'ARTISTS'),                 type => 'link', url => \&handleFavoriteArtists, image => 'plugins/zvuk/html/images/artists.png' },
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),   type => 'link', url => \&handleUserPlaylists,   image => 'plugins/zvuk/html/images/playlists.png' },
-				{ name => cstring($client, 'PODCASTS'),                type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
-				{ name => cstring($client, 'EPISODES'),                type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_PODCASTS'),     type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_EPISODES'),    type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
 				# TODO: Synthesis Playlists API endpoint not available
 				# { name => 'Synthesis Playlists', type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
@@ -229,7 +310,12 @@ sub selectAccount {
 }
 
 sub _switchAccount {
-	my ($client, $cb, $args, $userId) = @_;
+	my ($p1, $cb, $args, $userId) = @_;
+
+	# In Jive, p1 is client only when called from connected player.
+	# When called from web UI without player, p1 is undef.
+	# The real client (if any) is in args->{client}
+	my $client = (ref($p1) && $p1->can('name')) ? $p1 : $args->{client};
 
 	my $accounts = $prefs->get('accounts') || {};
 	unless (exists $accounts->{$userId}) {
@@ -237,8 +323,18 @@ sub _switchAccount {
 		return;
 	}
 
-	$prefs->client($client)->set('userId', $userId);
-	$log->info("Zvuk: " . $client->name() . " switched to userId=$userId");
+	# Set client preference if we have a client
+	if ($client && ref($client)) {
+		eval {
+			if (my $clientPrefs = $prefs->client($client)) {
+				$clientPrefs->set('userId', $userId);
+			}
+		};
+		$log->info("Zvuk: " . $client->name() . " switched to userId=$userId");
+	} else {
+		# No client connected - just log the switch (will use first account as fallback)
+		$log->info("Zvuk: Account switched to userId=$userId (no connected player)");
+	}
 
 	handleFeed($client, $cb, $args);
 }
@@ -557,6 +653,22 @@ sub handleGigaMixRemake {
 	}, { queryText => $prompt });
 }
 
+sub handleGigaMixAddMore {
+	my ($client, $cb, $args, $params) = @_;
+	my $api = _get_api_client($client);
+
+	my $cursor = $params->{cursor};
+	my $prompt = $params->{prompt};
+	my $initialTracks = $params->{initialTracks} || [];
+
+	$log->info("GigaMix: adding more tracks for: $prompt");
+
+	$api->getGenerativePlaylistPage(sub {
+		my $result = shift || {};
+		_renderGigaMixAddMore($client, $cb, $result, $prompt, $initialTracks, $cursor);
+	}, { cursor => $cursor, limit => 5 });
+}
+
 sub handleGigaMixNextPage {
 	my ($client, $cb, $args, $params) = @_;
 
@@ -640,16 +752,62 @@ sub _renderGigaMixPlaylist {
 		passthrough => [{ prompt => $prompt }],
 	};
 
-	# TODO: Next page pagination - getGenerativePlaylistPagination returns 500 error
-	# Need to verify correct GraphQL operation name for cursor-based pagination
-	# if ($cursor) {
-	#	push @items, {
-	#		name        => cstring($client, 'NEXT_PAGE'),
-	#		type        => 'link',
-	#		url         => \&handleGigaMixNextPage,
-	#		passthrough => [{ cursor => $cursor, prompt => $prompt }],
-	#	};
-	# }
+	# Add "More Tracks" button if cursor exists (pagination available)
+	if ($cursor) {
+		# Save context for auto-extend feature
+		_saveGigamixContext($client, $cursor, $prompt);
+
+		push @items, {
+			name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADD_MORE'),
+			type        => 'link',
+			url         => \&handleGigaMixAddMore,
+			passthrough => [{ cursor => $cursor, prompt => $prompt, initialTracks => $tracks }],
+		};
+	}
+
+	$cb->({ items => \@items });
+}
+
+# Render additional tracks loaded via "Add More" pagination
+sub _renderGigaMixAddMore {
+	my ($client, $cb, $result, $prompt, $initialTracks, $currentCursor) = @_;
+
+	if ($result->{error}) {
+		$log->error("GigaMix: load more failed: $result->{error}");
+		$cb->({ items => [
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE'), type => 'text' },
+		]});
+		return;
+	}
+
+	my $newTracks = $result->{tracks} || [];
+	my $newCursor = $result->{cursor};
+
+	$log->info("GigaMix: loaded " . scalar(@$newTracks) . " more tracks");
+
+	unless (@$newTracks) {
+		$cb->({ items => [
+			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_NO_RESULTS'), type => 'text' },
+		]});
+		return;
+	}
+
+	my @items;
+
+	push @items, map { _renderTrack($_, 1) } @$newTracks;
+
+	# Allow another pagination if cursor exists
+	if ($newCursor) {
+		# Save context for auto-extend feature
+		_saveGigamixContext($client, $newCursor, $prompt);
+
+		push @items, {
+			name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADD_MORE'),
+			type        => 'link',
+			url         => \&handleGigaMixAddMore,
+			passthrough => [{ cursor => $newCursor, prompt => $prompt, initialTracks => [@$initialTracks, @$newTracks] }],
+		};
+	}
 
 	$cb->({ items => \@items });
 }
@@ -1573,16 +1731,25 @@ sub handleSaveWaveSettingsWeb {
 sub handleSaveOAuthToken {
 	my ($httpClient, $response) = @_;
 
+	$log->debug("OAuth: handleSaveOAuthToken called");
+
 	my $request = $response->request;
 	my $body = $request->content_ref ? ${$request->content_ref} : '';
+	$log->debug("OAuth: Request body length: " . length($body));
+	$log->debug("OAuth: Request body (first 100 chars): " . substr($body, 0, 100));
+
 	my $data;
 
 	eval {
 		$data = decode_json($body);
 	};
 
+	if ($@) {
+		$log->error("OAuth: Failed to parse JSON: $@");
+	}
+
 	if ($@ || !$data || !$data->{token}) {
-		$log->error("OAuth: Failed to parse token request: $@");
+		$log->error("OAuth: Failed to parse token request: $@ | data: " . ($data ? 'exists' : 'null') . " | token: " . ($data->{token} ? 'exists' : 'null'));
 		$response->code(400);
 		$response->content_type('application/json');
 		my $json = encode_json({ success => 0, error => 'Missing token' });
@@ -1602,38 +1769,34 @@ sub handleSaveOAuthToken {
 		return;
 	}
 
-	# Verify token by fetching profile
-	require Plugins::Zvuk::API::Async;
-	Plugins::Zvuk::API::Async->getProfile(
-		sub {
-			my $profile = shift;
+	# Save token immediately without waiting for profile fetch
+	my $prefs = preferences('plugin.zvuk');
+	my $accounts = $prefs->get('accounts') || {};
 
-			if ($profile && $profile->{id} && !$profile->{error}) {
-				my $userId = $profile->{id};
-				my $prefs = preferences('plugin.zvuk');
-				my $accounts = $prefs->get('accounts') || {};
-				$accounts->{$userId} = {
-					token => $token,
-					name  => $profile->{name} || "Account $userId",
-				};
-				$prefs->set('accounts', $accounts);
-				$log->info("OAuth: Account added via browser: userId=$userId");
+	# Generate temporary userId from token hash
+	my $tempUserId = substr($token, 0, 16);
+	$accounts->{$tempUserId} = {
+		token => $token,
+		name  => "Account $tempUserId",
+	};
+	$prefs->set('accounts', $accounts);
+	$log->info("OAuth: Token saved immediately with tempUserId=$tempUserId");
 
-				$response->code(200);
-				$response->content_type('application/json');
-				my $json = encode_json({ success => 1 });
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
-			}
-			else {
-				$log->error("OAuth: Profile validation failed");
-				$response->code(401);
-				$response->content_type('application/json');
-				my $json = encode_json({ success => 0, error => 'Token validation failed' });
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
-			}
-		},
-		$token
-	);
+	# Send immediate response to client
+	$response->code(200);
+	$response->content_type('application/json');
+
+	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
+	my $json = $json_encoder->encode({
+		success => 1,
+		account => {
+			userId => $tempUserId,
+			name => "Account"
+		}
+	});
+	$log->debug("OAuth: Sending immediate response: $json");
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+	$log->debug("OAuth: Response sent immediately");
 }
 
 sub handleOAuthCallback {
