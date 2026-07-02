@@ -579,7 +579,8 @@ sub handleRecommendations {
 
 		$cb->({ items => \@menuItems });
 	}, {
-		contentType => 'FOR_YOU',
+		contentType => 'Music',
+		itemTypes   => ['Artist', 'Release', 'Playlist'],
 		page        => 1,
 	});
 }
