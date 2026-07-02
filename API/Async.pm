@@ -1059,7 +1059,7 @@ sub getMusicRecommendations {
 
 	my $contentType = $args->{contentType} || 'Music';
 	my $itemTypes   = $args->{itemTypes}   || ['Artist', 'Release', 'Playlist'];
-	my $page        = $args->{page}        || 1;
+	my $pages_list  = $args->{pages}       || [1..6];  # Request pages 1-6 by default (30+ items)
 
 	my $gql = qq{
 		query getMusicRecommendations(\$contentType: DynamicBlockContentType!, \$itemType: [DynamicBlockItemType!], \$pages: [Int!]!) {
@@ -1068,6 +1068,7 @@ sub getMusicRecommendations {
 				pages {
 					page
 					items {
+						__typename
 						... on Artist {
 							id
 							title
@@ -1099,10 +1100,10 @@ sub getMusicRecommendations {
 	my $vars = {
 		contentType => $contentType,
 		itemType    => $itemTypes,
-		pages       => [$page],
+		pages       => $pages_list,
 	};
 
-	$log->info("getMusicRecommendations: contentType=$contentType, page=$page");
+	$log->info("getMusicRecommendations: contentType=$contentType, requesting pages=" . join(',', @$pages_list));
 
 	$self->_graphql(sub {
 		my $data = shift;
@@ -1115,14 +1116,35 @@ sub getMusicRecommendations {
 
 		my $block = $data->{dynamicBlock} || {};
 		my $pages = $block->{pages} || [];
-		my $items = $pages->[0] ? $pages->[0]->{items} : [];
 
-		Plugins::Zvuk::API->cacheTrackMetadata($items) if $items && ref($items) eq 'ARRAY';
+		# Collect all items from all pages
+		my @allItems;
+		foreach my $page (@$pages) {
+			my $items = $page->{items} || [];
+			push @allItems, @$items;
+		}
+
+		Plugins::Zvuk::API->cacheTrackMetadata(\@allItems) if @allItems;
+
+		# Separate items by type
+		my (@artists, @releases, @playlists);
+		foreach my $item (@allItems) {
+			if ($item->{__typename} eq 'Artist') {
+				push @artists, $item;
+			} elsif ($item->{__typename} eq 'Release') {
+				push @releases, $item;
+			} elsif ($item->{__typename} eq 'Playlist') {
+				push @playlists, $item;
+			}
+		}
 
 		$cb->({
-			items      => $items,
-			totalPages => $block->{totalPages},
-			currentPage => $page,
+			allItems    => \@allItems,
+			artists     => \@artists,
+			releases    => \@releases,
+			playlists   => \@playlists,
+			totalPages  => $block->{totalPages},
+			totalCount  => scalar(@allItems),
 		});
 	}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }

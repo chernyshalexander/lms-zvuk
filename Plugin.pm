@@ -538,7 +538,7 @@ sub handlePersonalizedPlaylists {
 # --- Music Recommendations (For You) ---
 
 sub handleRecommendations {
-	my ($client, $cb, $args, $params) = @_;
+	my ($client, $cb) = @_;
 	my $api = _get_api_client($client);
 
 	$api->getMusicRecommendations(sub {
@@ -552,36 +552,141 @@ sub handleRecommendations {
 			return;
 		}
 
-		my $items = $result->{items} || [];
-		unless (@$items) {
+		my $totalCount = $result->{totalCount} || 0;
+		unless ($totalCount > 0) {
 			$cb->({ items => [
 				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY'), type => 'text' },
 			]});
 			return;
 		}
 
-		# Render mixed content (artists, releases, playlists)
+		# Show categories for recommendations
 		my @menuItems;
-		foreach my $item (@$items) {
-			if (ref($item) eq 'HASH') {
-				if ($item->{artists}) {
-					# Release (альбом)
-					push @menuItems, _renderReleaseItem($item);
-				} elsif ($item->{trackCount}) {
-					# Playlist
-					push @menuItems, _renderPlaylistItem($item);
-				} else {
-					# Artist
-					push @menuItems, _renderArtistItem($item);
-				}
-			}
+
+		# Artists category
+		my $artists = $result->{artists} || [];
+		if (@$artists) {
+			push @menuItems, {
+				name => cstring($client, 'PLUGIN_ZVUK_ARTISTS') . ' (' . scalar(@$artists) . ')',
+				type => 'link',
+				url  => \&handleRecommendationArtists,
+			};
+		}
+
+		# Releases (Albums) category
+		my $releases = $result->{releases} || [];
+		if (@$releases) {
+			push @menuItems, {
+				name => cstring($client, 'PLUGIN_ZVUK_ALBUMS') . ' (' . scalar(@$releases) . ')',
+				type => 'link',
+				url  => \&handleRecommendationAlbums,
+			};
+		}
+
+		# Playlists category
+		my $playlists = $result->{playlists} || [];
+		if (@$playlists) {
+			push @menuItems, {
+				name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS') . ' (' . scalar(@$playlists) . ')',
+				type => 'link',
+				url  => \&handleRecommendationPlaylists,
+			};
 		}
 
 		$cb->({ items => \@menuItems });
 	}, {
 		contentType => 'Music',
 		itemTypes   => ['Artist', 'Release', 'Playlist'],
-		page        => 1,
+	});
+}
+
+sub handleRecommendationArtists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getMusicRecommendations(sub {
+		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("getMusicRecommendations failed: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		my $artists = $result->{artists} || [];
+		unless (@$artists) {
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		$cb->({ items => [ map { _renderArtist($_) } @$artists ] });
+	}, {
+		contentType => 'Music',
+		itemTypes   => ['Artist', 'Release', 'Playlist'],
+	});
+}
+
+sub handleRecommendationAlbums {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getMusicRecommendations(sub {
+		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("getMusicRecommendations failed: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		my $releases = $result->{releases} || [];
+		unless (@$releases) {
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		$cb->({ items => [ map { _renderAlbum($_) } @$releases ] });
+	}, {
+		contentType => 'Music',
+		itemTypes   => ['Artist', 'Release', 'Playlist'],
+	});
+}
+
+sub handleRecommendationPlaylists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getMusicRecommendations(sub {
+		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("getMusicRecommendations failed: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		my $playlists = $result->{playlists} || [];
+		unless (@$playlists) {
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		$cb->({ items => [ map { _renderPlaylist($_) } @$playlists ] });
+	}, {
+		contentType => 'Music',
+		itemTypes   => ['Artist', 'Release', 'Playlist'],
 	});
 }
 
