@@ -23,7 +23,7 @@ sub page {
 }
 
 sub prefs {
-	return ($prefs, qw(quality));
+	return ($prefs, qw(quality gigamix_autoplay));
 }
 
 sub handler {

@@ -24,7 +24,6 @@ my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
 my %api_clients;
-my %gigamix_context;  # Store GigaMix state per client: { cursor => ..., prompt => ... }
 
 sub initPlugin {
 	my $class = shift;
@@ -85,9 +84,6 @@ sub initPlugin {
 	# Subscribe to events to clear wave_active flag when playback stops
 	Slim::Control::Request::subscribe(\&_onStop, [['stop', 'playlist']]);
 
-	# Subscribe to playlist changes to auto-extend GigaMix
-	Slim::Control::Request::subscribe(\&_onPlaylistChanged, [['playlist', 'newmetadata']]);
-
 	# Initialize API clients for all accounts at startup
 	my $accounts = $prefs->get('accounts') || {};
 	foreach my $userId (keys %$accounts) {
@@ -104,81 +100,9 @@ sub _onStop {
 	my $action = $request->getRequest(0);
 	if ($action eq 'stop' || ($action eq 'playlist' && $request->getRequest(1) eq 'clear')) {
 		$client->pluginData(zvuk_wave_active => 0);
-		$log->debug("Cleared zvuk_wave_active flag");
+		$client->pluginData(zvuk_gigamix_active => 0);
+		$log->debug("Cleared zvuk_wave_active and zvuk_gigamix_active flags");
 	}
-}
-
-sub _onPlaylistChanged {
-	my ($request) = @_;
-	my $client = $request->client();
-	return unless $client;
-
-	# Check if GigaMix autoplay is enabled
-	return unless $prefs->get('gigamix_autoplay');
-
-	# Get GigaMix context from global storage
-	my $clientId = $client->id();
-	my $gigamix_data = $gigamix_context{$clientId};
-	return unless $gigamix_data && $gigamix_data->{cursor} && $gigamix_data->{prompt};
-
-	# Get current playlist index
-	my $currentIndex = $client->currentPlaylistIndex();
-	my $playlistSize = $client->playlistLength();
-
-	$log->debug("GigaMix autoplay: index=$currentIndex, size=$playlistSize");
-
-	# Check if we're near the end (last track or close to it)
-	if (defined $currentIndex && defined $playlistSize && $currentIndex >= $playlistSize - 2) {
-		$log->info("GigaMix: at end of playlist, auto-loading more tracks");
-		_gigamixAutoExtend($client, $gigamix_data);
-	}
-}
-
-sub _gigamixAutoExtend {
-	my ($client, $gigamix_data) = @_;
-	my $api = _get_api_client($client);
-	return unless $api;
-
-	my $cursor = $gigamix_data->{cursor};
-	my $prompt = $gigamix_data->{prompt};
-
-	$api->getGenerativePlaylistPage(sub {
-		my $result = shift || {};
-		if ($result->{error}) {
-			$log->error("GigaMix autoplay: failed to load more: $result->{error}");
-			return;
-		}
-
-		my $tracks = $result->{tracks} || [];
-		return unless @$tracks;
-
-		# Update cursor for next extension
-		if ($result->{cursor}) {
-			$gigamix_data->{cursor} = $result->{cursor};
-			my $clientId = $client->id();
-			$gigamix_context{$clientId} = $gigamix_data;
-		}
-
-		# Add tracks to playlist
-		foreach my $track (@$tracks) {
-			my $url = 'zvuk://' . $track->{id};
-			$client->execute("playlist", "addtracks", "singleplay", $url);
-		}
-
-		$log->info("GigaMix: added " . scalar(@$tracks) . " tracks to playlist");
-	}, { cursor => $cursor, limit => 5 });
-}
-
-sub _saveGigamixContext {
-	my ($client, $cursor, $prompt) = @_;
-	return unless $client && $cursor && $prompt;
-
-	my $clientId = $client->id();
-	$gigamix_context{$clientId} = {
-		cursor => $cursor,
-		prompt => $prompt,
-	};
-	$log->debug("GigaMix: saved context for client $clientId");
 }
 
 sub _init_api_client {
@@ -247,9 +171,15 @@ sub _buildRootMenu {
 			url   => \&handlePersonalizedPlaylists,
 		},
 		{
+			name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
+			type  => 'link',
+			image => 'plugins/zvuk/html/images/playlists.png',
+			url   => \&handleRecommendations,
+		},
+		{
 			name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
 			type  => 'link',
-			image => 'plugins/zvuk/html/images/gigamix.png',
+			image => 'plugins/zvuk/html/images/playlists.png',
 			url   => \&handleGigaMix,
 		},
 		{
@@ -257,12 +187,12 @@ sub _buildRootMenu {
 			type  => 'outline',
 			image => 'plugins/zvuk/html/images/favorites.png',
 			items => [
-				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'),  type => 'link', url => \&handleCollection,      image => 'plugins/zvuk/html/images/personal.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_COLLECTION'),  type => 'link', url => \&handleCollection,      image => 'html/images/musicfolder.png' },
 				{ name => cstring($client, 'ALBUMS'),                  type => 'link', url => \&handleFavoriteAlbums,  image => 'plugins/zvuk/html/images/albums.png' },
 				{ name => cstring($client, 'ARTISTS'),                 type => 'link', url => \&handleFavoriteArtists, image => 'plugins/zvuk/html/images/artists.png' },
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),   type => 'link', url => \&handleUserPlaylists,   image => 'plugins/zvuk/html/images/playlists.png' },
-				{ name => cstring($client, 'PLUGIN_ZVUK_PODCASTS'),     type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast.png' },
-				{ name => cstring($client, 'PLUGIN_ZVUK_EPISODES'),    type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_PODCASTS'),     type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast_svg.png' },
+				{ name => cstring($client, 'PLUGIN_ZVUK_EPISODES'),    type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast_svg.png' },
 				# TODO: Synthesis Playlists API endpoint not available
 				# { name => 'Synthesis Playlists', type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
@@ -279,7 +209,7 @@ sub _buildRootMenu {
 			name  => cstring($client, 'PLUGIN_ZVUK_SELECT_ACCOUNT') . ': ' . $name,
 			type  => 'link',
 			url   => \&selectAccount,
-			image => 'plugins/zvuk/html/images/accnts.png',
+			image => 'plugins/zvuk/html/images/accnts_svg.png',
 		};
 	}
 
@@ -422,7 +352,7 @@ sub handleArtist {
 			name        => cstring($client, 'SONGS'),
 			type        => 'link',
 			url         => \&handleArtistTracks,
-			image       => 'html/images/playall.png',
+			image       => 'html/images/musicfolder.png',
 			passthrough => [{ id => $id }],
 		},
 		{
@@ -605,6 +535,91 @@ sub handlePersonalizedPlaylists {
 	});
 }
 
+# --- Music Recommendations (For You) ---
+
+sub handleRecommendations {
+	my ($client, $cb, $args, $params) = @_;
+	my $api = _get_api_client($client);
+
+	$api->getMusicRecommendations(sub {
+		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("getMusicRecommendations failed: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		my $items = $result->{items} || [];
+		unless (@$items) {
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		# Render mixed content (artists, releases, playlists)
+		my @menuItems;
+		foreach my $item (@$items) {
+			if (ref($item) eq 'HASH') {
+				if ($item->{artists}) {
+					# Release (альбом)
+					push @menuItems, _renderReleaseItem($item);
+				} elsif ($item->{trackCount}) {
+					# Playlist
+					push @menuItems, _renderPlaylistItem($item);
+				} else {
+					# Artist
+					push @menuItems, _renderArtistItem($item);
+				}
+			}
+		}
+
+		$cb->({ items => \@menuItems });
+	}, {
+		contentType => 'FOR_YOU',
+		page        => 1,
+	});
+}
+
+sub _renderArtistItem {
+	my ($artist) = @_;
+	return {
+		name     => $artist->{title},
+		type     => 'link',
+		url      => \&handleArtist,
+		image    => Plugins::Zvuk::API->getImageUrl($artist),
+		passthrough => [{ artistId => $artist->{id} }],
+	};
+}
+
+sub _renderReleaseItem {
+	my ($release) = @_;
+	my $artist_name = ($release->{artists} && @{$release->{artists}})
+		? $release->{artists}[0]{title}
+		: '';
+	return {
+		name     => $release->{title} . ($artist_name ? " - $artist_name" : ''),
+		type     => 'link',
+		url      => \&handleAlbum,
+		image    => Plugins::Zvuk::API->getImageUrl($release),
+		passthrough => [{ releaseId => $release->{id} }],
+	};
+}
+
+sub _renderPlaylistItem {
+	my ($playlist) = @_;
+	return {
+		name     => $playlist->{title},
+		type     => 'link',
+		url      => \&handlePlaylist,
+		image    => Plugins::Zvuk::API->getImageUrl($playlist),
+		passthrough => [{ playlistId => $playlist->{id} }],
+	};
+}
+
 # --- GigaMix AI Playlist Generator ---
 
 sub handleGigaMix {
@@ -659,13 +674,54 @@ sub handleGigaMixAddMore {
 
 	my $cursor = $params->{cursor};
 	my $prompt = $params->{prompt};
-	my $initialTracks = $params->{initialTracks} || [];
 
 	$log->info("GigaMix: adding more tracks for: $prompt");
 
 	$api->getGenerativePlaylistPage(sub {
 		my $result = shift || {};
-		_renderGigaMixAddMore($client, $cb, $result, $prompt, $initialTracks, $cursor);
+
+		if ($result->{error}) {
+			$log->error("GigaMix: failed to add more tracks: $result->{error}");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE'), type => 'text' },
+				{ name => "Error: $result->{error}", type => 'text' },
+			]});
+			return;
+		}
+
+		my $newTracks = $result->{tracks} || [];
+		my $newCursor = $result->{cursor};
+
+		$log->info("GigaMix: loaded " . scalar(@$newTracks) . " more tracks, adding to playlist");
+
+		unless (@$newTracks) {
+			$log->info("GigaMix: no more tracks available");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_NO_RESULTS') . " - плейлист исчерпан", type => 'text' },
+			]});
+			return;
+		}
+
+		# Add loaded tracks to the actual player playlist
+		foreach my $track (@$newTracks) {
+			Slim::Control::Request::executeRequest(
+				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
+			);
+		}
+
+		# Save GigaMix context for autoplay at end of playlist
+		if ($newCursor) {
+			$client->pluginData('zvuk_gigamix_active', 1);
+			$client->pluginData('zvuk_gigamix_cursor', $newCursor);
+			$client->pluginData('zvuk_gigamix_prompt', $prompt);
+		}
+
+		$log->info("GigaMix: successfully added " . scalar(@$newTracks) . " tracks to playlist");
+
+		# Return confirmation message
+		$cb->({ items => [
+			{ name => "Added " . scalar(@$newTracks) . " tracks to playlist", type => 'text' },
+		]});
 	}, { cursor => $cursor, limit => 5 });
 }
 
@@ -755,57 +811,15 @@ sub _renderGigaMixPlaylist {
 	# Add "More Tracks" button if cursor exists (pagination available)
 	if ($cursor) {
 		# Save context for auto-extend feature
-		_saveGigamixContext($client, $cursor, $prompt);
+		$client->pluginData('zvuk_gigamix_active', 1);
+		$client->pluginData('zvuk_gigamix_cursor', $cursor);
+		$client->pluginData('zvuk_gigamix_prompt', $prompt);
 
 		push @items, {
 			name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADD_MORE'),
 			type        => 'link',
 			url         => \&handleGigaMixAddMore,
 			passthrough => [{ cursor => $cursor, prompt => $prompt, initialTracks => $tracks }],
-		};
-	}
-
-	$cb->({ items => \@items });
-}
-
-# Render additional tracks loaded via "Add More" pagination
-sub _renderGigaMixAddMore {
-	my ($client, $cb, $result, $prompt, $initialTracks, $currentCursor) = @_;
-
-	if ($result->{error}) {
-		$log->error("GigaMix: load more failed: $result->{error}");
-		$cb->({ items => [
-			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE'), type => 'text' },
-		]});
-		return;
-	}
-
-	my $newTracks = $result->{tracks} || [];
-	my $newCursor = $result->{cursor};
-
-	$log->info("GigaMix: loaded " . scalar(@$newTracks) . " more tracks");
-
-	unless (@$newTracks) {
-		$cb->({ items => [
-			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_NO_RESULTS'), type => 'text' },
-		]});
-		return;
-	}
-
-	my @items;
-
-	push @items, map { _renderTrack($_, 1) } @$newTracks;
-
-	# Allow another pagination if cursor exists
-	if ($newCursor) {
-		# Save context for auto-extend feature
-		_saveGigamixContext($client, $newCursor, $prompt);
-
-		push @items, {
-			name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADD_MORE'),
-			type        => 'link',
-			url         => \&handleGigaMixAddMore,
-			passthrough => [{ cursor => $newCursor, prompt => $prompt, initialTracks => [@$initialTracks, @$newTracks] }],
 		};
 	}
 

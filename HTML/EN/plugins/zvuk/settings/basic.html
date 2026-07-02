@@ -163,6 +163,7 @@ function setDivStatus(div, text, type) {
 	div.style.backgroundColor = c.bg;
 	div.style.color = c.fg;
 	div.style.display = 'block';
+	div.setAttribute('data-status', type);
 }
 
 function openZvukOAuthWindow() {
@@ -241,7 +242,7 @@ function saveToken(token) {
 	.finally(function() {
 		// Only reload after everything is complete
 		// Wait 2-3 seconds to allow getProfile to complete in background
-		if (zvukStatusDiv && zvukStatusDiv.textContent.includes('✓')) {
+		if (zvukStatusDiv && zvukStatusDiv.getAttribute('data-status') === 'ok') {
 			console.log('Reloading page in 2.5 seconds...');
 			setTimeout(function() {
 				window.location.reload(true);

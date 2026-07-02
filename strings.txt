@@ -1,6 +1,6 @@
 PLUGIN_ZVUK
-	EN	Zvuk Music
-	RU	Звук
+	EN	Zvuk
+	RU	Zvuk
 
 PLUGIN_ZVUK_DESC
 	EN	Zvuk (zvuk.com) music streaming plugin for Lyrion Music Server
@@ -99,8 +99,8 @@ PLUGIN_ZVUK_PODCASTS
 	RU	Подкасты
 
 PLUGIN_ZVUK_EPISODES
-	EN	Episodes
-	RU	Эпизоды
+	EN	Podcasts Episodes
+	RU	Эпизоды Подкастов
 
 PLUGIN_ZVUK_WAVE
 	EN	Personal Wave
@@ -412,8 +412,8 @@ PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED
 	RU	Аккаунт добавлен: [name] ✓
 
 PLUGIN_ZVUK_GIGAMIX
-	EN	GigaMix AI
-	RU	GigaMix AI
+	EN	GigaMix AI Playlist
+	RU	GigaMix AI Плейлист
 
 PLUGIN_ZVUK_GIGAMIX_PROMPT
 	EN	Enter playlist description
@@ -468,6 +468,18 @@ PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_EMPTY
 	RU	Рекомендаций нет
 
 PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_ERROR
+	EN	Failed to load recommendations
+	RU	Не удалось загрузить рекомендации
+
+PLUGIN_ZVUK_RECOMMENDATIONS
+	EN	Recommendations
+	RU	Рекомендации
+
+PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY
+	EN	No recommendations available
+	RU	Рекомендаций нет
+
+PLUGIN_ZVUK_RECOMMENDATIONS_ERROR
 	EN	Failed to load recommendations
 	RU	Не удалось загрузить рекомендации
 

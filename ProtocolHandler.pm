@@ -68,6 +68,19 @@ sub getNextTrack {
 		}
 	}
 
+	# auto-load next batch of GigaMix tracks when approaching end of queue
+	if ($client) {
+		my $is_gigamix = $client->pluginData('zvuk_gigamix_active');
+		if ($is_gigamix) {
+			my $playlist_size = Slim::Player::Playlist::count($client);
+			my $current_index = Slim::Player::Source::playingSongIndex($client);
+			if (defined $playlist_size && defined $current_index
+					&& ($playlist_size - $current_index) <= 2) {
+				_loadMoreGigaMixTracks($client);
+			}
+		}
+	}
+
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 
 	_getAPIHandler($client)->getStream(sub {
@@ -343,6 +356,65 @@ sub _loadMoreWaveTracks {
 			);
 		}
 	}, $wave_settings);
+}
+
+sub _loadMoreGigaMixTracks {
+	my ($client) = @_;
+	return unless $client;
+
+	my $cursor = $client->pluginData('zvuk_gigamix_cursor');
+	my $prompt = $client->pluginData('zvuk_gigamix_prompt');
+	return unless $cursor && $prompt;
+
+	my $api = _getAPIHandler($client);
+	return unless $api;
+
+	$api->getGenerativePlaylistPage(sub {
+		my $result = shift || {};
+
+		if ($result->{error}) {
+			$log->error("GigaMix autoplay: failed to load more tracks: $result->{error}");
+
+			# Clear GigaMix context on error
+			$client->pluginData('zvuk_gigamix_active', 0);
+
+			# Show notification to user about the error
+			Slim::Control::Request::notifyFromArray($client, [
+				'notify', 'GigaMix autoplay error: ' . $result->{error}
+			]);
+			return;
+		}
+
+		my $tracks = $result->{tracks} || [];
+		unless (@$tracks) {
+			$log->info("GigaMix autoplay: no more tracks available");
+
+			# Clear GigaMix context when no more tracks are available
+			$client->pluginData('zvuk_gigamix_active', 0);
+
+			# Notify user that GigaMix has ended
+			Slim::Control::Request::notifyFromArray($client, [
+				'notify', 'GigaMix playlist complete - no more tracks available'
+			]);
+			return;
+		}
+
+		# Add tracks to playlist
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		foreach my $track (@$tracks) {
+			Slim::Control::Request::executeRequest(
+				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
+			);
+		}
+
+		# Update cursor for next auto-extend
+		if ($result->{cursor}) {
+			$client->pluginData('zvuk_gigamix_cursor', $result->{cursor});
+		}
+
+		$log->info("GigaMix: auto-extended playlist with " . scalar(@$tracks) . " tracks");
+	}, { cursor => $cursor, limit => 5 });
 }
 
 sub _getAPIHandler {
