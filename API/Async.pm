@@ -1104,7 +1104,8 @@ sub getMusicRecommendations {
 	my @all_items;
 	my $total_pages = 0;
 
-	my $fetch_next_page = sub {
+	my $fetch_next_page;  # Declare first for recursive closure
+	$fetch_next_page = sub {
 		if ($page_index >= @$pages_list) {
 			# All pages fetched - return aggregated results
 			Plugins::Zvuk::API->cacheTrackMetadata(\@all_items) if @all_items;
