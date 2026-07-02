@@ -1097,56 +1097,73 @@ sub getMusicRecommendations {
 		}
 	};
 
-	my $vars = {
-		contentType => $contentType,
-		itemType    => $itemTypes,
-		pages       => $pages_list,
-	};
-
 	$log->info("getMusicRecommendations: contentType=$contentType, requesting pages=" . join(',', @$pages_list));
 
-	$self->_graphql(sub {
-		my $data = shift;
+	# Fetch pages one-by-one to avoid WAF issues with large multi-page requests
+	my $page_index = 0;
+	my @all_items;
+	my $total_pages = 0;
 
-		if ($data->{error}) {
-			$log->error("getMusicRecommendations failed: $data->{error}");
-			$cb->($data);
+	my $fetch_next_page = sub {
+		if ($page_index >= @$pages_list) {
+			# All pages fetched - return aggregated results
+			Plugins::Zvuk::API->cacheTrackMetadata(\@all_items) if @all_items;
+
+			# Separate items by type
+			my (@artists, @releases, @playlists);
+			foreach my $item (@all_items) {
+				if ($item->{__typename} eq 'Artist') {
+					push @artists, $item;
+				} elsif ($item->{__typename} eq 'Release') {
+					push @releases, $item;
+				} elsif ($item->{__typename} eq 'Playlist') {
+					push @playlists, $item;
+				}
+			}
+
+			$cb->({
+				allItems    => \@all_items,
+				artists     => \@artists,
+				releases    => \@releases,
+				playlists   => \@playlists,
+				totalPages  => $total_pages,
+				totalCount  => scalar(@all_items),
+			});
 			return;
 		}
 
-		my $block = $data->{dynamicBlock} || {};
-		my $pages = $block->{pages} || [];
+		my $page = $pages_list->[$page_index];
+		$page_index++;
 
-		# Collect all items from all pages
-		my @allItems;
-		foreach my $page (@$pages) {
-			my $items = $page->{items} || [];
-			push @allItems, @$items;
-		}
+		my $vars = {
+			contentType => $contentType,
+			itemType    => $itemTypes,
+			pages       => [$page],  # Request one page at a time
+		};
 
-		Plugins::Zvuk::API->cacheTrackMetadata(\@allItems) if @allItems;
+		$self->_graphql(sub {
+			my $data = shift;
 
-		# Separate items by type
-		my (@artists, @releases, @playlists);
-		foreach my $item (@allItems) {
-			if ($item->{__typename} eq 'Artist') {
-				push @artists, $item;
-			} elsif ($item->{__typename} eq 'Release') {
-				push @releases, $item;
-			} elsif ($item->{__typename} eq 'Playlist') {
-				push @playlists, $item;
+			if ($data->{error}) {
+				# Log error but continue with next page
+				$log->warn("getMusicRecommendations page $page failed: $data->{error}");
+			} else {
+				my $block = $data->{dynamicBlock} || {};
+				$total_pages = $block->{totalPages} if $block->{totalPages};
+				my $pages = $block->{pages} || [];
+
+				foreach my $page_data (@$pages) {
+					my $items = $page_data->{items} || [];
+					push @all_items, @$items;
+				}
 			}
-		}
 
-		$cb->({
-			allItems    => \@allItems,
-			artists     => \@artists,
-			releases    => \@releases,
-			playlists   => \@playlists,
-			totalPages  => $block->{totalPages},
-			totalCount  => scalar(@allItems),
-		});
-	}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+			# Fetch next page
+			$fetch_next_page->();
+		}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	};
+
+	$fetch_next_page->();
 }
 
 1;
