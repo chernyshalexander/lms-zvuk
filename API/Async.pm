@@ -1052,4 +1052,79 @@ sub getSynthesisPlaylists {
 	});
 }
 
+# Get personalized music recommendations (For You, Trending, etc.)
+sub getMusicRecommendations {
+	my ($self, $cb, $args) = @_;
+	$args ||= {};
+
+	my $contentType = $args->{contentType} || 'Music';
+	my $itemTypes   = $args->{itemTypes}   || ['Artist', 'Release', 'Playlist'];
+	my $page        = $args->{page}        || 1;
+
+	my $gql = qq{
+		query getMusicRecommendations(\$contentType: DynamicBlockContentType!, \$itemType: [DynamicBlockItemType!], \$pages: [Int!]!) {
+			dynamicBlock(contentType: \$contentType, itemType: \$itemType, pages: \$pages) {
+				totalPages
+				pages {
+					page
+					items {
+						... on Artist {
+							id
+							title
+							image { src }
+						}
+						... on Release {
+							id
+							title
+							explicit
+							artists {
+								id
+								title
+							}
+							image { src }
+						}
+						... on Playlist {
+							id
+							title
+							duration
+							trackCount
+							image { src }
+						}
+					}
+				}
+			}
+		}
+	};
+
+	my $vars = {
+		contentType => $contentType,
+		itemType    => $itemTypes,
+		pages       => [$page],
+	};
+
+	$log->info("getMusicRecommendations: contentType=$contentType, page=$page");
+
+	$self->_graphql(sub {
+		my $data = shift;
+
+		if ($data->{error}) {
+			$log->error("getMusicRecommendations failed: $data->{error}");
+			$cb->($data);
+			return;
+		}
+
+		my $block = $data->{dynamicBlock} || {};
+		my $pages = $block->{pages} || [];
+		my $items = $pages->[0] ? $pages->[0]->{items} : [];
+
+		Plugins::Zvuk::API->cacheTrackMetadata($items) if $items && ref($items) eq 'ARRAY';
+
+		$cb->({
+			items      => $items,
+			totalPages => $block->{totalPages},
+			currentPage => $page,
+		});
+	}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
+
 1;
