@@ -101,12 +101,18 @@ sub handler {
 		}
 	}
 
-	$class->beforeRender($params);
+	$class->beforeRender($params, $client);
 	return $class->SUPER::handler($client, $params);
 }
 
 sub beforeRender {
-	my ($class, $params) = @_;
+	my ($class, $params, $client) = @_;
+
+	# Resolve the real per-account Wave settings for whichever player is
+	# currently selected in the web UI, instead of the hardcoded 'default'
+	# key (which never matched the key Wave/ProtocolHandler actually read
+	# from during playback).
+	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
 
 	# Build accounts list for template
 	my $accounts = $prefs->get('accounts') || {};
@@ -123,7 +129,7 @@ sub beforeRender {
 	# Add wave settings for modal sliders
 	require Plugins::Zvuk::WaveSettings;
 
-	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
 	my @genre_list;
 	my %genre_labels;

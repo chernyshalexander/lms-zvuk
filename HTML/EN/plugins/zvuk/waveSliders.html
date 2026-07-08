@@ -11,8 +11,23 @@
 	background-color: #ffffff;
 	border-radius: 8px;
 	border: 1px solid #e8e8e8;
-	border-left: 4px solid #b8a6db;
+	border-left: 4px solid #90a4ae;
 }
+
+.wave-setting-group.mood-group {
+	border: 1px solid transparent;
+	border-left: 4px solid transparent;
+	background-image:
+		linear-gradient(#fff, #fff),
+		linear-gradient(180deg, #ef5350, #ffca28, #66bb6a, #42a5f5);
+	background-origin: border-box;
+	background-clip: padding-box, border-box;
+}
+
+.wave-setting-group.popularity-group { border-left-color: #fb8c00; }
+.wave-setting-group.vocal-group { border-left-color: #00acc1; }
+.wave-setting-group.language-group { border-left-color: #ec407a; }
+.wave-setting-group.genres-group { border-left-color: #43a047; }
 
 .wave-setting-title {
 	font-size: 14px;
@@ -22,147 +37,218 @@
 	text-shadow: none;
 }
 
-.slider-container {
+/* ===================== 2D Mood Pad (energy + fun) ===================== */
+
+.mood-pad-wrapper {
 	display: flex;
-	align-items: center;
-	gap: 12px;
-}
-
-.slider-input {
-	flex: 1;
-	height: 20px;
-	-webkit-appearance: none;
-	appearance: none;
-	background: transparent;
-	outline: none;
-	cursor: pointer;
+	flex-direction: column;
+	align-items: stretch;
 	width: 100%;
+	gap: 10px;
+}
+
+/* Full-width, half-height pad: same footprint as the other full-width
+   controls below it (step slider, pill groups), just squashed vertically
+   so it reads as a "bar" rather than a square trackpad. */
+.mood-pad {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 4 / 1;
+	background-color: #fafafa;
+	background-image:
+		radial-gradient(circle at 0% 100%, rgba(66,165,245,0.30), transparent 60%),
+		radial-gradient(circle at 100% 100%, rgba(239,83,80,0.30), transparent 60%),
+		radial-gradient(circle at 0% 0%, rgba(102,187,106,0.30), transparent 60%),
+		radial-gradient(circle at 100% 0%, rgba(255,202,40,0.30), transparent 60%);
+	border: 1px solid #e0e0e0;
+	border-radius: 12px;
+	touch-action: none;
+	cursor: crosshair;
+	overflow: hidden;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.mood-pad-dots {
+	position: absolute;
+	top: 14%;
+	left: 6%;
+	right: 6%;
+	bottom: 14%;
+	background-image: radial-gradient(rgba(0,0,0,0.14) 1px, transparent 0);
+	background-size: 18px 18px;
+	pointer-events: none;
+}
+
+.mood-pad-axis-v,
+.mood-pad-axis-h {
+	position: absolute;
+	background: rgba(0,0,0,0.12);
+	pointer-events: none;
+}
+
+.mood-pad-axis-v { top: 0; bottom: 0; left: 50%; width: 1px; }
+.mood-pad-axis-h { left: 0; right: 0; top: 50%; height: 1px; }
+
+.mood-pad-label {
+	position: absolute;
+	font-size: 10px;
+	font-weight: 700;
+	color: #555;
+	text-transform: uppercase;
+	letter-spacing: .03em;
+	pointer-events: none;
+	max-width: 70px;
+	line-height: 1.2;
+}
+
+.mood-pad-label-top    { top: 6px; left: 50%; transform: translateX(-50%); text-align: center; }
+.mood-pad-label-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); text-align: center; }
+.mood-pad-label-left   { left: 8px; top: 50%; transform: translateY(-50%); text-align: left; }
+.mood-pad-label-right  { right: 8px; top: 50%; transform: translateY(-50%); text-align: right; }
+
+.mood-pad-thumb {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	background-color: #888;
+	border: 2px solid #ffffff;
+	border-radius: 50%;
+	box-shadow: 0 0 0 4px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.25);
+	transform: translate(-50%, -50%);
+	transition: box-shadow .15s ease, left .2s ease, top .2s ease;
+	cursor: pointer;
+	left: 50%;
+	top: 50%;
+}
+
+.mood-pad.dragging .mood-pad-thumb {
+	box-shadow: 0 0 0 6px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.3);
+	transition: box-shadow .15s ease; /* no position transition while actively dragging */
+}
+
+.mood-pad-thumb.no-anim,
+.step-input-progress.no-anim {
+	transition: none !important;
+}
+
+.mood-pad-readout {
+	display: flex;
+	gap: 18px;
+	font-size: 12px;
+	color: #777;
+}
+
+.mood-pad-readout b#energyValue { color: #fb8c00; }
+.mood-pad-readout b#funValue { color: #ec407a; }
+
+/* ===================== Popularity step (dotted) slider ===================== */
+
+.step-input {
+	position: relative;
+	width: 100%;
+	padding: 14px 0 4px;
+	touch-action: none;
+}
+
+.step-input-track {
+	position: relative;
+	width: 100%;
+	height: 4px;
+	background-color: #e0e0e0;
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.step-input-progress {
+	position: absolute;
+	top: 0;
+	left: 0;
+	height: 4px;
+	background-color: #fb8c00;
+	border-radius: 2px;
+	transition: width .1s ease-in;
+	pointer-events: none;
+}
+
+.step-input-dots {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	right: 0;
+	transform: translateY(-50%);
+	display: flex;
+	justify-content: space-between;
+}
+
+.step-input-dot {
+	position: relative;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background-color: #d0d0d0;
+	cursor: pointer;
+	transition: transform .1s ease-in, background-color .1s ease-in;
+	border: none;
 	padding: 0;
-	margin: 0;
 }
 
-.slider-input::-webkit-slider-runnable-track {
-	background-color: #d0d0d0;
-	border-radius: 5px;
-	height: 6px;
-	border: none;
-}
+.step-input-dot.past { background-color: #fb8c00; }
+.step-input-dot:hover { transform: scale(1.5); }
 
-.slider-input::-webkit-slider-thumb {
-	-webkit-appearance: none;
-	appearance: none;
-	width: 18px;
-	height: 18px;
-	border-radius: 50%;
-	background: #a8d5ba;
-	cursor: pointer;
-	margin-top: -6px;
-	border: none;
-	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.slider-input::-moz-range-track {
-	background-color: #d0d0d0;
-	border-radius: 5px;
-	height: 6px;
-	border: none;
-}
-
-.slider-input::-moz-range-thumb {
-	width: 18px;
-	height: 18px;
-	border-radius: 50%;
-	background: #a8d5ba;
-	cursor: pointer;
-	border: none;
-	margin-top: 0;
-	box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.slider-input::-moz-range-progress {
-	background-color: #a8d5ba;
-	height: 6px;
-	border-radius: 5px;
-}
-
-.slider-value {
-	min-width: 60px;
+.step-input-value {
 	text-align: right;
 	font-weight: bold;
-	color: #a8d5ba;
+	color: #fb8c00;
 	font-size: 13px;
+	margin-top: 8px;
 }
 
+/* ===================== Pill toggle buttons (vocal / language / genres) ===================== */
 
-.genre-list {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 8px;
-	margin-top: 10px;
-}
-
-.genre-item {
+.pill-group {
 	display: flex;
-	align-items: center;
-	padding: 8px 10px;
-	background: white !important;
-	border: 1px solid #d0d0d0 !important;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.2s ease;
-	font-size: 13px;
-	margin-bottom: 6px;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
 }
 
-.genre-item:hover {
-	border-color: #b8a6db !important;
-	background-color: #f9f9f9 !important;
-}
-
-.genre-item input[type="checkbox"] {
-	margin-right: 10px;
-	cursor: pointer;
-	flex-shrink: 0;
-}
-
-.genre-item label {
-	cursor: pointer;
-	flex: 1;
-	user-select: none;
-	color: #333 !important;
-	font-weight: normal;
-	display: block;
-	margin: 0;
-	padding: 0;
-}
-
-.wave-setting-group label {
+.pill-btn {
+	padding: 6px 14px;
+	border-radius: 999px;
+	border: 1px solid #d0d0d0;
+	background: white;
 	color: #333;
-	font-size: 13px;
-	font-weight: 500;
-}
-
-.wave-setting-group label span {
-	color: #333;
-	font-weight: 500;
-}
-
-.wave-setting-group input[type="radio"] {
+	font-size: 12px;
 	cursor: pointer;
-	accent-color: #b8a6db !important;
-	margin-right: 8px;
-	vertical-align: middle;
-	width: auto;
-	height: auto;
-	caret-color: #b8a6db;
-	-webkit-accent-color: #b8a6db;
+	transition: all .15s ease;
+	max-width: 160px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Material UI specific overrides */
-.wave-setting-group input[type="radio"]:checked {
-	accent-color: #b8a6db !important;
-	-webkit-accent-color: #b8a6db !important;
+.pill-btn:hover {
+	border-color: #90a4ae;
+	background-color: #fafafa;
 }
+
+.pill-btn.active {
+	background-color: #2196f3;
+	border-color: #2196f3;
+	color: white !important;
+	font-weight: bold;
+}
+
+/* Each control group gets its own bright accent instead of one shared purple. */
+#vocalGroup .pill-btn:hover { border-color: #00acc1; background-color: #e0f7fa; }
+#vocalGroup .pill-btn.active { background-color: #00acc1; border-color: #00acc1; }
+
+#languagePillGroup .pill-btn:hover { border-color: #ec407a; background-color: #fce4ec; }
+#languagePillGroup .pill-btn.active { background-color: #ec407a; border-color: #ec407a; }
+
+#genreList .pill-btn:hover { border-color: #43a047; background-color: #e8f5e9; }
+#genreList .pill-btn.active { background-color: #43a047; border-color: #43a047; }
 
 .button-group {
 	margin-top: 20px;
@@ -172,34 +258,49 @@
 }
 
 .btn {
+	flex: 1 1 0;
+	min-width: 0;
 	padding: 8px 20px;
 	border: none;
-	border-radius: 4px;
+	border-radius: 999px;
 	font-size: 13px;
 	font-weight: bold;
+	text-align: center;
 	cursor: pointer;
 	transition: all 0.2s ease;
 }
 
+/* Below this the three equal-width pills get cramped -- stack them instead. */
+@media (max-width: 420px) {
+	.button-group { flex-direction: column; }
+}
+
 .btn-primary {
-	background-color: #b8a6db;
+	background-color: #2196f3;
 	color: white !important;
 	text-shadow: none;
 }
 
-.btn-primary:hover {
-	background-color: #a898c8;
-	color: white !important;
+.btn-primary:hover { background-color: #1976d2; color: white !important; }
+
+.btn-secondary { background-color: #e0e0e0; color: #333; }
+.btn-secondary:hover { background-color: #d0d0d0; }
+
+.btn-reset {
+	background-color: #f0f0f0;
+	color: #bbb !important;
+	cursor: default;
+	pointer-events: none;
 }
 
-.btn-secondary {
-	background-color: #e0e0e0;
-	color: #333;
+.btn-reset.enabled {
+	background-color: #fff3e0;
+	color: #ef6c00 !important;
+	cursor: pointer;
+	pointer-events: auto;
 }
 
-.btn-secondary:hover {
-	background-color: #d0d0d0;
-}
+.btn-reset.enabled:hover { background-color: #ffe0b2; }
 
 .status-message {
 	margin-top: 15px;
@@ -210,91 +311,118 @@
 	font-size: 12px;
 }
 
-.status-message.success {
-	background-color: #d4edda;
-	color: #155724;
-	display: block;
+.status-message.success { background-color: #d4edda; color: #155724; display: block; }
+.status-message.error { background-color: #f8d7da; color: #721c24; display: block; }
+
+/* ===================== Dark theme (matches Material Skin) ===================== */
+/* Toggled via the "zvuk-dark-theme" class on <html>, set in settings/basic.html
+   to approximate whichever theme is currently selected in Material Skin. */
+
+html.zvuk-dark-theme .wave-settings-container { background: transparent; color: #ddd; }
+
+html.zvuk-dark-theme .wave-setting-group { background-color: #383838; border-color: #4a4a4a; }
+
+html.zvuk-dark-theme .wave-setting-group.mood-group {
+	background-image:
+		linear-gradient(#383838, #383838),
+		linear-gradient(180deg, #ef5350, #ffca28, #66bb6a, #42a5f5);
 }
 
-.status-message.error {
-	background-color: #f8d7da;
-	color: #721c24;
-	display: block;
-}
+html.zvuk-dark-theme .wave-setting-title { color: #eee !important; }
+
+html.zvuk-dark-theme .mood-pad { background-color: #2a2a2a; border-color: #4a4a4a; }
+html.zvuk-dark-theme .mood-pad-dots { background-image: radial-gradient(rgba(255,255,255,0.16) 1px, transparent 0); }
+html.zvuk-dark-theme .mood-pad-axis-v,
+html.zvuk-dark-theme .mood-pad-axis-h { background: rgba(255,255,255,0.18); }
+html.zvuk-dark-theme .mood-pad-label { color: #bbb; }
+html.zvuk-dark-theme .mood-pad-readout { color: #aaa; }
+
+html.zvuk-dark-theme .step-input-track { background-color: #4a4a4a; }
+html.zvuk-dark-theme .step-input-dot { background-color: #5a5a5a; }
+
+html.zvuk-dark-theme .pill-btn { background: #383838; color: #ddd; border-color: #555; }
+html.zvuk-dark-theme .pill-btn:hover { border-color: #90a4ae; background-color: #454545; }
+
+html.zvuk-dark-theme #vocalGroup .pill-btn:hover { border-color: #00acc1; background-color: rgba(0,172,193,0.15); }
+html.zvuk-dark-theme #languagePillGroup .pill-btn:hover { border-color: #ec407a; background-color: rgba(236,64,122,0.15); }
+html.zvuk-dark-theme #genreList .pill-btn:hover { border-color: #43a047; background-color: rgba(67,160,71,0.15); }
+
+html.zvuk-dark-theme .btn-secondary { background-color: #4a4a4a; color: #ddd; }
+html.zvuk-dark-theme .btn-secondary:hover { background-color: #5a5a5a; }
+
+html.zvuk-dark-theme .btn-reset { background-color: #3a3a3a; color: #6a6a6a !important; }
+html.zvuk-dark-theme .btn-reset.enabled { background-color: rgba(239,108,0,0.2); color: #ffb74d !important; }
+html.zvuk-dark-theme .btn-reset.enabled:hover { background-color: rgba(239,108,0,0.32); }
+
+html.zvuk-dark-theme .status-message.success { background-color: rgba(76,175,80,0.18); color: #81c784; }
+html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.18); color: #ef9a9a; }
 </style>
 
 <div class="wave-settings-container">
-	<!-- Popularity Slider -->
-	<div class="wave-setting-group">
+
+	<!-- Mood 2D Pad: replaces the separate Energy + Fun sliders -->
+	<div class="wave-setting-group mood-group">
+		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_ENERGY" | string %] / [% "PLUGIN_ZVUK_SETTING_FUN" | string %]</div>
+		<div class="mood-pad-wrapper">
+			<div class="mood-pad" id="moodPad">
+				<div class="mood-pad-dots"></div>
+				<div class="mood-pad-axis-v"></div>
+				<div class="mood-pad-axis-h"></div>
+				<div class="mood-pad-label mood-pad-label-top">[% "PLUGIN_ZVUK_MOOD_FUN_HIGH" | string %]</div>
+				<div class="mood-pad-label mood-pad-label-bottom">[% "PLUGIN_ZVUK_MOOD_FUN_LOW" | string %]</div>
+				<div class="mood-pad-label mood-pad-label-left">[% "PLUGIN_ZVUK_MOOD_ENERGY_LOW" | string %]</div>
+				<div class="mood-pad-label mood-pad-label-right">[% "PLUGIN_ZVUK_MOOD_ENERGY_HIGH" | string %]</div>
+				<div class="mood-pad-thumb" id="moodPadThumb"></div>
+			</div>
+			<div class="mood-pad-readout">
+				<span>[% "PLUGIN_ZVUK_SETTING_ENERGY" | string %]: <b id="energyValue">[% wave_settings.energy %]</b></span>
+				<span>[% "PLUGIN_ZVUK_SETTING_FUN" | string %]: <b id="funValue">[% wave_settings.fun %]</b></span>
+			</div>
+		</div>
+	</div>
+
+	<!-- Popularity: dotted step slider -->
+	<div class="wave-setting-group popularity-group">
 		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_POPULAR" | string %]</div>
-		<div class="slider-container">
-			<input type="range" id="popular" class="slider-input" min="0" max="1" step="0.1" value="[% wave_settings.popular %]">
-			<div class="slider-value"><span id="popularValue">[% wave_settings.popular %]</span></div>
+		<div class="step-input" id="popularStepInput">
+			<div class="step-input-track" id="popularTrack">
+				<div class="step-input-progress" id="popularProgress"></div>
+				<div class="step-input-dots" id="popularDots"></div>
+			</div>
 		</div>
+		<div class="step-input-value"><span id="popularValue">[% wave_settings.popular %]</span></div>
 	</div>
 
-	<!-- Energy Slider -->
-	<div class="wave-setting-group">
-		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_ENERGY" | string %]</div>
-		<div class="slider-container">
-			<input type="range" id="energy" class="slider-input" min="0" max="1" step="0.1" value="[% wave_settings.energy %]">
-			<div class="slider-value"><span id="energyValue">[% wave_settings.energy %]</span></div>
-		</div>
-	</div>
-
-	<!-- Fun Slider -->
-	<div class="wave-setting-group">
-		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_FUN" | string %]</div>
-		<div class="slider-container">
-			<input type="range" id="fun" class="slider-input" min="0" max="1" step="0.1" value="[% wave_settings.fun %]">
-			<div class="slider-value"><span id="funValue">[% wave_settings.fun %]</span></div>
-		</div>
-	</div>
-
-	<!-- Vocal Radio Buttons -->
-	<div class="wave-setting-group">
+	<!-- Vocal: pill toggle (single-select) -->
+	<div class="wave-setting-group vocal-group">
 		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_VOCAL" | string %]</div>
-		<div style="margin-top: 8px;">
-			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
-				<input type="radio" name="vocal" value="1" [% IF wave_settings.vocal == 1 %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
-				<span>[% "PLUGIN_ZVUK_VOCAL_WITH" | string %]</span>
-			</label>
-			<label style="display: flex; align-items: center; cursor: pointer;">
-				<input type="radio" name="vocal" value="0" [% IF wave_settings.vocal == 0 %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
-				<span>[% "PLUGIN_ZVUK_VOCAL_WITHOUT" | string %]</span>
-			</label>
+		<div class="pill-group" id="vocalGroup">
+			<button type="button" class="pill-btn" data-value="1">[% "PLUGIN_ZVUK_VOCAL_WITH" | string %]</button>
+			<button type="button" class="pill-btn" data-value="0">[% "PLUGIN_ZVUK_VOCAL_WITHOUT" | string %]</button>
 		</div>
 	</div>
 
-	<!-- Language Radio Buttons (visible only if vocal=1) -->
-	<div id="languageGroup" class="wave-setting-group" style="display: none;">
+	<!-- Language: pill toggle (single-select), shown only when vocal = 1 -->
+	<div id="languageGroup" class="wave-setting-group language-group" style="display: none;">
 		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_LANGUAGE" | string %]</div>
-		<div style="margin-top: 8px;">
-			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
-				<input type="radio" name="language" value="all" [% IF wave_settings.language == 'all' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
-				<span>[% "PLUGIN_ZVUK_LANGUAGE_ALL" | string %]</span>
-			</label>
-			<label style="display: flex; align-items: center; margin-bottom: 6px; cursor: pointer;">
-				<input type="radio" name="language" value="foreign" [% IF wave_settings.language == 'foreign' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
-				<span>[% "PLUGIN_ZVUK_LANGUAGE_FOREIGN" | string %]</span>
-			</label>
-			<label style="display: flex; align-items: center; cursor: pointer;">
-				<input type="radio" name="language" value="russian" [% IF wave_settings.language == 'russian' %]checked[% END %] style="margin-right: 8px; cursor: pointer;">
-				<span>[% "PLUGIN_ZVUK_LANGUAGE_RUSSIAN" | string %]</span>
-			</label>
+		<div class="pill-group" id="languagePillGroup">
+			<button type="button" class="pill-btn" data-value="all">[% "PLUGIN_ZVUK_LANGUAGE_ALL" | string %]</button>
+			<button type="button" class="pill-btn" data-value="foreign">[% "PLUGIN_ZVUK_LANGUAGE_FOREIGN" | string %]</button>
+			<button type="button" class="pill-btn" data-value="russian">[% "PLUGIN_ZVUK_LANGUAGE_RUSSIAN" | string %]</button>
 		</div>
 	</div>
 
-	<!-- Genres -->
-	<div class="wave-setting-group">
+	<!-- Genres: pill toggle (multi-select) -->
+	<div class="wave-setting-group genres-group">
 		<div class="wave-setting-title">[% "PLUGIN_ZVUK_SETTING_GENRES" | string %]</div>
-		<div class="genre-list" id="genreList"></div>
+		<div class="pill-group" id="genreList"></div>
 	</div>
 
 	<!-- Buttons -->
 	<div class="button-group">
-		<button class="btn btn-primary" style="color: white !important;" onclick="saveWaveSettings()">[% "PLUGIN_ZVUK_SAVE" | string %]</button>
-		<button class="btn btn-secondary" onclick="closeWaveSliderModal()">[% "PLUGIN_ZVUK_CANCEL" | string %]</button>
+		<button type="button" class="btn btn-primary" style="color: white !important;" onclick="saveWaveSettings()">[% "PLUGIN_ZVUK_SAVE" | string %]</button>
+		<button type="button" class="btn btn-reset" id="resetBtn" onclick="resetWaveSettings()">[% "PLUGIN_ZVUK_RESET" | string %]</button>
+		<button type="button" class="btn btn-secondary" onclick="closeWaveSliderModal()">[% "PLUGIN_ZVUK_CANCEL" | string %]</button>
 	</div>
 
 	<!-- Status Message -->
@@ -302,150 +430,414 @@
 </div>
 
 <script>
-// Initialize genre list
-function initializeGenres() {
-	const genres = [% genres_json %];
-	const selectedGenres = [% selected_genres_json %];
-	const genreLabels = [% genres_labels_json %];
-	const container = document.getElementById('genreList');
-
-	// Clear any previous content
-	container.innerHTML = '';
-
-	console.log('Raw genres_labels_json type:', typeof genreLabels);
-	console.log('Initializing genres:', genres);
-	console.log('Genre labels object:', genreLabels);
-	console.log('Selected genres:', selectedGenres);
-
-	if (!genres || genres.length === 0) {
-		console.error('No genres loaded!');
-		container.innerHTML = '<p>Error: No genres available</p>';
-		return;
-	}
-
-	genres.forEach(genre => {
-		const isChecked = selectedGenres && selectedGenres.includes(genre.name);
-		let label = genre.name;
-
-		if (genreLabels && typeof genreLabels === 'object' && genreLabels[genre.name]) {
-			label = genreLabels[genre.name];
-		}
-
-		console.log('Processing genre: ' + genre.name + ', label: ' + label + ', checked: ' + isChecked);
-
-		const item = document.createElement('div');
-		item.className = 'genre-item';
-
-		const checkbox = document.createElement('input');
-		checkbox.type = 'checkbox';
-		checkbox.id = 'genre_' + genre.name;
-		checkbox.name = 'genre';
-		checkbox.value = genre.name;
-		checkbox.checked = isChecked;
-
-		const labelEl = document.createElement('label');
-		labelEl.htmlFor = 'genre_' + genre.name;
-		labelEl.textContent = label;
-		labelEl.style.margin = '0';
-		labelEl.style.padding = '0';
-		labelEl.style.color = '#333';
-		labelEl.style.fontWeight = 'normal';
-
-		item.appendChild(checkbox);
-		item.appendChild(labelEl);
-		container.appendChild(item);
-	});
-}
-
-// Update slider value display
-document.getElementById('popular').addEventListener('input', function() {
-	document.getElementById('popularValue').textContent = this.value;
-});
-
-document.getElementById('energy').addEventListener('input', function() {
-	document.getElementById('energyValue').textContent = this.value;
-});
-
-document.getElementById('fun').addEventListener('input', function() {
-	document.getElementById('funValue').textContent = this.value;
-});
-
-// Handle vocal selection to show/hide language group
-function updateLanguageVisibility() {
-	const vocalRadio = document.querySelector('input[name="vocal"]:checked');
-	const languageGroup = document.getElementById('languageGroup');
-	if (languageGroup) {
-		if (vocalRadio && parseInt(vocalRadio.value) === 1) {
-			languageGroup.style.display = 'block';
-		} else {
-			languageGroup.style.display = 'none';
-		}
-	}
-}
-
-document.querySelectorAll('input[name="vocal"]').forEach(radio => {
-	radio.addEventListener('change', updateLanguageVisibility);
-});
-
-// Initialize language visibility on page load
-document.addEventListener('DOMContentLoaded', function() {
-	initializeGenres();
-	updateLanguageVisibility();
-});
-
-// Save settings via AJAX
-function saveWaveSettings() {
-	const vocalRadio = document.querySelector('input[name="vocal"]:checked');
-	const languageRadio = document.querySelector('input[name="language"]:checked');
-
-	const settings = {
-		popular: parseFloat(document.getElementById('popular').value),
-		energy: parseFloat(document.getElementById('energy').value),
-		fun: parseFloat(document.getElementById('fun').value),
-		language: languageRadio ? languageRadio.value : 'all',
-		vocal: vocalRadio ? parseInt(vocalRadio.value) : 1,
-		genres: Array.from(document.querySelectorAll('input[name="genre"]:checked')).map(el => el.value)
+(function() {
+	// ----------------------------------------------------------------
+	// Defaults (must mirror Plugins::Zvuk::WaveSettings defaults / _getDefaults)
+	// ----------------------------------------------------------------
+	var DEFAULTS = {
+		popular: 0.5,
+		energy: 0.5,
+		fun: 0.5,
+		vocal: 1,
+		language: 'all',
+		genres: []
 	};
 
-	document.querySelector('.btn-primary').style.opacity = '0.6';
-	document.querySelector('.btn-primary').style.pointerEvents = 'none';
-	document.getElementById('statusMessage').className = '';
+	// ----------------------------------------------------------------
+	// State, seeded from the server-rendered template values
+	// ----------------------------------------------------------------
+	var state = {
+		popular: parseFloat('[% wave_settings.popular %]'),
+		energy: parseFloat('[% wave_settings.energy %]'),
+		fun: parseFloat('[% wave_settings.fun %]'),
+		vocal: parseInt('[% wave_settings.vocal %]', 10),
+		language: '[% wave_settings.language %]',
+		genres: [% selected_genres_json %].slice()
+	};
 
-	fetch('/plugins/zvuk/saveWaveSettings', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(settings)
-	})
-	.then(response => response.json())
-	.then(data => {
-		document.querySelector('.btn-primary').style.opacity = '1';
-		document.querySelector('.btn-primary').style.pointerEvents = 'auto';
+	var genresData = [% genres_json %];
+	var genreLabels = [% genres_labels_json %];
 
-		if (data.success) {
-			showMessage('[% "PLUGIN_ZVUK_SETTINGS_SAVED" | string %]', 'success');
-			setTimeout(() => {
-				closeWaveSliderModal();
-			}, 1000);
-		} else {
-			showMessage('Error: ' + (data.error || 'Unknown error'), 'error');
+	// ----------------------------------------------------------------
+	// DOM refs
+	// ----------------------------------------------------------------
+	var moodPad = document.getElementById('moodPad');
+	var moodPadThumb = document.getElementById('moodPadThumb');
+	var energyValueEl = document.getElementById('energyValue');
+	var funValueEl = document.getElementById('funValue');
+
+	var popularTrack = document.getElementById('popularTrack');
+	var popularProgress = document.getElementById('popularProgress');
+	var popularDots = document.getElementById('popularDots');
+	var popularValueEl = document.getElementById('popularValue');
+
+	var vocalGroup = document.getElementById('vocalGroup');
+	var languageGroup = document.getElementById('languageGroup');
+	var languagePillGroup = document.getElementById('languagePillGroup');
+	var genreList = document.getElementById('genreList');
+
+	var resetBtn = document.getElementById('resetBtn');
+	var statusMessage = document.getElementById('statusMessage');
+
+	// ==================================================================
+	// 2D Mood Pad (energy = X, fun = Y)
+	// ==================================================================
+	var moodDragging = false;
+
+	// Thumb color follows the classic 4-quadrant "mood meter" palette:
+	// blue = calm+sad, red = energetic+sad, green = calm+happy, amber = energetic+happy.
+	// Bilinear-interpolated live from (energy, fun) so the color itself gives
+	// feedback about where you are on the pad, instead of one fixed accent.
+	var MOOD_CALM_SAD = [66, 165, 245];        // energy 0, fun 0
+	var MOOD_ENERGETIC_SAD = [239, 83, 80];    // energy 1, fun 0
+	var MOOD_CALM_HAPPY = [102, 187, 106];     // energy 0, fun 1
+	var MOOD_ENERGETIC_HAPPY = [255, 202, 40]; // energy 1, fun 1
+
+	function lerp(a, b, t) { return a + (b - a) * t; }
+
+	function lerpColor(c1, c2, t) {
+		return [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
+	}
+
+	function moodColor(energy, fun) {
+		var bottom = lerpColor(MOOD_CALM_SAD, MOOD_ENERGETIC_SAD, energy);
+		var top = lerpColor(MOOD_CALM_HAPPY, MOOD_ENERGETIC_HAPPY, energy);
+		var c = lerpColor(bottom, top, fun);
+		return [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])];
+	}
+
+	function clientCoordsFromEvent(e) {
+		if (e.touches && e.touches.length) {
+			return { x: e.touches[0].clientX, y: e.touches[0].clientY };
 		}
-	})
-	.catch(error => {
-		document.querySelector('.btn-primary').style.opacity = '1';
-		document.querySelector('.btn-primary').style.pointerEvents = 'auto';
-		showMessage('Network error: ' + error.message, 'error');
+		return { x: e.clientX, y: e.clientY };
+	}
+
+	function updateMoodPadFromEvent(e) {
+		var rect = moodPad.getBoundingClientRect();
+		var c = clientCoordsFromEvent(e);
+
+		var x = Math.max(0, Math.min(c.x - rect.left, rect.width));
+		var y = Math.max(0, Math.min(c.y - rect.top, rect.height));
+
+		// energy: 0 = left (calm), 1 = right (energetic)
+		state.energy = Math.round((x / rect.width) * 100) / 100;
+		// fun: 0 = bottom (sad), 1 = top (happy) -- invert Y so "up" means higher value
+		state.fun = Math.round((1 - (y / rect.height)) * 100) / 100;
+
+		renderMoodPad();
+		updateResetButtonState();
+	}
+
+	function renderMoodPad() {
+		moodPadThumb.style.left = (state.energy * 100) + '%';
+		moodPadThumb.style.top = ((1 - state.fun) * 100) + '%';
+
+		var rgb = moodColor(state.energy, state.fun);
+		var rgbStr = rgb[0] + ',' + rgb[1] + ',' + rgb[2];
+		moodPadThumb.style.backgroundColor = 'rgb(' + rgbStr + ')';
+		moodPadThumb.style.boxShadow =
+			'0 0 0 4px rgba(' + rgbStr + ',0.35), 0 2px 6px rgba(0,0,0,0.25)';
+
+		energyValueEl.textContent = state.energy.toFixed(2);
+		funValueEl.textContent = state.fun.toFixed(2);
+	}
+
+	moodPad.addEventListener('mousedown', function(e) {
+		moodDragging = true;
+		moodPad.classList.add('dragging');
+		updateMoodPadFromEvent(e);
 	});
-}
+	window.addEventListener('mousemove', function(e) {
+		if (moodDragging) updateMoodPadFromEvent(e);
+	});
+	window.addEventListener('mouseup', function() {
+		if (moodDragging) {
+			moodDragging = false;
+			moodPad.classList.remove('dragging');
+		}
+	});
 
-function showMessage(text, type) {
-	const msg = document.getElementById('statusMessage');
-	msg.textContent = text;
-	msg.className = 'status-message ' + type;
-}
+	moodPad.addEventListener('touchstart', function(e) {
+		moodDragging = true;
+		moodPad.classList.add('dragging');
+		updateMoodPadFromEvent(e);
+		e.preventDefault();
+	}, { passive: false });
+	window.addEventListener('touchmove', function(e) {
+		if (moodDragging) {
+			updateMoodPadFromEvent(e);
+			e.preventDefault();
+		}
+	}, { passive: false });
+	window.addEventListener('touchend', function() {
+		if (moodDragging) {
+			moodDragging = false;
+			moodPad.classList.remove('dragging');
+		}
+	});
 
-document.addEventListener('DOMContentLoaded', function() {
-	initializeGenres();
-});
+	// ==================================================================
+	// Popularity: dotted step slider (11 stops, 0.0 .. 1.0 step 0.1)
+	// ==================================================================
+	var POPULAR_STEPS = 11; // 0, 0.1, ..., 1.0
+	var popularDragging = false;
+
+	function buildPopularDots() {
+		popularDots.innerHTML = '';
+		for (var i = 0; i < POPULAR_STEPS; i++) {
+			var dot = document.createElement('button');
+			dot.type = 'button';
+			dot.className = 'step-input-dot';
+			dot.dataset.step = i;
+			dot.addEventListener('mousedown', function(e) {
+				e.stopPropagation();
+				setPopularFromStep(parseInt(this.dataset.step, 10));
+			});
+			popularDots.appendChild(dot);
+		}
+	}
+
+	function setPopularFromStep(step) {
+		state.popular = Math.round((step / (POPULAR_STEPS - 1)) * 10) / 10;
+		renderPopular();
+		updateResetButtonState();
+	}
+
+	function updatePopularFromEvent(e) {
+		var rect = popularTrack.getBoundingClientRect();
+		var c = clientCoordsFromEvent(e);
+		var x = Math.max(0, Math.min(c.x - rect.left, rect.width));
+		var ratio = rect.width === 0 ? 0 : x / rect.width;
+		var step = Math.round(ratio * (POPULAR_STEPS - 1));
+		setPopularFromStep(step);
+	}
+
+	function renderPopular() {
+		popularProgress.style.width = (state.popular * 100) + '%';
+		popularValueEl.textContent = state.popular.toFixed(1);
+
+		var activeStep = Math.round(state.popular * (POPULAR_STEPS - 1));
+		var dots = popularDots.children;
+		for (var i = 0; i < dots.length; i++) {
+			dots[i].classList.toggle('past', i <= activeStep);
+		}
+	}
+
+	popularTrack.addEventListener('mousedown', function(e) {
+		popularDragging = true;
+		updatePopularFromEvent(e);
+	});
+	window.addEventListener('mousemove', function(e) {
+		if (popularDragging) updatePopularFromEvent(e);
+	});
+	window.addEventListener('mouseup', function() {
+		popularDragging = false;
+	});
+
+	popularTrack.addEventListener('touchstart', function(e) {
+		popularDragging = true;
+		updatePopularFromEvent(e);
+		e.preventDefault();
+	}, { passive: false });
+	window.addEventListener('touchmove', function(e) {
+		if (popularDragging) {
+			updatePopularFromEvent(e);
+			e.preventDefault();
+		}
+	}, { passive: false });
+	window.addEventListener('touchend', function() {
+		popularDragging = false;
+	});
+
+	// ==================================================================
+	// Vocal pill toggle (single-select)
+	// ==================================================================
+	function renderVocal() {
+		var buttons = vocalGroup.querySelectorAll('.pill-btn');
+		buttons.forEach(function(btn) {
+			btn.classList.toggle('active', parseInt(btn.dataset.value, 10) === state.vocal);
+		});
+		languageGroup.style.display = state.vocal === 1 ? 'block' : 'none';
+	}
+
+	vocalGroup.querySelectorAll('.pill-btn').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			state.vocal = parseInt(this.dataset.value, 10);
+			renderVocal();
+			updateResetButtonState();
+		});
+	});
+
+	// ==================================================================
+	// Language pill toggle (single-select)
+	// ==================================================================
+	function renderLanguage() {
+		var buttons = languagePillGroup.querySelectorAll('.pill-btn');
+		buttons.forEach(function(btn) {
+			btn.classList.toggle('active', btn.dataset.value === state.language);
+		});
+	}
+
+	languagePillGroup.querySelectorAll('.pill-btn').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			state.language = this.dataset.value;
+			renderLanguage();
+			updateResetButtonState();
+		});
+	});
+
+	// ==================================================================
+	// Genres pill toggle (multi-select)
+	// ==================================================================
+	function buildGenreButtons() {
+		genreList.innerHTML = '';
+
+		if (!genresData || genresData.length === 0) {
+			genreList.innerHTML = '<p>Error: No genres available</p>';
+			return;
+		}
+
+		genresData.forEach(function(genre) {
+			var label = genre.name;
+			if (genreLabels && typeof genreLabels === 'object' && genreLabels[genre.name]) {
+				label = genreLabels[genre.name];
+			}
+
+			var btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'pill-btn';
+			btn.dataset.value = genre.name;
+			btn.textContent = label;
+			btn.title = label;
+			btn.classList.toggle('active', state.genres.indexOf(genre.name) !== -1);
+
+			btn.addEventListener('click', function() {
+				var idx = state.genres.indexOf(genre.name);
+				if (idx === -1) {
+					state.genres.push(genre.name);
+				} else {
+					state.genres.splice(idx, 1);
+				}
+				this.classList.toggle('active', idx === -1);
+				updateResetButtonState();
+			});
+
+			genreList.appendChild(btn);
+		});
+	}
+
+	// ==================================================================
+	// Reset button dirty-state (mirrors Settings_resetButtonEnabled in Zvuk)
+	// ==================================================================
+	function sameGenres(a, b) {
+		if (a.length !== b.length) return false;
+		var sa = a.slice().sort();
+		var sb = b.slice().sort();
+		for (var i = 0; i < sa.length; i++) {
+			if (sa[i] !== sb[i]) return false;
+		}
+		return true;
+	}
+
+	function isDirty() {
+		return state.popular !== DEFAULTS.popular ||
+			state.energy !== DEFAULTS.energy ||
+			state.fun !== DEFAULTS.fun ||
+			state.vocal !== DEFAULTS.vocal ||
+			state.language !== DEFAULTS.language ||
+			!sameGenres(state.genres, DEFAULTS.genres);
+	}
+
+	function updateResetButtonState() {
+		resetBtn.classList.toggle('enabled', isDirty());
+	}
+
+	function renderAll() {
+		renderMoodPad();
+		renderPopular();
+		renderVocal();
+		renderLanguage();
+		buildGenreButtons();
+		updateResetButtonState();
+	}
+
+	window.resetWaveSettings = function() {
+		state.popular = DEFAULTS.popular;
+		state.energy = DEFAULTS.energy;
+		state.fun = DEFAULTS.fun;
+		state.vocal = DEFAULTS.vocal;
+		state.language = DEFAULTS.language;
+		state.genres = DEFAULTS.genres.slice();
+		renderAll();
+	};
+
+	// ==================================================================
+	// Save (payload shape identical to the original waveSliders.html)
+	// ==================================================================
+	window.saveWaveSettings = function() {
+		console.log('[zvuk] saveWaveSettings() called');
+		var settings = {
+			popular: state.popular,
+			energy: state.energy,
+			fun: state.fun,
+			language: state.language,
+			vocal: state.vocal,
+			genres: state.genres.slice()
+		};
+
+		statusMessage.className = '';
+
+		fetch('/plugins/zvuk/saveWaveSettings[% IF playerid %]?player=[% playerid | uri %][% END %]', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(settings)
+		})
+		.then(function(response) {
+			console.log('[zvuk] fetch resolved, status=', response.status);
+			return response.json();
+		})
+		.then(function(data) {
+			console.log('[zvuk] parsed data=', data); closeWaveSliderModal();
+			if (data.success) {
+				closeWaveSliderModal();
+			} else {
+				showMessage('Error: ' + (data.error || 'Unknown error'), 'error');
+			}
+		})
+		.catch(function(error) {
+			console.log('[zvuk] caught error=', error);
+			showMessage('Network error: ' + error.message, 'error');
+		});
+	};
+
+	function showMessage(text, type) {
+		statusMessage.textContent = text;
+		statusMessage.className = 'status-message ' + type;
+	}
+
+	function initialRender() {
+		// Render the saved values instantly on first paint: suppress the CSS
+		// transitions used for drag/reset so the thumb and progress bar don't
+		// visibly slide in from their CSS defaults (center / 0%) on modal open.
+		moodPadThumb.classList.add('no-anim');
+		popularProgress.classList.add('no-anim');
+
+		buildPopularDots();
+		renderAll();
+
+		requestAnimationFrame(function() {
+			requestAnimationFrame(function() {
+				moodPadThumb.classList.remove('no-anim');
+				popularProgress.classList.remove('no-anim');
+			});
+		});
+	}
+
+	if (document.readyState === 'interactive' || document.readyState === 'complete') {
+		initialRender();
+	} else {
+		document.addEventListener('DOMContentLoaded', initialRender);
+	}
+})();
 </script>

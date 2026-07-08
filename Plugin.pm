@@ -9,6 +9,7 @@ use base qw(Slim::Plugin::OPMLBased);
 use Encode qw(decode_utf8 encode_utf8);
 use JSON::XS;
 use JSON::XS::VersionOneAndTwo;
+use URI::QueryParam;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::PluginManager;
@@ -1194,16 +1195,11 @@ sub handleGenreToggle {
 sub _getAPIHandler {
 	my ($client) = @_;
 	return unless $client;
-	return $client->pluginData('zvuk_api') || _initAPIHandler($client);
-}
-
-sub _initAPIHandler {
-	my ($client) = @_;
-	require Plugins::Zvuk::API::Async;
-	my $userId = _getUserIdForClient($client);
-	my $api = Plugins::Zvuk::API::Async->new({ userId => $userId });
-	$client->pluginData(zvuk_api => $api);
-	return $api;
+	# Always resolve fresh from the client's current userId pref (same path
+	# as _get_api_client) instead of caching the API object in pluginData:
+	# a cached object silently kept pointing at the account that was active
+	# when it was first created, surviving _switchAccount indefinitely.
+	return _get_api_client($client);
 }
 
 # Handle slider changes (Popular, Energy, Fun)
@@ -1767,6 +1763,31 @@ sub _getVocalMenu {
 	return \@vocal_items;
 }
 
+# Resolve the connected player for a raw web/AJAX request, so handlers that
+# only get ($httpClient, $response) can still find "the current account".
+# Same lookup order as Slim::Plugin::DnDPlay::Plugin::_getClient: explicit
+# ?player=<id> query param first, then the Squeezebox-player cookie the
+# skins set for the currently selected player.
+sub _clientForWebRequest {
+	my ($request) = @_;
+	return unless $request;
+
+	my $client;
+	if (my $id = $request->uri->query_param('player')) {
+		$client = Slim::Player::Client::getClient($id);
+	}
+
+	if (!$client && (my $cookie = $request->header('Cookie'))) {
+		require CGI::Cookie;
+		my $cookies = { CGI::Cookie->parse($cookie) };
+		if (my $player = $cookies->{'Squeezebox-player'}) {
+			$client = Slim::Player::Client::getClient($player->value);
+		}
+	}
+
+	return $client;
+}
+
 # Web UI handler for displaying wave settings (AJAX or standalone)
 sub handleWaveSettingsWebUI {
 	my ($httpClient, $response) = @_;
@@ -1774,7 +1795,9 @@ sub handleWaveSettingsWebUI {
 	require Plugins::Zvuk::WaveSettings;
 	require Slim::Web::HTTP;
 	my $request = $response->request;
-	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings('default');
+	my $client = _clientForWebRequest($request);
+	my $account_id = $client ? _getUserIdForClient($client) : 'default';
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 
 	# Build genres list for JavaScript
 	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
@@ -1791,16 +1814,18 @@ sub handleWaveSettingsWebUI {
 		genres_labels_json => encode_json(\%genre_labels),
 		selected_genres_json => encode_json($wave_settings->{genres} || []),
 		webroot => '/html/',
+		playerid => ($client ? $client->id : ''),
 	};
 
 	# Use waveSliders.html for AJAX modal content, waveSettings.html for standalone
 	my $template = 'plugins/zvuk/waveSliders.html';
 
-	my $output = Slim::Web::HTTP::filltemplatefile($template, $vars);
+	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output);
+	$response->content_length(length($$output_ref));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
 }
 
 # Web AJAX handler for saving wave settings from web interface
@@ -1822,12 +1847,15 @@ sub handleSaveWaveSettingsWeb {
 		$response->code(400);
 		$response->content_type('application/json');
 		my $json = encode_json({ success => 0, error => 'Invalid JSON' });
+		$response->content_length(length($json));
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
 	}
 
-	# Get current account ID (default for web UI)
-	my $account_id = 'default';
+	# Get current account ID from the connected player (falls back to
+	# 'default' only if no player is selected in the web UI at all).
+	my $client = _clientForWebRequest($request);
+	my $account_id = $client ? _getUserIdForClient($client) : 'default';
 
 	# Validate and save settings
 	my $settings = {
@@ -1845,6 +1873,7 @@ sub handleSaveWaveSettingsWeb {
 	$response->code(200);
 	$response->content_type('application/json');
 	my $json = encode_json({ success => 1 });
+	$response->content_length(length($json));
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 }
 
@@ -1873,6 +1902,7 @@ sub handleSaveOAuthToken {
 		$response->code(400);
 		$response->content_type('application/json');
 		my $json = encode_json({ success => 0, error => 'Missing token' });
+		$response->content_length(length($json));
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
 	}
@@ -1885,6 +1915,7 @@ sub handleSaveOAuthToken {
 		$response->code(400);
 		$response->content_type('application/json');
 		my $json = encode_json({ success => 0, error => 'Invalid token format' });
+		$response->content_length(length($json));
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
 	}
@@ -1915,6 +1946,7 @@ sub handleSaveOAuthToken {
 		}
 	});
 	$log->debug("OAuth: Sending immediate response: $json");
+	$response->content_length(length($json));
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 	$log->debug("OAuth: Response sent immediately");
 }
@@ -2106,6 +2138,7 @@ END_HTML
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
+	$response->content_length(length($html));
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
 }
 
@@ -2135,6 +2168,7 @@ sub handleGetAnonymousToken {
 				$response->code(200);
 				$response->content_type('application/json');
 				my $json = encode_json({ success => 1 });
+				$response->content_length(length($json));
 				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 			}
 			else {
@@ -2142,6 +2176,7 @@ sub handleGetAnonymousToken {
 				$response->code(500);
 				$response->content_type('application/json');
 				my $json = encode_json({ success => 0, error => 'No token in response' });
+				$response->content_length(length($json));
 				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 			}
 		},
@@ -2151,6 +2186,7 @@ sub handleGetAnonymousToken {
 			$response->code(500);
 			$response->content_type('application/json');
 			my $json = encode_json({ success => 0, error => $error });
+			$response->content_length(length($json));
 			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		}
 	);

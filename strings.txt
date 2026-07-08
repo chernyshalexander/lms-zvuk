@@ -306,6 +306,10 @@ PLUGIN_ZVUK_CANCEL
 	EN	Cancel
 	RU	Отмена
 
+PLUGIN_ZVUK_RESET
+	EN	Reset
+	RU	Сбросить
+
 PLUGIN_ZVUK_SETTINGS_IN_PLUGIN_PAGE
 	EN	Settings are available on the plugin settings page via "Open Settings" button
 	RU	Настройки доступны на странице параметров плагина через кнопку "Открыть настройки"

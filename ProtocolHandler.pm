@@ -421,25 +421,14 @@ sub _getAPIHandler {
 	my ($client) = @_;
 
 	if (ref $client) {
-		return $client->pluginData('zvuk_api') || _initAPIHandler($client);
+		# Delegate to Plugin.pm's resolver instead of keeping our own
+		# pluginData-cached copy: that cache never got invalidated on
+		# account switch, so Wave/streaming kept using the old account.
+		return Plugins::Zvuk::Plugin::_get_api_client($client);
 	} else {
 		my $userId = Plugins::Zvuk::API->getSomeUserId();
 		return Plugins::Zvuk::API::Async->new({ userId => $userId });
 	}
-}
-
-sub _initAPIHandler {
-	my ($client) = @_;
-	my $prefs = preferences('plugin.zvuk');
-	my $userId = $prefs->client($client)->get('userId') || Plugins::Zvuk::API->getSomeUserId();
-
-	my $api;
-	if ($userId) {
-		$prefs->client($client)->set('userId', $userId);
-		$api = Plugins::Zvuk::API::Async->new({ userId => $userId });
-		$client->pluginData(zvuk_api => $api);
-	}
-	return $api;
 }
 
 1;

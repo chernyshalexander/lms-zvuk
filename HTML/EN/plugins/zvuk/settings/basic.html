@@ -1,13 +1,76 @@
 [% PROCESS settings/header.html %]
 
+<style>
+/* This admin page is a classic LMS settings page, separate from the Material
+   Skin Vue app, so it doesn't inherit Material's theme automatically. We
+   approximate "the theme selected in Material" via prefers-color-scheme
+   (which is also what Material's own "Auto" theme uses), with a best-effort
+   read of Material's persisted choice in localStorage for exact fidelity --
+   see zvukApplyTheme() below. */
+.wave-modal-overlay {
+	display: none;
+	position: fixed;
+	top: 0; left: 0;
+	width: 100%; height: 100%;
+	background: rgba(0,0,0,0.5);
+	z-index: 1000;
+}
+
+.wave-modal-box {
+	position: absolute;
+	top: 50%; left: 50%;
+	transform: translate(-50%,-50%);
+	background: white;
+	border-radius: 8px;
+	max-width: 600px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.wave-modal-header {
+	padding: 20px;
+	border-bottom: 1px solid #ddd;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.wave-modal-header h2 {
+	margin: 0;
+	color: #222;
+	font-weight: bold;
+	font-size: 18px;
+}
+
+.wave-modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #999;
+}
+
+.wave-modal-content { padding: 20px; }
+
+/* ===================== Dark theme ===================== */
+html.zvuk-dark-theme .wave-modal-overlay { background: rgba(0,0,0,0.65); }
+html.zvuk-dark-theme .wave-modal-box { background: #2d2d2d; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+html.zvuk-dark-theme .wave-modal-header { border-bottom-color: #444; }
+html.zvuk-dark-theme .wave-modal-header h2 { color: #eee; }
+html.zvuk-dark-theme .wave-modal-close { color: #aaa; }
+html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
+</style>
+
 <!-- Wave Sliders Modal -->
-<div id="waveSliderModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
-	<div id="waveSliderBox" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; max-width:600px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-		<div style="padding:20px; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
-			<h2 style="margin:0; color:#222; font-weight:bold; font-size:18px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</h2>
-			<button onclick="closeWaveSliderModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#999;">&times;</button>
+<div id="waveSliderModal" class="wave-modal-overlay">
+	<div id="waveSliderBox" class="wave-modal-box">
+		<div class="wave-modal-header">
+			<h2>[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</h2>
+			<button type="button" onclick="closeWaveSliderModal()" class="wave-modal-close">&times;</button>
 		</div>
-		<div id="waveSliderContent" style="padding:20px;">
+		<div id="waveSliderContent" class="wave-modal-content">
 [% PROCESS plugins/zvuk/waveSliders.html %]
 		</div>
 	</div>
@@ -16,9 +79,40 @@
 <script>
 var waveModalInitialized = false;
 
+// Match Material Skin's currently selected theme. Material persists the
+// user's raw theme choice (e.g. "dark", "light", "black", "auto", or an
+// OS-specific auto-resolved name like "windows/light/Windows-10") under
+// localStorage key "lms-material::theme". Its own UI treats anything that
+// doesn't start with "light" (or contain "/light/") as dark, and resolves
+// "auto" via prefers-color-scheme -- mirrored here so we track the exact
+// same choice instead of guessing from the OS preference directly (which
+// gave wrong, device-dependent results: always dark on mobile, always
+// light on desktop, regardless of what was actually picked in Material).
+function zvukDetectDarkTheme() {
+	var chosen;
+	try {
+		chosen = window.localStorage.getItem('lms-material::theme');
+	} catch (e) {}
+
+	if (!chosen) {
+		// No persisted choice yet: Material's own default is dark.
+		return true;
+	}
+	if (chosen.indexOf('auto') === 0) {
+		return !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+	}
+	chosen = chosen.replace('darker', 'dark');
+	return chosen.indexOf('light') !== 0 && chosen.indexOf('/light/') === -1;
+}
+
+function zvukApplyTheme() {
+	document.documentElement.classList.toggle('zvuk-dark-theme', zvukDetectDarkTheme());
+}
+
 function openWaveSliderModal() {
 	var modal = document.getElementById('waveSliderModal');
 	if (modal) {
+		zvukApplyTheme();
 		modal.style.display = 'block';
 	}
 }
