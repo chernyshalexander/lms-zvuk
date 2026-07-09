@@ -6,7 +6,6 @@ use utf8;
 
 use Slim::Utils::Log;
 use Slim::Utils::Strings qw(cstring);
-use Slim::Control::Request;
 
 my $log = logger('plugin.zvuk');
 
