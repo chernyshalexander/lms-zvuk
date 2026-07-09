@@ -16,6 +16,11 @@ use Plugins::Zvuk::WaveSettings;
 
 my $log = logger('plugin.zvuk');
 
+# Resolve the connected player for a raw web/AJAX request, so handlers that
+# only get ($httpClient, $response) can still find "the current account".
+# Same lookup order as Slim::Plugin::DnDPlay::Plugin::_getClient: explicit
+# ?player=<id> query param first, then the Squeezebox-player cookie the
+# skins set for the currently selected player.
 sub _clientForWebRequest {
 	my ($request) = @_;
 	return unless $request;
