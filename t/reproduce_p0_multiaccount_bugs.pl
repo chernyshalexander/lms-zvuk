@@ -32,6 +32,7 @@ require Plugins::Zvuk::Settings;
 require Plugins::Zvuk::WaveSettings;
 require Plugins::Zvuk::WaveWizardUI;
 require Plugins::Zvuk::WaveUI;
+require Plugins::Zvuk::WebHandlers;
 
 my $failures = 0;
 sub ok {
@@ -105,7 +106,7 @@ my $request = Test::FakeRequest->new(
 );
 my $response = Test::FakeResponse->new($request);
 
-Plugins::Zvuk::Plugin::handleSaveWaveSettingsWeb(undef, $response);
+Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb(undef, $response);
 
 my $savedForRealAccount = Plugins::Zvuk::WaveSettings::loadSettings('acctA');
 ok(abs(($savedForRealAccount->{popular} // -1) - 0.91) < 1e-9,
