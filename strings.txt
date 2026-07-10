@@ -479,6 +479,10 @@ PLUGIN_ZVUK_RECOMMENDATIONS
 	EN	Recommendations
 	RU	Рекомендации
 
+PLUGIN_ZVUK_RECOMMENDATIONS_MIXED
+	EN	Artists, Albums & Playlists
+	RU	Артисты, альбомы и плейлисты
+
 PLUGIN_ZVUK_RECOMMENDATIONS_EMPTY
 	EN	No recommendations available
 	RU	Рекомендаций нет

@@ -41,11 +41,19 @@ sub register {
 	Slim::Player::ProtocolHandlers->registerHandler('zvuk', $class);
 }
 
+# Both bare track URLs (zvuk://<id>) and typed media URLs
+# (zvuk://episode:<id>) share the same numeric media-content ID space.
+sub _parseZvukId {
+	my ($url) = @_;
+	my ($id) = $url =~ m{zvuk://(?:\w+:)?(\d+)};
+	return $id;
+}
+
 sub getNextTrack {
 	my ($class, $song, $successCb, $errorCb) = @_;
 
 	my $url = $song->track()->url;
-	my ($id) = $url =~ m{zvuk://(\d+)};
+	my $id  = _parseZvukId($url);
 
 	if (!$id) {
 		$errorCb->('Invalid Zvuk ID');
@@ -173,7 +181,7 @@ sub getNextTrack {
 sub getMetadataFor {
 	my ($class, $client, $url) = @_;
 
-	my ($id) = $url =~ m{zvuk://(\d+)};
+	my $id = _parseZvukId($url);
 	return {} unless $id;
 
 	my $meta = Plugins::Zvuk::API->cache->get("zvuk_meta_$id");
@@ -239,7 +247,7 @@ sub getHeaders {
 
 sub getFormatForURL {
 	my ($class, $url) = @_;
-	return if $url =~ m{zvuk://\w+:};
+	return if $url =~ m{zvuk://(?:album|playlist|artist):};
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 	return $prefQuality eq 'flac' ? 'flc' : 'mp3';
 }

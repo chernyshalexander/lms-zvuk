@@ -170,16 +170,23 @@ sub _buildRootMenu {
 			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client),
 		},
 		{
-			name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
-			type  => 'link',
-			image => 'plugins/zvuk/html/images/playlists.png',
-			url   => \&handlePersonalizedPlaylists,
-		},
-		{
 			name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
-			type  => 'link',
+			type  => 'outline',
 			image => 'plugins/zvuk/html/images/playlists.png',
-			url   => \&handleRecommendations,
+			items => [
+				{
+					name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
+					type  => 'link',
+					image => 'plugins/zvuk/html/images/playlists.png',
+					url   => \&handlePersonalizedPlaylists,
+				},
+				{
+					name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_MIXED'),
+					type  => 'link',
+					image => 'plugins/zvuk/html/images/playlists.png',
+					url   => \&handleRecommendations,
+				},
+			],
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
@@ -835,13 +842,18 @@ sub _renderPodcast {
 sub _renderEpisode {
 	my ($episode) = @_;
 	my $podcast_name = $episode->{podcast} ? $episode->{podcast}->{title} : "Podcast";
+	my $url = 'zvuk://episode:' . $episode->{id};
 	return {
 		name      => $episode->{title},
 		line1     => $episode->{title},
 		line2     => $podcast_name,
 		duration  => $episode->{duration},
 		secs      => $episode->{duration},
-		type      => 'text',
+		on_select => 'play',
+		url       => $url,
+		play      => $url,
+		playall   => 1,
+		type      => 'audio',
 		image     => $episode->{podcast} ? Plugins::Zvuk::API->getImageUrl($episode->{podcast}) : "",
 	};
 }

@@ -247,35 +247,34 @@ sub _graphql {
 						$op_cb->({ data => $data });
 					},
 
-					# HTTP ERROR HANDLER: Network error or timeout
+					# HTTP ERROR HANDLER: any non-2xx/3xx HTTP response, or a
+					# genuine network-level failure (connect/DNS/timeout).
+					#
+					# Slim::Networking::Async::HTTP routes ANY response outside
+					# [23]\d\d here as soon as headers are read -- BEFORE the
+					# body is fetched (Async/HTTP.pm:432-434) -- so for real
+					# HTTP error responses (400/401/404/429/5xx) the response
+					# body (e.g. a GraphQL error message) is never available,
+					# only the status line/code. $response is still passed
+					# through and has the real numeric code, though, so use
+					# that instead of pattern-matching the error string --
+					# the string match previously left HTTP 400 (and 401/403/
+					# 404/409) miscategorized as code=>0 ("timeout"), which
+					# Retry.pm treats as retryable, wasting several retries
+					# with growing backoff on errors that will never succeed.
 					sub {
-						my ($http, $error) = @_;
+						my ($http, $error, $response) = @_;
+						my $code = $response ? $response->code : 0;
 
-						# Detect HTTP error code from error string for retry classification
-						# This determines whether retry manager will attempt retries
-						my $code = 0;  # default timeout
-						if ($error =~ /timeout|timed out/i) {
-							$code = 0;  # Retryable: timeout
-							$log->warn("GraphQL: Request timeout for $operationName");
-						} elsif ($error =~ /429|too many requests|rate limit/i) {
-							$code = 429;  # Retryable: rate limit
-							$log->warn("GraphQL: Rate limited (429) for $operationName");
-						} elsif ($error =~ /502|bad gateway/i) {
-							$code = 502;  # Retryable: server error
-							$log->warn("GraphQL: Bad gateway (502) for $operationName");
-						} elsif ($error =~ /503|service unavailable/i) {
-							$code = 503;  # Retryable: server error
-							$log->warn("GraphQL: Service unavailable (503) for $operationName");
-						} elsif ($error =~ /504|gateway timeout/i) {
-							$code = 504;  # Retryable: server error
-							$log->warn("GraphQL: Gateway timeout (504) for $operationName");
+						if ($code) {
+							$log->error("GraphQL: HTTP $code for $operationName: $error");
 						} else {
+							# No HTTP response at all -- real network/timeout failure.
 							$log->error("GraphQL: Network error for $operationName: $error");
-							# Unknown errors (network) are retryable by default
 						}
 
-						# Pass error to retry manager with HTTP code
-						# Retry manager will check is_retryable() to decide whether to retry
+						# Pass error to retry manager with the real HTTP code.
+						# Retry manager will check is_retryable() to decide whether to retry.
 						$op_cb->({ error => $error, code => $code });
 					},
 
@@ -446,6 +445,14 @@ sub getStream {
 						mid
 						flac
 						flacdrm
+					}
+				}
+				... on Episode {
+					id
+					duration
+					stream {
+						high
+						mid
 					}
 				}
 			}
@@ -1035,24 +1042,47 @@ sub remakeGenerativePlaylist {
 	}, 'remakeGenerativePlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::GIGAMIX_CACHE_TTL });
 }
 
-# Fetch synthesis playlists (Playlists for You personalization feature)
-sub getSynthesisPlaylists {
-	my ($self, $cb) = @_;
+# Get lightweight playlist metadata (no tracks) for a set of playlist IDs.
+# operationName is "getShortPlaylist" (verified against zvuk-music sources)
+# but the GraphQL field it actually selects is the same getPlaylists field
+# used for regular playlists — just without a `tracks` selection.
+sub getShortPlaylists {
+	my ($self, $cb, $ids) = @_;
 
-	# TODO: API operation for fetching synthesis playlists not yet confirmed
-	# Synthesis playlist IDs (Плейлисты для вас): 3, 4, 6, 11, 12, 13, 14, 15
-	# Candidate: mediaContents(ids: $ids) { ... on Playlist { ... } }
-	# Awaiting confirmation before implementation
+	my $gql = q{
+		query getShortPlaylist($ids: [ID!]!) {
+			getPlaylists(ids: $ids) {
+				id
+				title
+				isPublic
+				description
+				duration
+				image { src }
+			}
+		}
+	};
 
-	$log->debug("Personalized Playlists: getSynthesisPlaylists not implemented");
-
-	$cb->({
-		error => 'not_implemented',
-		message => 'Feature not yet implemented'
-	});
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) {
+			$cb->($data || { error => 'Unknown error' });
+			return;
+		}
+		$cb->($data->{getPlaylists} || []);
+	}, 'getShortPlaylist', $gql, { ids => $ids });
 }
 
-# Get personalized music recommendations (For You, Trending, etc.)
+# Fetch synthesis playlists (Playlists for You personalization feature).
+# Fixed, stable per-account IDs (see ma-provider/provider/constants.py:SYNTHESIS_PLAYLIST_IDS).
+use constant SYNTHESIS_PLAYLIST_IDS => [3, 4, 6, 11, 12, 13, 14, 15];
+
+sub getSynthesisPlaylists {
+	my ($self, $cb) = @_;
+	$self->getShortPlaylists($cb, SYNTHESIS_PLAYLIST_IDS);
+}
+
+# Get personalized music recommendations (For You, Trending, etc.).
+# $args->{page}: optional page number (defaults to 1).
 sub getMusicRecommendations {
 	my ($self, $cb, $args) = @_;
 	$args ||= {};
