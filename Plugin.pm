@@ -546,6 +546,7 @@ sub handleRecommendations {
 	my ($client, $cb) = @_;
 	my $api = _get_api_client($client);
 
+	# Fetches the first dynamicBlock page and renders the menu from it.
 	$api->getMusicRecommendations(sub {
 		my $result = shift || {};
 
@@ -569,12 +570,15 @@ sub handleRecommendations {
 		my @menuItems;
 
 		# Artists category
+		# Pass the already-fetched items through so drilling into a category
+		# doesn't re-issue the same getMusicRecommendations request.
 		my $artists = $result->{artists} || [];
 		if (@$artists) {
 			push @menuItems, {
 				name => cstring($client, 'PLUGIN_ZVUK_ARTISTS') . ' (' . scalar(@$artists) . ')',
 				type => 'link',
 				url  => \&handleRecommendationArtists,
+				passthrough => [{ artists => $artists }],
 			};
 		}
 
@@ -585,6 +589,7 @@ sub handleRecommendations {
 				name => cstring($client, 'PLUGIN_ZVUK_ALBUMS') . ' (' . scalar(@$releases) . ')',
 				type => 'link',
 				url  => \&handleRecommendationAlbums,
+				passthrough => [{ releases => $releases }],
 			};
 		}
 
@@ -595,6 +600,7 @@ sub handleRecommendations {
 				name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS') . ' (' . scalar(@$playlists) . ')',
 				type => 'link',
 				url  => \&handleRecommendationPlaylists,
+				passthrough => [{ playlists => $playlists }],
 			};
 		}
 
@@ -606,7 +612,15 @@ sub handleRecommendations {
 }
 
 sub handleRecommendationArtists {
-	my ($client, $cb) = @_;
+	my ($client, $cb, $args, $passthrough) = @_;
+
+	# Normal path: category items already fetched by handleRecommendations
+	# and handed down via passthrough, so avoid a redundant round-trip.
+	if ($passthrough && $passthrough->{artists}) {
+		$cb->({ items => [ map { _renderArtist($_) } @{ $passthrough->{artists} } ] });
+		return;
+	}
+
 	my $api = _get_api_client($client);
 
 	$api->getMusicRecommendations(sub {
@@ -636,7 +650,13 @@ sub handleRecommendationArtists {
 }
 
 sub handleRecommendationAlbums {
-	my ($client, $cb) = @_;
+	my ($client, $cb, $args, $passthrough) = @_;
+
+	if ($passthrough && $passthrough->{releases}) {
+		$cb->({ items => [ map { _renderAlbum($_) } @{ $passthrough->{releases} } ] });
+		return;
+	}
+
 	my $api = _get_api_client($client);
 
 	$api->getMusicRecommendations(sub {
@@ -666,7 +686,13 @@ sub handleRecommendationAlbums {
 }
 
 sub handleRecommendationPlaylists {
-	my ($client, $cb) = @_;
+	my ($client, $cb, $args, $passthrough) = @_;
+
+	if ($passthrough && $passthrough->{playlists}) {
+		$cb->({ items => [ map { _renderPlaylist($_) } @{ $passthrough->{playlists} } ] });
+		return;
+	}
+
 	my $api = _get_api_client($client);
 
 	$api->getMusicRecommendations(sub {
