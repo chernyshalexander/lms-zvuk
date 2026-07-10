@@ -71,9 +71,11 @@ sub acquire {
         # Add timestamp before scheduling the timer, not in the callback
         push @{$self->{_task_logs}}, $now;
 
+        # setTimer's $when is an absolute epoch time (Slim::Utils::Timers.pm:66-95),
+        # not a relative delay -- must add to the current time.
         Slim::Utils::Timers::setTimer(
             undef,
-            $delay_until,
+            $now + $delay_until,
             sub {
                 $callback->($delay_until);
             }

@@ -95,11 +95,13 @@ sub execute {
                 return;
             }
 
-            # Calculate backoff and retry
+            # Calculate backoff and retry.
+            # setTimer's $when is an absolute epoch time
+            # (Slim::Utils::Timers.pm:66-95), not a relative delay.
             my $backoff = $self->_calculate_backoff($attempt - 1);
             Slim::Utils::Timers::setTimer(
                 undef,
-                $backoff,
+                time() + $backoff,
                 $run_operation
             );
         });
