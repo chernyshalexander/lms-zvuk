@@ -169,31 +169,37 @@ sub _buildRootMenu {
 			image => 'plugins/zvuk/html/images/radio.png',
 			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client),
 		},
-		{
-			name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
-			type  => 'outline',
-			image => 'plugins/zvuk/html/images/playlists.png',
-			items => [
-				{
-					name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
-					type  => 'link',
-					image => 'plugins/zvuk/html/images/playlists.png',
-					url   => \&handlePersonalizedPlaylists,
-				},
-				{
-					name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_MIXED'),
-					type  => 'link',
-					image => 'plugins/zvuk/html/images/playlists.png',
-					url   => \&handleRecommendations,
-				},
-			],
-		},
-		{
-			name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
-			type  => 'link',
-			image => 'plugins/zvuk/html/images/playlists.png',
-			url   => \&Plugins::Zvuk::GigaMix::handleGigaMix,
-		},
+			{
+				name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
+				type  => 'outline',
+				image => 'plugins/zvuk/html/images/playlists.png',
+				items => [
+					{
+						name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
+						type  => 'link',
+						image => 'plugins/zvuk/html/images/playlists.png',
+						url   => \&handlePersonalizedPlaylists,
+					},
+					{
+						name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_MIXED'),
+						type  => 'link',
+						image => 'plugins/zvuk/html/images/playlists.png',
+						url   => \&handleRecommendations,
+					},
+				],
+			},
+			{
+				name  => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS'),
+				type  => 'link',
+				image => 'plugins/zvuk/html/images/genres.png',
+				url   => \&handleEditorialPlaylists,
+			},
+			{
+				name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
+				type  => 'link',
+				image => 'plugins/zvuk/html/images/playlists.png',
+				url   => \&Plugins::Zvuk::GigaMix::handleGigaMix,
+			},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
 			type  => 'outline',
@@ -728,6 +734,56 @@ sub handleRecommendationPlaylists {
 	});
 }
 
+sub handleEditorialPlaylists {
+	my ($client, $cb) = @_;
+	my $api = _get_api_client($client);
+
+	$log->info("Loading editorial playlists for client");
+
+	# Step 1: Get editorial playlist IDs from Grid API
+	$api->getEditorialPlaylistIds(sub {
+		my ($ids, $error) = @_;
+
+		if ($error) {
+			$log->error("getEditorialPlaylistIds failed: $error");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_ERROR'), type => 'text' },
+			]});
+			return;
+		}
+
+		unless ($ids && @$ids) {
+			$log->info("No editorial playlists available");
+			$cb->({ items => [
+				{ name => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_EMPTY'), type => 'text' },
+			]});
+			return;
+		}
+
+		$log->info("Got " . scalar(@$ids) . " editorial playlist IDs, loading metadata");
+
+		# Step 2: Get lightweight metadata for all playlists
+		$api->getShortPlaylists(sub {
+			my $playlists = shift;
+
+			unless ($playlists && @$playlists) {
+				$log->warn("getShortPlaylist returned empty results");
+				$cb->({ items => [
+					{ name => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_EMPTY'), type => 'text' },
+				]});
+				return;
+			}
+
+			$log->info("Got metadata for " . scalar(@$playlists) . " editorial playlists");
+
+			# Step 3: Render all playlists
+			my @items = map { _renderEditorialPlaylist($_) } @$playlists;
+
+			$cb->({ items => \@items });
+		}, $ids);
+	});
+}
+
 sub _renderArtistItem {
 	my ($artist) = @_;
 	return {
@@ -819,6 +875,20 @@ sub _renderPlaylist {
 	my ($playlist) = @_;
 	return {
 		name      => $playlist->{title},
+		type      => 'link',
+		url       => \&handlePlaylist,
+		passthrough => [{ id => $playlist->{id} }],
+		image     => Plugins::Zvuk::API->getImageUrl($playlist),
+	};
+}
+
+sub _renderEditorialPlaylist {
+	my ($playlist) = @_;
+
+	return {
+		name      => $playlist->{title},
+		line1     => $playlist->{title},
+		line2     => $playlist->{description} || "",
 		type      => 'link',
 		url       => \&handlePlaylist,
 		passthrough => [{ id => $playlist->{id} }],
