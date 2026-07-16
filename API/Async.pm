@@ -1150,13 +1150,13 @@ sub getEditorialPlaylistIds {
 			return;
 		}
 		
-		if (!$data || !$data->{page} || !$data->{page}{data}) {
-			$log->warn("Grid API returned empty data structure");
-			$cb->([]);
-			return;
-		}
-		
-		my $items = $data->{page}{data} || [];
+			if (!$data || !$data->{result} || !$data->{result}{page} || !$data->{result}{page}{data}) {
+				$log->warn("Grid API returned empty data structure");
+				$cb->([]);
+				return;
+			}
+			
+			my $items = $data->{result}{page}{data} || [];
 		$log->debug("Grid API returned " . scalar(@$items) . " items");
 		
 		# Filter only playlists and extract IDs
