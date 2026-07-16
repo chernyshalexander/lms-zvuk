@@ -534,3 +534,15 @@ PLUGIN_ZVUK_ANONYMOUS_ERROR
 PLUGIN_ZVUK_NETWORK_ERROR
 	EN	Network error: [error]
 	RU	Ошибка сети: [error]
+
+PLUGIN_ZVUK_EDITORIAL_PLAYLISTS
+	EN	Editorial Playlists
+	RU	Подборки
+
+PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_ERROR
+	EN	Error loading editorial playlists
+	RU	Ошибка загрузки подборок
+
+PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_EMPTY
+	EN	No editorial playlists available
+	RU	Нет доступных подборок
