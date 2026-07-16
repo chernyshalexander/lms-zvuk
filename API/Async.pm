@@ -307,10 +307,58 @@ sub _getCacheTTL {
 	return Plugins::Zvuk::API::DEFAULT_TTL;
 }
 
-# --- API Methods ---
+	# --- API Methods ---
 
-# Get user profile to validate token and get real userId
-sub getProfile {
+	# Helper method for HTTP GET requests with JSON parsing and error handling
+	sub _http_get {
+		my ($self, $url, $params, $cb) = @_;
+		
+		# Build URL with query parameters
+		if ($params && %$params) {
+			my @param_pairs;
+			foreach my $key (keys %$params) {
+				my $value = $params->{$key};
+				push @param_pairs, "$key=" . ($value // '');
+			}
+			$url .= '?' . join('&', @param_pairs);
+		}
+		
+		$log->debug("HTTP GET: $url");
+		
+		my $http = Slim::Networking::SimpleAsyncHTTP->new(
+			sub {
+				my $response = shift;
+				my $content = $response->content;
+				my $code = $response->code;
+				
+				# Parse JSON response
+				my $data = eval { decode_json($content) };
+				if ($@) {
+					my $error = "JSON parse error: $@";
+					$log->error("HTTP GET $url: $error");
+					$cb->(undef, $error);
+					return;
+				}
+				
+				# Success callback with parsed data
+				$cb->($data, undef);
+			},
+			sub {
+				my ($http, $error) = @_;
+				$log->error("HTTP GET $url failed: $error");
+				$cb->(undef, $error);
+			}
+		);
+		
+		$http->get(
+			$url,
+			'x-auth-token' => Plugins::Zvuk::API->getTokenForUser($self->accountId),
+			'user-agent'   => Plugins::Zvuk::API::USER_AGENT
+		);
+	}
+
+	# Get user profile to validate token and get real userId
+	sub getProfile {
 	my ($class, $cb, $token) = @_;
 
 	my $http = Slim::Networking::SimpleAsyncHTTP->new(
@@ -1079,6 +1127,91 @@ use constant SYNTHESIS_PLAYLIST_IDS => [3, 4, 6, 11, 12, 13, 14, 15];
 sub getSynthesisPlaylists {
 	my ($self, $cb) = @_;
 	$self->getShortPlaylists($cb, SYNTHESIS_PLAYLIST_IDS);
+}
+
+# Get editorial playlist IDs from Zvuk's Tiny API Grid endpoint
+sub getEditorialPlaylistIds {
+	my ($self, $cb) = @_;
+	
+	my $url = "https://zvuk.com/api/tiny/grid/content";
+	my $params = {
+		name => "editorial_playlist",
+		ranker_enabled => "true",
+	};
+	
+	$log->info("Fetching editorial playlist IDs from Grid API");
+	
+	$self->_http_get($url, $params, sub {
+		my ($data, $error) = @_;
+		
+		if ($error) {
+			$log->error("Grid API request failed: $error");
+			$cb->({ error => "Failed to fetch editorial playlists: $error" });
+			return;
+		}
+		
+		if (!$data || !$data->{page} || !$data->{page}{data}) {
+			$log->warn("Grid API returned empty data structure");
+			$cb->([]);
+			return;
+		}
+		
+		my $items = $data->{page}{data} || [];
+		$log->debug("Grid API returned " . scalar(@$items) . " items");
+		
+		# Filter only playlists and extract IDs
+		my @playlist_ids = map { $_->{id} } grep { $_->{type} eq 'playlist' } @$items;
+		
+		$log->info("Found " . scalar(@playlist_ids) . " editorial playlist IDs");
+		$cb->(\@playlist_ids);
+	});
+}
+
+# Get lightweight playlist metadata for editorial playlists
+sub getShortPlaylist {
+	my ($self, $cb, $playlist_ids) = @_;
+	
+	unless ($playlist_ids && @$playlist_ids) {
+		$log->debug("No playlist IDs provided to getShortPlaylist");
+		$cb->([]);
+		return;
+	}
+	
+	my $ids = ref $playlist_ids eq 'ARRAY' ? $playlist_ids : [$playlist_ids];
+	
+	my $gql = q{
+		query getShortPlaylist($ids: [ID!]!) {
+			getPlaylists(ids: $ids) {
+				id
+				title
+				image {
+					src
+				}
+				description
+				trackCount
+				isPublic
+			}
+		}
+	};
+	
+	my $vars = { ids => $ids };
+	
+	$log->info("getShortPlaylist: requesting metadata for " . scalar(@$ids) . " playlists");
+	
+	$self->_graphql(sub {
+		my $data = shift;
+		
+		if ($data->{error}) {
+			$log->error("getShortPlaylist failed: $data->{error}");
+			$cb->([]);
+			return;
+		}
+		
+		my $playlists = $data->{getPlaylists} || [];
+		$log->debug("getShortPlaylist: received metadata for " . scalar(@$playlists) . " playlists");
+		
+		$cb->($playlists);
+	}, 'getShortPlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }
 
 # Get personalized music recommendations (For You, Trending, etc.).
