@@ -1168,51 +1168,50 @@ sub getEditorialPlaylistIds {
 }
 
 # Get lightweight playlist metadata for editorial playlists
-sub getShortPlaylist {
-	my ($self, $cb, $playlist_ids) = @_;
-	
-	unless ($playlist_ids && @$playlist_ids) {
-		$log->debug("No playlist IDs provided to getShortPlaylist");
-		$cb->([]);
-		return;
-	}
-	
-	my $ids = ref $playlist_ids eq 'ARRAY' ? $playlist_ids : [$playlist_ids];
-	
-	my $gql = q{
-		query getShortPlaylist($ids: [ID!]!) {
-			getPlaylists(ids: $ids) {
-				id
-				title
-				image {
-					src
-				}
-				description
-				trackCount
-				isPublic
-			}
-		}
-	};
-	
-	my $vars = { ids => $ids };
-	
-	$log->info("getShortPlaylist: requesting metadata for " . scalar(@$ids) . " playlists");
-	
-	$self->_graphql(sub {
-		my $data = shift;
+	sub getEditorialPlaylistMetadata {
+		my ($self, $cb, $playlist_ids) = @_;
 		
-		if ($data->{error}) {
-			$log->error("getShortPlaylist failed: $data->{error}");
+		unless ($playlist_ids && @$playlist_ids) {
+			$log->debug("No playlist IDs provided to getEditorialPlaylistMetadata");
 			$cb->([]);
 			return;
 		}
 		
-		my $playlists = $data->{getPlaylists} || [];
-		$log->debug("getShortPlaylist: received metadata for " . scalar(@$playlists) . " playlists");
+		my $ids = ref $playlist_ids eq 'ARRAY' ? $playlist_ids : [$playlist_ids];
 		
-		$cb->($playlists);
-	}, 'getShortPlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
-}
+		my $gql = q{
+			query getShortPlaylist($ids: [ID!]!) {
+				getPlaylists(ids: $ids) {
+					id
+					title
+					image {
+						src
+					}
+					description
+					trackCount
+					isPublic
+				}
+			}
+		};
+		
+		my $vars = { ids => $ids };
+		
+		$log->info("getEditorialPlaylistMetadata: requesting metadata for " . scalar(@$ids) . " playlists");
+		
+		$self->_graphql(sub {
+			my $data = shift;
+			
+			if (!$data || $data->{error}) {
+				$cb->($data || { error => 'Unknown error' });
+				return;
+			}
+			
+			my $playlists = $data->{getPlaylists} || [];
+			$log->debug("getEditorialPlaylistMetadata: received metadata for " . scalar(@$playlists) . " playlists");
+			
+			$cb->($playlists);
+		}, 'getShortPlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+	}
 
 # Get personalized music recommendations (For You, Trending, etc.).
 # $args->{page}: optional page number (defaults to 1).
