@@ -351,10 +351,10 @@ sub _getCacheTTL {
 		);
 		
 		$http->get(
-			$url,
-			'x-auth-token' => Plugins::Zvuk::API->getTokenForUser($self->accountId),
-			'user-agent'   => Plugins::Zvuk::API::USER_AGENT
-		);
+				$url,
+				'x-auth-token' => Plugins::Zvuk::API->getToken($self->accountId),
+				'user-agent'   => Plugins::Zvuk::API::USER_AGENT
+			);
 	}
 
 	# Get user profile to validate token and get real userId
