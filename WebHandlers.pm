@@ -454,4 +454,67 @@ sub handleGetAnonymousToken {
 	);
 }
 
+sub handleImageProxy {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $url = $request->uri->query_param('url');
+
+	unless ($url) {
+		$response->code(400);
+		$response->content_type('text/plain');
+		my $err_msg = 'Missing url parameter';
+		$response->content_length(length($err_msg));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$err_msg);
+		return;
+	}
+
+	# Strip size suffix (e.g. _150x150_f or _50x50_o) added by LMS or client
+	# since Zvuk static CDN returns 403 Forbidden for resized filenames,
+	# but returns 200 OK for the original image file.
+	$url =~ s/_\d+x\d+_[a-z](\.[a-z]+)$/$1/i;
+
+	my $client = _clientForWebRequest($request);
+	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
+	my $token = Plugins::Zvuk::API->getToken($account_id);
+
+	my %headers = (
+		'User-Agent' => Plugins::Zvuk::API::USER_AGENT,
+	);
+	if ($token) {
+		$headers{'x-auth-token'} = $token;
+		$headers{'Cookie'} = "auth=$token";
+	}
+
+	require Slim::Networking::SimpleAsyncHTTP;
+	my $http = Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $resp = shift;
+			$log->info("Image proxy: fetched $url successfully, status code: " . $resp->code);
+			$response->code($resp->code);
+			
+			my $content_type = 'image/png';
+			if ($resp->headers) {
+				$content_type = $resp->headers->header('Content-Type') || $content_type;
+			}
+			$response->content_type($content_type);
+			
+			my $content = $resp->content;
+			$response->content_length(length($content));
+			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$content);
+		},
+		sub {
+			my ($http, $error) = @_;
+			$log->error("Image proxy failed for $url: $error");
+			$response->code(500);
+			$response->content_type('text/plain');
+			$response->content_length(length($error));
+			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$error);
+		}
+	);
+
+	$log->debug("Image proxy: fetching $url");
+	$http->get($url, %headers);
+}
+
 1;

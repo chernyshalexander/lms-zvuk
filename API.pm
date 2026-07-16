@@ -84,12 +84,27 @@ sub getImageUrl {
            || '';
 
     if ($src) {
-        # Handle {size} placeholder if present
-        $src =~ s/\{size\}/500x500/g;
-        
-        # Add size parameters if no parameters present
-        if ($src !~ /\?/) {
-            $src .= '?width=500&height=500';
+        # Static files (like /static/avatar/...) require authentication to fetch from Zvuk.
+        # Since the player/browser cannot fetch them directly without cookies/headers,
+        # we route them through our authenticated image proxy.
+        if ($src =~ m{/static/}) {
+            if ($src =~ m{^/}) {
+                $src = 'https://zvuk.com' . $src;
+            }
+            require URI::Escape;
+            $src = '/plugins/zvuk/imageproxy?url=' . URI::Escape::uri_escape($src);
+        }
+        else {
+            if ($src =~ m{^/}) {
+                $src = 'https://zvuk.com' . $src;
+            }
+            # Handle {size} placeholder if present
+            $src =~ s/\{size\}/500x500/g;
+            
+            # Add size parameters if no parameters present
+            if ($src !~ /\?/) {
+                $src .= '?width=500&height=500';
+            }
         }
     }
 

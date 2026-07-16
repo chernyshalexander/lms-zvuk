@@ -77,6 +77,11 @@ sub initPlugin {
 			'plugins/zvuk/getAnonymousToken',
 			\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
 		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/imageproxy',
+			\&Plugins::Zvuk::WebHandlers::handleImageProxy
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -188,12 +193,12 @@ sub _buildRootMenu {
 					},
 				],
 			},
-			{
-				name  => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS'),
-				type  => 'link',
-				image => 'plugins/zvuk/html/images/genres.png',
-				url   => \&handleEditorialPlaylists,
-			},
+				{
+					name  => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS'),
+					type  => 'link',
+					image => 'plugins/zvuk/html/images/playlists.png',
+					url   => \&handleEditorialPlaylists,
+				},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
 				type  => 'link',
@@ -762,9 +767,9 @@ sub handleEditorialPlaylists {
 
 		$log->info("Got " . scalar(@$ids) . " editorial playlist IDs, loading metadata");
 
-		# Step 2: Get lightweight metadata for all playlists
-		$api->getShortPlaylists(sub {
-			my $playlists = shift;
+			# Step 2: Get lightweight metadata for all playlists
+			$api->getEditorialPlaylistMetadata(sub {
+				my $playlists = shift;
 
 			unless ($playlists && @$playlists) {
 				$log->warn("getShortPlaylist returned empty results");
@@ -775,7 +780,6 @@ sub handleEditorialPlaylists {
 			}
 
 			$log->info("Got metadata for " . scalar(@$playlists) . " editorial playlists");
-
 			# Step 3: Render all playlists
 			my @items = map { _renderEditorialPlaylist($_) } @$playlists;
 

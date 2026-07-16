@@ -1146,7 +1146,7 @@ sub getEditorialPlaylistIds {
 		
 		if ($error) {
 			$log->error("Grid API request failed: $error");
-			$cb->({ error => "Failed to fetch editorial playlists: $error" });
+			$cb->(undef, "Failed to fetch editorial playlists: $error");
 			return;
 		}
 		
@@ -1179,20 +1179,19 @@ sub getEditorialPlaylistIds {
 		
 		my $ids = ref $playlist_ids eq 'ARRAY' ? $playlist_ids : [$playlist_ids];
 		
-		my $gql = q{
-			query getShortPlaylist($ids: [ID!]!) {
-				getPlaylists(ids: $ids) {
-					id
-					title
-					image {
-						src
+			my $gql = q{
+				query getShortPlaylist($ids: [ID!]!) {
+					getPlaylists(ids: $ids) {
+						id
+						title
+						image { src }
+						description
+						trackCount
+						isPublic
+						duration
 					}
-					description
-					trackCount
-					isPublic
 				}
-			}
-		};
+			};
 		
 		my $vars = { ids => $ids };
 		
