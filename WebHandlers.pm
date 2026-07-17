@@ -70,8 +70,8 @@ sub handleWaveSettingsWebUI {
 		playerid => ($client ? $client->id : ''),
 	};
 
-	# Use waveSliders.html for AJAX modal content, waveSettings.html for standalone
-	my $template = 'plugins/zvuk/waveSliders.html';
+	# Use waveSliders.html for AJAX modal content, waveSettingsModal.html for standalone
+	my $template = 'plugins/zvuk/waveSettingsModal.html';
 
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
 
@@ -120,12 +120,46 @@ sub handleSaveWaveSettingsWeb {
 		genres   => $data->{genres} && ref $data->{genres} eq 'ARRAY' ? $data->{genres} : [],
 	};
 
-	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
-	$log->info("Wave settings saved from web interface for account $account_id");
+		Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
+		$log->info("Wave settings saved from web interface for account $account_id");
+
+		$response->code(200);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 1 });
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+	}
+
+# Web AJAX handler for getting wave settings for modal initialization
+sub handleGetWaveSettingsWeb {
+	my ($httpClient, $response) = @_;
+
+	require Plugins::Zvuk::WaveSettings;
+	require Slim::Web::HTTP;
+	my $request = $response->request;
+	my $client = _clientForWebRequest($request);
+	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+
+	# Build genres list for JavaScript
+	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+	my @genre_list;
+	my %genre_labels;
+	foreach my $genre (@$genres) {
+		push @genre_list, { name => $genre->{name} };
+		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+	}
+
+	my $response_data = {
+		success => 1,
+		settings => $wave_settings,
+		genres => \@genre_list,
+		genre_labels => \%genre_labels,
+	};
 
 	$response->code(200);
 	$response->content_type('application/json');
-	my $json = encode_json({ success => 1 });
+	my $json = encode_json($response_data);
 	$response->content_length(length($json));
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 }

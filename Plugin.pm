@@ -58,10 +58,15 @@ sub initPlugin {
 			\&Plugins::Zvuk::WebHandlers::handleWaveSettingsWebUI
 		);
 
-		Slim::Web::Pages->addRawFunction(
-			'plugins/zvuk/saveWaveSettings',
-			\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
-		);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/saveWaveSettings',
+				\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
+			);
+
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/getWaveSettings',
+				\&Plugins::Zvuk::WebHandlers::handleGetWaveSettingsWeb
+			);
 
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/saveOAuthToken',

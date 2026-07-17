@@ -209,11 +209,27 @@ sub _getWaveMenuItems {
 		url  => 'zvuk://wave',
 	};
 
-	push @items, {
-		name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-		type  => 'link',
-		url   => \&handleWaveSettingsRouter,
-	};
+		# Detect client type and return appropriate item directly
+		my $isWeb = $client && Slim::Utils::Misc::isWebBrowser($client);
+		my $canWeblink = $client && Slim::Utils::Misc::canFollowWeblinks($client);
+		
+		if ($canWeblink) {
+			# For Web/Material UI: direct weblink to wave settings page
+			push @items, {
+				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+				type    => 'link',
+				weblink => '/plugins/zvuk/waveSettings?player=' . ($client ? $client->id : ''),
+				image   => 'plugins/zvuk/html/images/playlists.png',
+			};
+		} else {
+			# For Jive/SqueezePlay: link to router that shows native UI
+			push @items, {
+				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+				type  => 'link',
+				url   => \&handleWaveSettingsRouter,
+				jive  => { actions => { go => { player => 0, cmd => ['zvuk', 'wavecontrols'] } } },
+			};
+		}
 
 	return \@items;
 }
