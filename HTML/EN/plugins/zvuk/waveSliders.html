@@ -798,9 +798,10 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 			return response.json();
 		})
 		.then(function(data) {
-			console.log('[zvuk] parsed data=', data); closeWaveSliderModal();
+			console.log('[zvuk] parsed data=', data);
 			if (data.success) {
 				closeWaveSliderModal();
+				showMessage('Settings saved successfully', 'success');
 			} else {
 				showMessage('Error: ' + (data.error || 'Unknown error'), 'error');
 			}
@@ -836,8 +837,24 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 
 	if (document.readyState === 'interactive' || document.readyState === 'complete') {
 		initialRender();
-	} else {
-		document.addEventListener('DOMContentLoaded', initialRender);
+		} else {
+			document.addEventListener('DOMContentLoaded', initialRender);
+		}
+	})();
+
+	// Close modal function for standalone and iframe mode
+	function closeWaveSliderModal() {
+		// Check if we're in an iframe (Material modal mode)
+		if (window.parent && window.parent !== window) {
+			// In iframe mode - Material controls the modal, just notify parent
+			// Material will handle closing the iframe dialog
+			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
+			return;
+		}
+		// Standalone mode - find and hide modal manually
+		var modal = document.getElementById('waveSliderModal');
+		if (modal) {
+			modal.style.display = 'none';
+		}
 	}
-})();
 </script>

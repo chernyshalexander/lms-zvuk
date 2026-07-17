@@ -264,12 +264,12 @@ sub handleWaveSettingsRouter {
 	$log->info("=== End Router Decision ===");
 
 		if ($useWebUI) {
-			# For Web/Material UI: Provide direct link to wave settings web page
+			# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
 			$callback->([{
-				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type  => 'link',
-				url   => 'plugins/zvuk/waveSettings',
-				image => 'plugins/zvuk/html/images/playlists.png',
+				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+				type    => 'link',
+				weblink => '/plugins/zvuk/waveSettings?player=' . ($client ? $client->id : ''),
+				image   => 'plugins/zvuk/html/images/playlists.png',
 			}]);
 		} else {
 		# For Jive/SqueezePlay: show standard list settings
