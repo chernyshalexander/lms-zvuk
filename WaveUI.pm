@@ -263,15 +263,15 @@ sub handleWaveSettingsRouter {
 	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
 	$log->info("=== End Router Decision ===");
 
-	if ($useWebUI) {
-		# For Web/Material UI: Settings not available in OPML menu
-		# Web UI users should use "Open Settings" button on plugin settings page
-		# to access the slider-based settings form (waveSliders.html)
-		$callback->([{
-			name => cstring($client, 'PLUGIN_ZVUK_SETTINGS_IN_PLUGIN_PAGE'),
-			type => 'text'
-		}]);
-	} else {
+		if ($useWebUI) {
+			# For Web/Material UI: Provide direct link to wave settings web page
+			$callback->([{
+				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+				type  => 'link',
+				url   => 'plugins/zvuk/waveSettings',
+				image => 'plugins/zvuk/html/images/playlists.png',
+			}]);
+		} else {
 		# For Jive/SqueezePlay: show standard list settings
 		handleWaveSettings($client, $callback, $args);
 	}
