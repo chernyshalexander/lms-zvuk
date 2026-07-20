@@ -546,3 +546,20 @@ PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_ERROR
 PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_EMPTY
 	EN	No editorial playlists available
 	RU	Нет доступных подборок
+
+PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE
+	EN	Wave Settings Mode in Material UI
+	RU	Режим открытия настроек волны в Material UI
+
+PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_DESC
+	EN	Choose whether the settings slider panel should open in a modal overlay dialog or in a new browser tab.
+	RU	Выберите, открывать ли панель настроек волны в модальном окне поверх страницы или во вкладке браузера.
+
+PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_IFRAME
+	EN	Modal Dialog (Iframe)
+	RU	Модальное окно (Iframe)
+
+PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_TAB
+	EN	New Browser Tab
+	RU	Новая вкладка браузера
+

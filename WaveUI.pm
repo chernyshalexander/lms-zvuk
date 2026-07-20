@@ -215,10 +215,12 @@ sub _getWaveMenuItems {
 		
 		if ($canWeblink) {
 			# For Web/Material UI: direct link to standalone wave settings page
+			my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
+			my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
 			push @items, {
 				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 				type    => 'link',
-				weblink => '/plugins/zvuk/waveStandalone?player=' . ($client ? $client->id : ''),
+				weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
 				image   => 'plugins/zvuk/html/images/playlists.png',
 			};
 		} else {
@@ -281,10 +283,12 @@ sub handleWaveSettingsRouter {
 
 		if ($useWebUI) {
 			# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
+			my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
+			my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
 			$callback->([{
 				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 				type    => 'link',
-				weblink => '/plugins/zvuk/waveStandalone.html?player=' . ($client ? $client->id : ''),
+				weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
 				image   => 'plugins/zvuk/html/images/playlists.png',
 			}]);
 		} else {

@@ -200,6 +200,13 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 	<input type="checkbox" name="pref_gigamix_autoplay" id="pref_gigamix_autoplay" class="stdedit" [% IF prefs.gigamix_autoplay %]checked[% END %]>
 [% END %]
 
+[% WRAPPER setting title="PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE" desc="PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_DESC" %]
+	<select name="pref_material_settings_mode" id="pref_material_settings_mode" class="stdedit">
+		<option value="iframe" [% IF prefs.material_settings_mode == 'iframe' || !prefs.material_settings_mode %]selected[% END %]>[% "PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_IFRAME" | string %]</option>
+		<option value="tab" [% IF prefs.material_settings_mode == 'tab' %]selected[% END %]>[% "PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_TAB" | string %]</option>
+	</select>
+[% END %]
+
 <!-- OAuth Authentication Section -->
 <div style="margin-top:20px; padding:15px; background-color:#f0f0f0; border-radius:4px; border-left:4px solid #b8a6db;">
 	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</div>

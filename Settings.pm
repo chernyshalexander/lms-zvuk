@@ -23,7 +23,7 @@ sub page {
 }
 
 sub prefs {
-	return ($prefs, qw(quality gigamix_autoplay));
+	return ($prefs, qw(quality gigamix_autoplay material_settings_mode));
 }
 
 sub handler {

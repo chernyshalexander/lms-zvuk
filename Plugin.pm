@@ -42,9 +42,10 @@ sub initPlugin {
 	$log->info("Initializing Zvuk plugin...");
 
 	$prefs->init({
-		accounts           => {},
-		quality            => 'high',
-		gigamix_autoplay   => 0,
+		accounts               => {},
+		quality                => 'high',
+		gigamix_autoplay       => 0,
+		material_settings_mode => 'iframe',
 	});
 
 	Plugins::Zvuk::ProtocolHandler->register();
