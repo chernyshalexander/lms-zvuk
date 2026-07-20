@@ -26,6 +26,8 @@ use constant GENRES => [
     { name => 'hip_hop', label => 'PLUGIN_ZVUK_GENRE_HIP_HOP' },
     { name => 'indie', label => 'PLUGIN_ZVUK_GENRE_INDIE' },
     { name => 'instrumental_acoustic', label => 'PLUGIN_ZVUK_GENRE_INSTRUMENTAL' },
+    { name => 'jazz', label => 'PLUGIN_ZVUK_GENRE_JAZZ' },
+    { name => 'latin', label => 'PLUGIN_ZVUK_GENRE_LATIN' },
     { name => 'metal', label => 'PLUGIN_ZVUK_GENRE_METAL' },
     { name => 'pop', label => 'PLUGIN_ZVUK_GENRE_POP' },
     { name => 'rock', label => 'PLUGIN_ZVUK_GENRE_ROCK' },

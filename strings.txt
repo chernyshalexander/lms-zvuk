@@ -230,6 +230,14 @@ PLUGIN_ZVUK_GENRE_INSTRUMENTAL
 	EN	Instrumental / Acoustic
 	RU	Инструментальная / Акустика
 
+PLUGIN_ZVUK_GENRE_JAZZ
+	EN	Jazz
+	RU	Джаз
+
+PLUGIN_ZVUK_GENRE_LATIN
+	EN	Latin
+	RU	Латиноамериканская
+
 PLUGIN_ZVUK_GENRE_METAL
 	EN	Metal
 	RU	Метал
