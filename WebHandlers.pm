@@ -10,6 +10,7 @@ use URI::QueryParam;
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::Strings;
+use Encode qw(decode_utf8 encode_utf8);
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::WaveSettings;
@@ -58,14 +59,29 @@ sub handleWaveSettingsWebUI {
 	my %genre_labels;
 	foreach my $genre (@$genres) {
 		push @genre_list, { name => $genre->{name} };
-		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+		my $label = Slim::Utils::Strings::string($genre->{label});
+		$label = decode_utf8($label) unless Encode::is_utf8($label);
+		$genre_labels{$genre->{name}} = $label;
 	}
+
+	# Filter/sanitize genres list in selected genres too
+	my @valid_genres;
+	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
+		foreach my $g (@{$wave_settings->{genres}}) {
+			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
+				push @valid_genres, $g;
+			}
+		}
+	}
+	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
+
+	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
 
 	my $vars = {
 		wave_settings => $wave_settings,
-		genres_json => encode_json(\@genre_list),
-		genres_labels_json => encode_json(\%genre_labels),
-		selected_genres_json => encode_json($wave_settings->{genres} || []),
+		genres_json => $json_encoder->encode(\@genre_list),
+		genres_labels_json => $json_encoder->encode(\%genre_labels),
+		selected_genres_json => $json_encoder->encode($selected_genres),
 		webroot => '/html/',
 		playerid => ($client ? $client->id : ''),
 	};
@@ -74,11 +90,12 @@ sub handleWaveSettingsWebUI {
 	my $template = 'plugins/zvuk/waveSliders.html';
 
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
+	my $output_bytes = encode_utf8($$output_ref);
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
-	$response->content_length(length($$output_ref));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
+	$response->content_length(length($output_bytes));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
 }
 
 # Web UI handler for standalone wave settings page (from menu)
@@ -98,14 +115,29 @@ sub handleWaveSettingsStandalone {
 	my %genre_labels;
 	foreach my $genre (@$genres) {
 		push @genre_list, { name => $genre->{name} };
-		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+		my $label = Slim::Utils::Strings::string($genre->{label});
+		$label = decode_utf8($label) unless Encode::is_utf8($label);
+		$genre_labels{$genre->{name}} = $label;
 	}
+
+	# Filter/sanitize genres list in selected genres too
+	my @valid_genres;
+	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
+		foreach my $g (@{$wave_settings->{genres}}) {
+			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
+				push @valid_genres, $g;
+			}
+		}
+	}
+	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
+
+	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
 
 	my $vars = {
 		wave_settings => $wave_settings,
-		genres_json => encode_json(\@genre_list),
-		genres_labels_json => encode_json(\%genre_labels),
-		selected_genres_json => encode_json($wave_settings->{genres} || []),
+		genres_json => $json_encoder->encode(\@genre_list),
+		genres_labels_json => $json_encoder->encode(\%genre_labels),
+		selected_genres_json => $json_encoder->encode($selected_genres),
 		webroot => '/html/',
 		playerid => ($client ? $client->id : ''),
 	};
@@ -114,11 +146,12 @@ sub handleWaveSettingsStandalone {
 	my $template = 'plugins/zvuk/waveStandalone.html';
 
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
+	my $output_bytes = encode_utf8($$output_ref);
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
-	$response->content_length(length($$output_ref));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
+	$response->content_length(length($output_bytes));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
 }
 
 # Web AJAX handler for saving wave settings from web interface

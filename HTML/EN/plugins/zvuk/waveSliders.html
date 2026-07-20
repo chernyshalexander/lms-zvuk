@@ -849,12 +849,42 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 			// In iframe mode - Material controls the modal, just notify parent
 			// Material will handle closing the iframe dialog
 			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
+			try {
+				var dialog = window.parent.document.querySelector('.v-dialog--active')
+				          || window.parent.document.querySelector('.v-dialog');
+				if (dialog) {
+					var buttons = dialog.querySelectorAll('button');
+					for (var i = 0; i < buttons.length; i++) {
+						var btn = buttons[i];
+						var txt = (btn.textContent || btn.innerText || '').toLowerCase();
+						if (txt.indexOf('close') !== -1 || txt.indexOf('clear') !== -1 || btn.querySelector('.v-icon')) {
+							btn.click();
+							return;
+						}
+					}
+					if (buttons.length > 0) {
+						buttons[0].click();
+						return;
+					}
+				}
+			} catch (e) {
+				console.error('[zvuk] Failed to close parent dialog:', e);
+			}
 			return;
 		}
 		// Standalone mode - find and hide modal manually
 		var modal = document.getElementById('waveSliderModal');
 		if (modal) {
 			modal.style.display = 'none';
+		}
+		try {
+			if (window.history.length > 1) {
+				window.history.back();
+			} else {
+				window.close();
+			}
+		} catch (e) {
+			console.error('[zvuk] Failed to navigate back/close:', e);
 		}
 	}
 </script>

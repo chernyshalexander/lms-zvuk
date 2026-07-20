@@ -284,7 +284,7 @@ sub handleWaveSettingsRouter {
 			$callback->([{
 				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 				type    => 'link',
-				weblink => '/plugins/zvuk/waveSettings?player=' . ($client ? $client->id : ''),
+				weblink => '/plugins/zvuk/waveStandalone?player=' . ($client ? $client->id : ''),
 				image   => 'plugins/zvuk/html/images/playlists.png',
 			}]);
 		} else {

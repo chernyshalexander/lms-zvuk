@@ -63,8 +63,6 @@ html.zvuk-dark-theme .wave-modal-header h2 { color: #eee; }
 html.zvuk-dark-theme .wave-modal-close { color: #aaa; }
 html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 </style>
-<!-- Include wave sliders styles -->
-[% PROCESS plugins/zvuk/waveSliders.html %]
 </head>
 <body>
 <!-- Wave Sliders Modal -->
@@ -75,8 +73,7 @@ html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 			<button type="button" onclick="closeWaveSliderModal()" class="wave-modal-close">&times;</button>
 		</div>
 		<div id="waveSliderContent" class="wave-modal-content">
-			<!-- wave sliders content from waveSliders.html -->
-			<div class="wave-settings-container"></div>
+[% PROCESS plugins/zvuk/waveSliders.html %]
 		</div>
 	</div>
 </div>
@@ -134,39 +131,74 @@ html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 			modal.style.display = 'block';
 		}
 
-		// Move wave sliders content to the modal content area
-		var waveContainer = document.querySelector('.wave-settings-container');
-		var contentArea = document.getElementById('waveSliderContent');
-		if (waveContainer && contentArea) {
-			contentArea.innerHTML = '';
-			contentArea.appendChild(waveContainer);
+		// (waveSliders.html is processed directly inside waveSliderContent)
+	}
+
+	function closeParentDialog() {
+		if (window.parent && window.parent !== window) {
+			try {
+				var dialog = window.parent.document.querySelector('.v-dialog--active')
+				          || window.parent.document.querySelector('.v-dialog');
+				if (dialog) {
+					var buttons = dialog.querySelectorAll('button');
+					for (var i = 0; i < buttons.length; i++) {
+						var btn = buttons[i];
+						var txt = (btn.textContent || btn.innerText || '').toLowerCase();
+						if (txt.indexOf('close') !== -1 || txt.indexOf('clear') !== -1 || btn.querySelector('.v-icon')) {
+							btn.click();
+							return true;
+						}
+					}
+					if (buttons.length > 0) {
+						buttons[0].click();
+						return true;
+					}
+				}
+			} catch (e) {
+				console.error('[zvuk] Failed to close parent dialog:', e);
+			}
 		}
+		return false;
 	}
 
 	// Override close function for standalone mode
 	window.closeWaveSliderModal = function() {
-		// In iframe mode (Material UI), parent controls closing
-		if (window.parent && window.parent !== window) {
-			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
+		if (closeParentDialog()) {
 			return;
 		}
-		// Standalone mode - hide modal
+		// Standalone mode - hide modal and go back/close
 		var modal = document.getElementById('waveSliderModal');
 		if (modal) {
 			modal.style.display = 'none';
+		}
+		try {
+			if (window.history.length > 1) {
+				window.history.back();
+			} else {
+				window.close();
+			}
+		} catch (e) {
+			console.error('[zvuk] Failed to navigate back/close:', e);
 		}
 	};
 
 	function closeModal() {
-		// For iframe mode - let parent handle closing
-		if (window.parent && window.parent !== window) {
-			console.log('[zvuk] Requesting parent to close modal');
+		if (closeParentDialog()) {
 			return;
 		}
-		// For standalone mode - hide modal
+		// For standalone mode - hide modal and go back/close
 		var modal = document.getElementById('waveSliderModal');
 		if (modal) {
 			modal.style.display = 'none';
+		}
+		try {
+			if (window.history.length > 1) {
+				window.history.back();
+			} else {
+				window.close();
+			}
+		} catch (e) {
+			console.error('[zvuk] Failed to navigate back/close:', e);
 		}
 	}
 
@@ -181,7 +213,7 @@ html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 	if (document.readyState === 'interactive' || document.readyState === 'complete') {
 		initializeStandalone();
 	} else {
-		document.addEventListener('DOMContentLoaded', initializeStandalone());
+		document.addEventListener('DOMContentLoaded', initializeStandalone);
 	}
 })();
 </script>
