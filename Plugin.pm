@@ -64,6 +64,11 @@ sub initPlugin {
 			);
 
 			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/waveStandalone.html',
+				\&Plugins::Zvuk::WebHandlers::handleWaveSettingsStandalone
+			);
+
+			Slim::Web::Pages->addRawFunction(
 				'plugins/zvuk/saveWaveSettings',
 				\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
 			);
