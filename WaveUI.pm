@@ -244,7 +244,6 @@ sub _getWaveMenuItems {
 				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 				type  => 'link',
 				url   => \&handleWaveSettingsRouter,
-				jive  => { actions => { go => { player => 0, cmd => ['zvuk', 'wavecontrols'] } } },
 			};
 		}
 
