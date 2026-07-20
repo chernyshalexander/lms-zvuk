@@ -61,6 +61,7 @@ html.zvuk-dark-theme .wave-modal-header { border-bottom-color: #444; }
 html.zvuk-dark-theme .wave-modal-header h2 { color: #eee; }
 html.zvuk-dark-theme .wave-modal-close { color: #aaa; }
 html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
+html.zvuk-dark-theme hr.settings-divider { border-top-color: #444; }
 </style>
 
 <!-- Wave Sliders Modal -->
@@ -200,6 +201,8 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_ANONYMOUS_BUTTON" | string %]</button>
 	<div id="anonStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
 [% END %]
+
+<hr class="settings-divider" style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
 
 [% WRAPPER setting title="PLUGIN_ZVUK_QUALITY" desc="PLUGIN_ZVUK_QUALITY_DESC" %]
 	<select name="pref_quality" id="pref_quality" class="stdedit">
