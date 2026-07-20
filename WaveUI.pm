@@ -201,7 +201,7 @@ sub handleSlider {
 }
 
 sub _getWaveMenuItems {
-	my ($client) = @_;
+	my ($client, $args) = @_;
 	my @items;
 
 	push @items, {
@@ -211,10 +211,24 @@ sub _getWaveMenuItems {
 	};
 
 		# Detect client type and return appropriate item directly
-		my $isWeb = $client && Slim::Utils::Misc::isWebBrowser($client);
-		my $canWeblink = $client && Slim::Utils::Misc::canFollowWeblinks($client);
+		my $isWeb = $args && $args->{isWeb} ? 1 : 0;
+		my $isControl = $args && defined $args->{isControl} ? $args->{isControl} : undef;
 		
-		if ($canWeblink) {
+		# Fallback to canFollowWeblinks for compatibility if we have no args
+		my $useWebUI = 0;
+		if ($args) {
+			if ($isWeb) {
+				$useWebUI = 1;
+			} elsif (!defined $isControl) {
+				$useWebUI = 1;
+			} elsif ($isControl && (!defined $args->{quantity} || $args->{quantity} > 5000)) {
+				$useWebUI = 1;
+			}
+		} else {
+			$useWebUI = $client && Slim::Utils::Misc::canFollowWeblinks($client);
+		}
+		
+		if ($useWebUI) {
 			# For Web/Material UI: direct link to standalone wave settings page
 			my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
 			my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
@@ -228,7 +242,7 @@ sub _getWaveMenuItems {
 			# For Jive/SqueezePlay: link to router that shows native UI
 			push @items, {
 				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type  => 'replace',
+				type  => 'link',
 				url   => \&handleWaveSettingsRouter,
 				jive  => { actions => { go => { player => 0, cmd => ['zvuk', 'wavecontrols'] } } },
 			};

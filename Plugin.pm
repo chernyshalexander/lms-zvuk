@@ -161,11 +161,11 @@ sub handleFeed {
 		return;
 	}
 
-	_buildRootMenu($client, $cb);
+	_buildRootMenu($client, $cb, $args);
 }
 
 sub _buildRootMenu {
-	my ($client, $cb) = @_;
+	my ($client, $cb, $args) = @_;
 
 	my @items = (
 		{
@@ -183,7 +183,7 @@ sub _buildRootMenu {
 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
 			type  => 'link',
 			image => 'plugins/zvuk/html/images/radio.png',
-			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client),
+			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client, $args),
 		},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
