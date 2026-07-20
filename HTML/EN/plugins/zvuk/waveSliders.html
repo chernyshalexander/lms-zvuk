@@ -842,29 +842,77 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 		}
 	})();
 
+	function triggerClickSequence(btn) {
+		if (!btn) return;
+		console.log('[zvuk] Simulating click sequence on button:', btn);
+		try {
+			var downEvent = new MouseEvent('mousedown', {
+				bubbles: true,
+				cancelable: true,
+				view: window.parent || window
+			});
+			btn.dispatchEvent(downEvent);
+
+			var upEvent = new MouseEvent('mouseup', {
+				bubbles: true,
+				cancelable: true,
+				view: window.parent || window
+			});
+			btn.dispatchEvent(upEvent);
+
+			var clickEvent = new MouseEvent('click', {
+				bubbles: true,
+				cancelable: true,
+				view: window.parent || window
+			});
+			btn.dispatchEvent(clickEvent);
+		} catch (e) {
+			console.error('[zvuk] Failed to dispatch MouseEvents, falling back to click()', e);
+			if (typeof btn.click === 'function') {
+				btn.click();
+			}
+		}
+	}
+
 	// Close modal function for standalone and iframe mode
 	function closeWaveSliderModal() {
 		// Check if we're in an iframe (Material modal mode)
 		if (window.parent && window.parent !== window) {
-			// In iframe mode - Material controls the modal, just notify parent
-			// Material will handle closing the iframe dialog
 			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
 			try {
-				var dialog = window.parent.document.querySelector('.v-dialog--active')
-				          || window.parent.document.querySelector('.v-dialog');
-				if (dialog) {
-					var buttons = dialog.querySelectorAll('button');
+				var parentDoc = window.parent.document;
+				var dialogs = parentDoc.querySelectorAll('.v-dialog__content--active, .v-dialog--active, .v-dialog, [role="dialog"], .dialog, .modal');
+				for (var d = 0; d < dialogs.length; d++) {
+					var dialog = dialogs[d];
+					if (dialog.offsetWidth === 0 && dialog.offsetHeight === 0) {
+						continue;
+					}
+					var buttons = dialog.querySelectorAll('button, a, [role="button"]');
 					for (var i = 0; i < buttons.length; i++) {
 						var btn = buttons[i];
-						var txt = (btn.textContent || btn.innerText || '').toLowerCase();
-						if (txt.indexOf('close') !== -1 || txt.indexOf('clear') !== -1 || btn.querySelector('.v-icon')) {
-							btn.click();
+						var txt = (btn.textContent || btn.innerText || '').toLowerCase().trim();
+						var title = (btn.getAttribute('title') || '').toLowerCase();
+						var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+						var cls = (btn.className || '').toLowerCase();
+						if (txt.indexOf('close') !== -1 || txt.indexOf('clear') !== -1 || txt.indexOf('cancel') !== -1 || 
+						    txt.indexOf('закрыть') !== -1 || txt.indexOf('отмена') !== -1 || txt === 'x' || txt === '×' ||
+						    title.indexOf('close') !== -1 || title.indexOf('clear') !== -1 || title.indexOf('cancel') !== -1 || title.indexOf('закрыть') !== -1 ||
+						    aria.indexOf('close') !== -1 || aria.indexOf('clear') !== -1 || aria.indexOf('cancel') !== -1 || aria.indexOf('закрыть') !== -1 ||
+						    cls.indexOf('close') !== -1 || cls.indexOf('clear') !== -1 || cls.indexOf('cancel') !== -1 ||
+						    btn.querySelector('.v-icon') || btn.querySelector('i') || btn.querySelector('span')) {
+							triggerClickSequence(btn);
 							return;
 						}
 					}
-					if (buttons.length > 0) {
-						buttons[0].click();
-						return;
+				}
+				for (var d = 0; d < dialogs.length; d++) {
+					var dialog = dialogs[d];
+					if (dialog.offsetWidth > 0 || dialog.offsetHeight > 0) {
+						var buttons = dialog.querySelectorAll('button');
+						if (buttons.length > 0) {
+							triggerClickSequence(buttons[0]);
+							return;
+						}
 					}
 				}
 			} catch (e) {
