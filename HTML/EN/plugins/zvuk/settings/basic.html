@@ -188,6 +188,19 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 	</div>
 [% END %]
 
+[% WRAPPER setting title="PLUGIN_ZVUK_OAUTH_TITLE" desc="PLUGIN_ZVUK_OAUTH_DESC" %]
+	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
+	<div id="oauthStatus" style="margin:10px 0; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
+	<div class="prefDesc" style="margin-top:10px; font-size:11px; max-width: 600px;">
+		[% "PLUGIN_ZVUK_OAUTH_INSTRUCTIONS" | string %]
+	</div>
+[% END %]
+
+[% WRAPPER setting title="PLUGIN_ZVUK_ANONYMOUS_TITLE" desc="PLUGIN_ZVUK_ANONYMOUS_DESC" %]
+	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_ANONYMOUS_BUTTON" | string %]</button>
+	<div id="anonStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
+[% END %]
+
 [% WRAPPER setting title="PLUGIN_ZVUK_QUALITY" desc="PLUGIN_ZVUK_QUALITY_DESC" %]
 	<select name="pref_quality" id="pref_quality" class="stdedit">
 		<option value="mid" [% IF prefs.quality == 'mid' %]selected[% END %]>[% "PLUGIN_ZVUK_QUALITY_MID" | string %]</option>
@@ -207,34 +220,9 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 	</select>
 [% END %]
 
-<!-- OAuth Authentication Section -->
-<div style="margin-top:20px; padding:15px; background-color:#f0f0f0; border-radius:4px; border-left:4px solid #b8a6db;">
-	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:12px;">[% "PLUGIN_ZVUK_OAUTH_DESC" | string %]</div>
-
-	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton" style="margin-bottom:15px;">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
-	<div id="oauthStatus" style="margin:10px 0; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
-
-	<div style="font-size:11px; color:#666; margin-top:10px; padding:8px; background-color:#fff; border-radius:4px; border:1px solid #ddd;">
-		[% "PLUGIN_ZVUK_OAUTH_INSTRUCTIONS" | string %]
-	</div>
-</div>
-
-<!-- Anonymous Access Section -->
-<div style="margin-top:12px; padding:15px; background-color:#f9f9f9; border-radius:4px; border-left:4px solid #aaa;">
-	<div style="font-weight:bold; margin-bottom:6px;">[% "PLUGIN_ZVUK_ANONYMOUS_TITLE" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:12px;">
-		[% "PLUGIN_ZVUK_ANONYMOUS_DESC" | string %]
-	</div>
-	<button type="button" onclick="getAnonymousToken(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_ANONYMOUS_BUTTON" | string %]</button>
-	<div id="anonStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
-</div>
-
-<div style="margin-top:20px; padding:10px; background-color:#f9f9f9; border-radius:4px;">
-	<div style="font-weight:bold; margin-bottom:8px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</div>
-	<div style="font-size:12px; color:#666; margin-bottom:10px;">[% "PLUGIN_ZVUK_WAVE_SLIDERS_DESC" | string %]</div>
+[% WRAPPER setting title="PLUGIN_ZVUK_WAVE_SLIDERS" desc="PLUGIN_ZVUK_WAVE_SLIDERS_DESC" %]
 	<button type="button" onclick="openWaveSliderModal(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OPEN_SLIDERS" | string %]</button>
-</div>
+[% END %]
 
 <script>
 var zvukCallbackUrl = window.location.protocol + '//' + window.location.host + '/plugins/zvuk/saveOAuthToken';
