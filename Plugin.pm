@@ -53,35 +53,35 @@ sub initPlugin {
 		Plugins::Zvuk::Settings->new();
 
 			# Register web routes for AJAX and web pages
-				Slim::Web::Pages->addRawFunction(
-					'plugins/zvuk/waveSettings',
-					\&Plugins::Zvuk::WebHandlers::handleWaveSettingsWebUI
-				);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/waveSettings',
+				\&Plugins::Zvuk::WebHandlers::handleWaveSettingsWebUI
+			);
 
-				Slim::Web::Pages->addRawFunction(
-					'plugins/zvuk/waveStandalone',
-					\&Plugins::Zvuk::WebHandlers::handleWaveSettingsStandalone
-				);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/waveStandalone',
+				\&Plugins::Zvuk::WebHandlers::handleWaveSettingsStandalone
+			);
 
-				Slim::Web::Pages->addRawFunction(
-					'plugins/zvuk/saveWaveSettings',
-					\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
-				);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/saveWaveSettings',
+				\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
+			);
 
-		Slim::Web::Pages->addRawFunction(
-			'plugins/zvuk/saveOAuthToken',
-			\&Plugins::Zvuk::WebHandlers::handleSaveOAuthToken
-		);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/saveOAuthToken',
+				\&Plugins::Zvuk::WebHandlers::handleSaveOAuthToken
+			);
 
-		Slim::Web::Pages->addRawFunction(
-			'plugins/zvuk/oauthCallback',
-			\&Plugins::Zvuk::WebHandlers::handleOAuthCallback
-		);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/oauthCallback',
+				\&Plugins::Zvuk::WebHandlers::handleOAuthCallback
+			);
 
-		Slim::Web::Pages->addRawFunction(
-			'plugins/zvuk/getAnonymousToken',
-			\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
-		);
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/getAnonymousToken',
+				\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
+			);
 
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/imageproxy',
