@@ -6,6 +6,7 @@ use utf8;
 
 use Slim::Utils::Log;
 use Slim::Utils::Strings qw(cstring);
+use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::WaveSettings;
 
