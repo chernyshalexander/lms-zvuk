@@ -52,6 +52,46 @@ sub handleWaveSettingsWebUI {
 	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 
+		# Build genres list for JavaScript
+		my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+		my @genre_list;
+		my %genre_labels;
+		foreach my $genre (@$genres) {
+			push @genre_list, { name => $genre->{name} };
+			$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+		}
+
+		my $vars = {
+			wave_settings => $wave_settings,
+			genres_json => encode_json(\@genre_list),
+			genres_labels_json => encode_json(\%genre_labels),
+			selected_genres_json => encode_json($wave_settings->{genres} || []),
+			webroot => '/html/',
+			playerid => ($client ? $client->id : ''),
+		};
+
+		# Use waveSliders.html for settings page integration
+		my $template = 'plugins/zvuk/waveSliders.html';
+
+		my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
+
+		$response->code(200);
+		$response->content_type('text/html; charset=utf-8');
+		$response->content_length(length($$output_ref));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
+}
+
+# Web UI handler for standalone wave settings page (from menu)
+sub handleWaveSettingsStandalone {
+	my ($httpClient, $response) = @_;
+
+	require Plugins::Zvuk::WaveSettings;
+	require Slim::Web::HTTP;
+	my $request = $response->request;
+	my $client = _clientForWebRequest($request);
+	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
+	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
+
 	# Build genres list for JavaScript
 	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
 	my @genre_list;
@@ -70,13 +110,16 @@ sub handleWaveSettingsWebUI {
 		playerid => ($client ? $client->id : ''),
 	};
 
-	# Use waveSliders.html for AJAX modal content, waveSettingsModal.html for standalone
-	my $template = 'plugins/zvuk/waveSettingsModal.html';
+	# Use waveStandalone.html for menu access
+	my $template = 'plugins/zvuk/waveStandalone.html';
 
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
+	$response->content_length(length($$output_ref));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
+}
 	$response->content_length(length($$output_ref));
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, $output_ref);
 }

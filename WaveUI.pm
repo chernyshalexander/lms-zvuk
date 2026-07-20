@@ -214,11 +214,11 @@ sub _getWaveMenuItems {
 		my $canWeblink = $client && Slim::Utils::Misc::canFollowWeblinks($client);
 		
 		if ($canWeblink) {
-			# For Web/Material UI: direct weblink to wave settings page
+			# For Web/Material UI: direct link to standalone wave settings page
 			push @items, {
 				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 				type    => 'link',
-				weblink => '/plugins/zvuk/waveSettings?player=' . ($client ? $client->id : ''),
+				weblink => '/plugins/zvuk/waveStandalone?player=' . ($client ? $client->id : ''),
 				image   => 'plugins/zvuk/html/images/playlists.png',
 			};
 		} else {

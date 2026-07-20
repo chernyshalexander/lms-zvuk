@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</title>
+<style>
+/* ================================================================
+   MODAL STYLES (from basic.html)
+   ================================================================ */
+.wave-modal-overlay {
+	display: none;
+	position: fixed;
+	top: 0; left: 0;
+	width: 100%; height: 100%;
+	background: rgba(0,0,0,0.5);
+	z-index: 1000;
+}
+
+.wave-modal-box {
+	position: absolute;
+	top: 50%; left: 50%;
+	transform: translate(-50%,-50%);
+	background: white;
+	border-radius: 8px;
+	max-width: 600px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.wave-modal-header {
+	padding: 20px;
+	border-bottom: 1px solid #ddd;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.wave-modal-header h2 {
+	margin: 0;
+	color: #222;
+	font-weight: bold;
+	font-size: 18px;
+}
+
+.wave-modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #999;
+}
+
+.wave-modal-content { padding: 20px; }
+
+/* Dark theme */
+html.zvuk-dark-theme .wave-modal-overlay { background: rgba(0,0,0,0.65); }
+html.zvuk-dark-theme .wave-modal-box { background: #2d2d2d; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+html.zvuk-dark-theme .wave-modal-header { border-bottom-color: #444; }
+html.zvuk-dark-theme .wave-modal-header h2 { color: #eee; }
+html.zvuk-dark-theme .wave-modal-close { color: #aaa; }
+html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
+</style>
+<!-- Include wave sliders styles -->
+[% PROCESS plugins/zvuk/waveSliders.html %]
+</head>
+<body>
+<!-- Wave Sliders Modal -->
+<div id="waveSliderModal" class="wave-modal-overlay">
+	<div id="waveSliderBox" class="wave-modal-box">
+		<div class="wave-modal-header">
+			<h2>[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]</h2>
+			<button type="button" onclick="closeWaveSliderModal()" class="wave-modal-close">&times;</button>
+		</div>
+		<div id="waveSliderContent" class="wave-modal-content">
+			<!-- wave sliders content from waveSliders.html -->
+			<div class="wave-settings-container"></div>
+		</div>
+	</div>
+</div>
+
+<script>
+(function() {
+	// ================================================================
+	// DETECT MATERIAL THEME (same as settings page)
+	// ================================================================
+	function zvukDetectDarkTheme() {
+		var chosen;
+		try {
+			chosen = window.localStorage.getItem('lms-material::theme');
+		} catch (e) {}
+
+		if (!chosen) {
+			// Material default is dark
+			return true;
+		}
+		if (chosen.indexOf('auto') === 0) {
+			return !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+		}
+		chosen = chosen.replace('darker', 'dark');
+		return chosen.indexOf('light') !== 0 && chosen.indexOf('/light/') === -1;
+	}
+
+	function zvukApplyTheme() {
+		document.documentElement.classList.toggle('zvuk-dark-theme', zvukDetectDarkTheme());
+	}
+
+	// ================================================================
+	// INITIALIZATION (same as settings page)
+	// ================================================================
+	function initializeStandalone() {
+		zvukApplyTheme();
+
+		// Initialize modal event handlers
+		var modal = document.getElementById('waveSliderModal');
+		var modalBox = document.getElementById('waveSliderBox');
+
+		if (modal && modalBox) {
+			modal.addEventListener('click', function(e) {
+				if (e.target === modal) {
+					closeModal();
+				}
+			});
+
+			modalBox.addEventListener('click', function(e) {
+				e.stopPropagation();
+			});
+		}
+
+		// Auto-open modal for standalone mode
+		if (modal) {
+			modal.style.display = 'block';
+		}
+
+		// Move wave sliders content to the modal content area
+		var waveContainer = document.querySelector('.wave-settings-container');
+		var contentArea = document.getElementById('waveSliderContent');
+		if (waveContainer && contentArea) {
+			contentArea.innerHTML = '';
+			contentArea.appendChild(waveContainer);
+		}
+	}
+
+	// Override close function for standalone mode
+	window.closeWaveSliderModal = function() {
+		// In iframe mode (Material UI), parent controls closing
+		if (window.parent && window.parent !== window) {
+			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
+			return;
+		}
+		// Standalone mode - hide modal
+		var modal = document.getElementById('waveSliderModal');
+		if (modal) {
+			modal.style.display = 'none';
+		}
+	};
+
+	function closeModal() {
+		// For iframe mode - let parent handle closing
+		if (window.parent && window.parent !== window) {
+			console.log('[zvuk] Requesting parent to close modal');
+			return;
+		}
+		// For standalone mode - hide modal
+		var modal = document.getElementById('waveSliderModal');
+		if (modal) {
+			modal.style.display = 'none';
+		}
+	}
+
+	// Listen for theme changes
+	window.addEventListener('storage', function(e) {
+		if (e.key === 'lms-material::theme') {
+			zvukApplyTheme();
+		}
+	});
+
+	// Start initialization
+	if (document.readyState === 'interactive' || document.readyState === 'complete') {
+		initializeStandalone();
+	} else {
+		document.addEventListener('DOMContentLoaded', initializeStandalone());
+	}
+})();
+</script>
+</body>
+</html>

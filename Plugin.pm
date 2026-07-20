@@ -52,21 +52,21 @@ sub initPlugin {
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
 
-		# Register web routes for AJAX and web pages
-		Slim::Web::Pages->addRawFunction(
-			'plugins/zvuk/waveSettings',
-			\&Plugins::Zvuk::WebHandlers::handleWaveSettingsWebUI
-		);
+			# Register web routes for AJAX and web pages
+				Slim::Web::Pages->addRawFunction(
+					'plugins/zvuk/waveSettings',
+					\&Plugins::Zvuk::WebHandlers::handleWaveSettingsWebUI
+				);
 
-			Slim::Web::Pages->addRawFunction(
-				'plugins/zvuk/saveWaveSettings',
-				\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
-			);
+				Slim::Web::Pages->addRawFunction(
+					'plugins/zvuk/waveStandalone',
+					\&Plugins::Zvuk::WebHandlers::handleWaveSettingsStandalone
+				);
 
-			Slim::Web::Pages->addRawFunction(
-				'plugins/zvuk/getWaveSettings',
-				\&Plugins::Zvuk::WebHandlers::handleGetWaveSettingsWeb
-			);
+				Slim::Web::Pages->addRawFunction(
+					'plugins/zvuk/saveWaveSettings',
+					\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
+				);
 
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/saveOAuthToken',
