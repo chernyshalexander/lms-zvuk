@@ -283,8 +283,8 @@ sub handleWaveSettingsRouter {
 			# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
 			$callback->([{
 				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type    => 'link',
-				weblink => '/plugins/zvuk/waveStandalone?player=' . ($client ? $client->id : ''),
+				type    => 'extra',
+				url     => '/plugins/zvuk/waveStandalone?',
 				image   => 'plugins/zvuk/html/images/playlists.png',
 			}]);
 		} else {
