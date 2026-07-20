@@ -1220,7 +1220,8 @@ sub getMusicRecommendations {
 
 	my $contentType = $args->{contentType} || 'Music';
 	my $itemTypes   = $args->{itemTypes}   || ['Artist', 'Release', 'Playlist'];
-	my $page        = $args->{page}        || 1;
+	my $requested_page = $args->{page};
+	my $page        = $requested_page || 1;
 
 	my $gql = qq{
 		query getMusicRecommendations(\$contentType: DynamicBlockContentType!, \$itemType: [DynamicBlockItemType!], \$pages: [Int!]!) {
@@ -1279,45 +1280,81 @@ sub getMusicRecommendations {
 
 		my $block = $data->{dynamicBlock} || {};
 		my $pages = $block->{pages} || [];
+		my $totalPages = $block->{totalPages} || 1;
 
-		$log->debug("getMusicRecommendations: dynamicBlock received, totalPages=$block->{totalPages}, pages count=" . scalar(@$pages));
+		$log->debug("getMusicRecommendations: dynamicBlock received, totalPages=$totalPages, pages count=" . scalar(@$pages));
 
 		# Collect all items from this page
 		my @allItems;
-		foreach my $page_data (@$pages) {
+		my @sorted_pages = sort { ($a->{page} // 0) <=> ($b->{page} // 0) } @$pages;
+		foreach my $page_data (@sorted_pages) {
 			my $items = $page_data->{items} || [];
 			$log->debug("  Page " . ($page_data->{page} // '?') . ": " . scalar(@$items) . " items");
 			push @allItems, @$items;
 		}
 
-		$log->debug("getMusicRecommendations: total items collected=" . scalar(@allItems));
+		my $process_results = sub {
+			my ($items_ref) = @_;
+			$log->debug("getMusicRecommendations: total items collected=" . scalar(@$items_ref));
 
-		Plugins::Zvuk::API->cacheTrackMetadata(\@allItems) if @allItems;
+			Plugins::Zvuk::API->cacheTrackMetadata($items_ref) if @$items_ref;
 
-		# Separate items by type
-		my (@artists, @releases, @playlists);
-		foreach my $item (@allItems) {
-			my $type = $item->{__typename} || 'UNKNOWN';
-			$log->debug("  Item typename=$type");
-			if ($type eq 'Artist') {
-				push @artists, $item;
-			} elsif ($type eq 'Release') {
-				push @releases, $item;
-			} elsif ($type eq 'Playlist') {
-				push @playlists, $item;
+			# Separate items by type
+			my (@artists, @releases, @playlists);
+			foreach my $item (@$items_ref) {
+				my $type = $item->{__typename} || 'UNKNOWN';
+				$log->debug("  Item typename=$type");
+				if ($type eq 'Artist') {
+					push @artists, $item;
+				} elsif ($type eq 'Release') {
+					push @releases, $item;
+				} elsif ($type eq 'Playlist') {
+					push @playlists, $item;
+				}
 			}
+
+			$log->info("getMusicRecommendations result: artists=" . scalar(@artists) . ", releases=" . scalar(@releases) . ", playlists=" . scalar(@playlists));
+
+			$cb->({
+				allItems    => $items_ref,
+				artists     => \@artists,
+				releases    => \@releases,
+				playlists   => \@playlists,
+				totalPages  => $totalPages,
+				totalCount  => scalar(@$items_ref),
+			});
+		};
+
+		# If caller did NOT request a specific page, and totalPages > 1, fetch remaining pages in one call
+		if (!defined $requested_page && $totalPages > 1 && $page == 1) {
+			$log->info("getMusicRecommendations: fetching remaining pages 2..$totalPages");
+			my $remaining_vars = {
+				contentType => $contentType,
+				itemType    => $itemTypes,
+				pages       => [ 2 .. $totalPages ],
+			};
+			$self->_graphql(sub {
+				my $rem_data = shift;
+				if ($rem_data->{error}) {
+					$log->error("getMusicRecommendations: failed to fetch remaining pages: $rem_data->{error}");
+					# Return what we got from page 1 instead of failing completely
+					$process_results->(\@allItems);
+					return;
+				}
+				my $rem_block = $rem_data->{dynamicBlock} || {};
+				my $rem_pages = $rem_block->{pages} || [];
+				my @sorted_rem_pages = sort { ($a->{page} // 0) <=> ($b->{page} // 0) } @$rem_pages;
+				foreach my $page_data (@sorted_rem_pages) {
+					my $items = $page_data->{items} || [];
+					$log->debug("  Page " . ($page_data->{page} // '?') . ": " . scalar(@$items) . " items");
+					push @allItems, @$items;
+				}
+				$process_results->(\@allItems);
+			}, 'getMusicRecommendations', $gql, $remaining_vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+			return;
 		}
 
-		$log->info("getMusicRecommendations result: artists=" . scalar(@artists) . ", releases=" . scalar(@releases) . ", playlists=" . scalar(@playlists));
-
-		$cb->({
-			allItems    => \@allItems,
-			artists     => \@artists,
-			releases    => \@releases,
-			playlists   => \@playlists,
-			totalPages  => $block->{totalPages},
-			totalCount  => scalar(@allItems),
-		});
+		$process_results->(\@allItems);
 	}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }
 
