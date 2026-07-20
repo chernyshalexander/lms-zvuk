@@ -228,7 +228,7 @@ sub _getWaveMenuItems {
 			# For Jive/SqueezePlay: link to router that shows native UI
 			push @items, {
 				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type  => 'link',
+				type  => 'replace',
 				url   => \&handleWaveSettingsRouter,
 				jive  => { actions => { go => { player => 0, cmd => ['zvuk', 'wavecontrols'] } } },
 			};
