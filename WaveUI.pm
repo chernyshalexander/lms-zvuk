@@ -64,6 +64,7 @@ sub _getWaveSettingsItems {
 	push @items, {
 		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type       => 'link',
+		url        => \&handleWaveMenu,
 		nextWindow => 'parent',
 	};
 
@@ -147,6 +148,7 @@ sub _getGenresMenu {
 	push @genre_items, {
 		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type       => 'link',
+		url        => \&handleWaveSettings,
 		nextWindow => 'parent',
 	};
 
@@ -325,6 +327,7 @@ sub _getSliderItems {
 	push @slider_items, {
 		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type       => 'link',
+		url        => \&handleWaveSettings,
 		nextWindow => 'parent',
 	};
 
@@ -426,6 +429,7 @@ sub _getLanguageMenu {
 		{
 			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 			type       => 'link',
+			url        => \&handleWaveSettings,
 			nextWindow => 'parent',
 		},
 	);
@@ -469,11 +473,17 @@ sub _getVocalMenu {
 		{
 			name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 			type       => 'link',
+			url        => \&handleWaveSettings,
 			nextWindow => 'parent',
 		},
 	);
 
 	return \@vocal_items;
+}
+
+sub handleWaveMenu {
+	my ($client, $callback, $args) = @_;
+	$callback->({ items => _getWaveMenuItems($client, $args) });
 }
 
 1;
