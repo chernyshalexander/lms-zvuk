@@ -213,7 +213,7 @@ sub _uiKind {
 	if ($client && Slim::Utils::Misc::canFollowWeblinks($client)) {
 		return 'weblink_capable'; # Material, iPeng, SqueezePad
 	}
-	if ($client && $client->controllerUA && $client->controllerUA =~ /^SqueezePlay/) {
+	if ($client && $client->can('controllerUA') && $client->controllerUA && $client->controllerUA =~ /^SqueezePlay/) {
 		return 'jive'; # Squeezebox Touch, Radio, Controller, desktop SqueezePlay
 	}
 
@@ -331,6 +331,11 @@ sub _getSliderItems {
 	return \@slider_items;
 }
 
+sub _shouldGoBackToSettings {
+	my ($client, $args) = @_;
+	return _uiKind($client, $args) eq 'player_buttons';
+}
+
 # Handle actual slider value selection
 sub handleSliderValue {
 	my ($client, $callback, $args, $params) = @_;
@@ -340,7 +345,12 @@ sub handleSliderValue {
 	my $value = $params->{value};
 
 	_updateSetting($client, $key, $value);
-	$callback->(_getSliderItems($client, $key));
+
+	if (_shouldGoBackToSettings($client, $args)) {
+		$callback->({ items => _getWaveSettingsItems($client) });
+	} else {
+		$callback->(_getSliderItems($client, $key));
+	}
 }
 
 # Handle language selection
@@ -350,7 +360,12 @@ sub handleLanguageSelect {
 
 	my $language = $params->{language};
 	_updateSetting($client, 'language', $language);
-	$callback->(_getLanguageMenu($client));
+
+	if (_shouldGoBackToSettings($client, $args)) {
+		$callback->({ items => _getWaveSettingsItems($client) });
+	} else {
+		$callback->(_getLanguageMenu($client));
+	}
 }
 
 # Handle vocal selection
@@ -360,7 +375,12 @@ sub handleVocalSelect {
 
 	my $vocal = $params->{vocal};
 	_updateSetting($client, 'vocal', $vocal);
-	$callback->(_getVocalMenu($client));
+
+	if (_shouldGoBackToSettings($client, $args)) {
+		$callback->({ items => _getWaveSettingsItems($client) });
+	} else {
+		$callback->(_getVocalMenu($client));
+	}
 }
 
 # Generate language selection menu handler
