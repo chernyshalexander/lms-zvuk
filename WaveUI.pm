@@ -366,7 +366,11 @@ sub handleSliderValue {
 	_updateSetting($client, $key, $value);
 
 	if (_shouldGoBackToSettings($client, $args)) {
-		$callback->({ items => _getWaveSettingsItems($client) });
+		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			title => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			items => _getWaveSettingsItems($client),
+		});
 	} else {
 		$callback->({
 			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_' . uc($key)),
@@ -385,7 +389,11 @@ sub handleLanguageSelect {
 	_updateSetting($client, 'language', $language);
 
 	if (_shouldGoBackToSettings($client, $args)) {
-		$callback->({ items => _getWaveSettingsItems($client) });
+		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			title => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			items => _getWaveSettingsItems($client),
+		});
 	} else {
 		$callback->({
 			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
@@ -404,7 +412,11 @@ sub handleVocalSelect {
 	_updateSetting($client, 'vocal', $vocal);
 
 	if (_shouldGoBackToSettings($client, $args)) {
-		$callback->({ items => _getWaveSettingsItems($client) });
+		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			title => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			items => _getWaveSettingsItems($client),
+		});
 	} else {
 		$callback->({
 			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
