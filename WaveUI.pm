@@ -121,6 +121,7 @@ sub _updateSetting {
 sub handleGenresMenu {
 	my ($client, $callback) = @_;
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		items => _getGenresMenu($client),
 	});
@@ -185,6 +186,7 @@ sub handleGenreToggle {
 
 	# Вернуть в меню жанров
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		items => _getGenresMenu($client),
 	});
@@ -206,6 +208,7 @@ sub handleSlider {
 	return unless $params;
 	my $key = $params->{key};
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_' . uc($key)),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_' . uc($key)),
 		items => _getSliderItems($client, $key),
 	});
@@ -314,6 +317,7 @@ sub handleWaveSettingsRouter {
 sub handleWaveSettings {
 	my ($client, $callback, $args) = @_;
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 		title => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 		items => _getWaveSettingsItems($client),
 	});
@@ -365,6 +369,7 @@ sub handleSliderValue {
 		$callback->({ items => _getWaveSettingsItems($client) });
 	} else {
 		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_' . uc($key)),
 			title => cstring($client, 'PLUGIN_ZVUK_SETTING_' . uc($key)),
 			items => _getSliderItems($client, $key),
 		});
@@ -383,6 +388,7 @@ sub handleLanguageSelect {
 		$callback->({ items => _getWaveSettingsItems($client) });
 	} else {
 		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
 			title => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
 			items => _getLanguageMenu($client),
 		});
@@ -401,6 +407,7 @@ sub handleVocalSelect {
 		$callback->({ items => _getWaveSettingsItems($client) });
 	} else {
 		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
 			title => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
 			items => _getVocalMenu($client),
 		});
@@ -411,6 +418,7 @@ sub handleVocalSelect {
 sub handleLanguageMenu {
 	my ($client, $callback) = @_;
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_LANGUAGE'),
 		items => _getLanguageMenu($client),
 	});
@@ -465,6 +473,7 @@ sub _getLanguageMenu {
 sub handleVocalMenu {
 	my ($client, $callback) = @_;
 	$callback->({
+		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_VOCAL'),
 		items => _getVocalMenu($client),
 	});
