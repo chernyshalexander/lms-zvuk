@@ -223,7 +223,7 @@ sub _getWaveMenuItems {
 				$useWebUI = 1;
 			} elsif (!defined $isControl) {
 				$useWebUI = 1;
-			} elsif ($isControl && (!defined $args->{quantity} || $args->{quantity} > 5000)) {
+			} elsif ($isControl && $client && Slim::Utils::Misc::canFollowWeblinks($client)) {
 				$useWebUI = 1;
 			}
 		} else {
@@ -290,11 +290,12 @@ sub handleWaveSettingsRouter {
 	} elsif (!defined $isControl) {
 		$useWebUI = 1;
 		$reason = 'isControl undefined - web-like client';
-	} elsif ($isControl && (!defined $quantity || $quantity > 5000)) {
+	} elsif ($isControl && $client && Slim::Utils::Misc::canFollowWeblinks($client)) {
 		$useWebUI = 1;
-		$reason = 'isControl=1 AND (quantity undef OR quantity > 5000) - Material UI';
+		$reason = 'isControl=1 AND client can follow weblinks (Material UI)';
 	} else {
-		$reason = 'isControl=1 AND quantity <= 5000 - Jive/SqueezePlay';
+		$useWebUI = 0;
+		$reason = 'isControl=1 AND client cannot follow weblinks - Jive/SqueezePlay/VFD';
 	}
 
 	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
