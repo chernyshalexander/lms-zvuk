@@ -216,19 +216,38 @@ sub _getWaveMenuItems {
 		my $isWeb = $args && $args->{isWeb} ? 1 : 0;
 		my $isControl = $args && defined $args->{isControl} ? $args->{isControl} : undef;
 		
+		my $canFollow = $client ? (Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0) : 'undef';
+		
 		# Fallback to canFollowWeblinks for compatibility if we have no args
 		my $useWebUI = 0;
+		my $reason = '';
 		if ($args) {
 			if ($isWeb) {
 				$useWebUI = 1;
+				$reason = 'isWeb=1';
 			} elsif (!defined $isControl) {
 				$useWebUI = 1;
+				$reason = 'isControl undefined';
 			} elsif ($isControl && $client && Slim::Utils::Misc::canFollowWeblinks($client)) {
 				$useWebUI = 1;
+				$reason = 'isControl=1 AND canFollowWeblinks=1';
+			} else {
+				$reason = 'isControl=1 AND canFollowWeblinks=0';
 			}
 		} else {
-			$useWebUI = $client && Slim::Utils::Misc::canFollowWeblinks($client);
+			$useWebUI = $client && Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0;
+			$reason = 'no args fallback to canFollowWeblinks=' . $useWebUI;
 		}
+
+		$log->warn("=== ZVUK DEBUG _getWaveMenuItems ===");
+		$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
+		$log->warn("  canFollowWeblinks: " . $canFollow);
+		if ($args) {
+			$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+		} else {
+			$log->warn("  Args NOT present");
+		}
+		$log->warn("  Decision: useWebUI=" . $useWebUI . " (Reason: " . $reason . ")");
 		
 		if ($useWebUI) {
 			# For Web/Material UI: direct link to standalone wave settings page
@@ -281,6 +300,8 @@ sub handleWaveSettingsRouter {
 	my $useWebUI = 0;
 	my $reason = '';
 
+	my $canFollow = $client ? (Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0) : 'undef';
+
 	if (!$args) {
 		$useWebUI = 0;
 		$reason = 'No args - classic player VFD';
@@ -298,8 +319,15 @@ sub handleWaveSettingsRouter {
 		$reason = 'isControl=1 AND client cannot follow weblinks - Jive/SqueezePlay/VFD';
 	}
 
-	$log->info("Decision: useWebUI=$useWebUI (Reason: $reason)");
-	$log->info("=== End Router Decision ===");
+	$log->warn("=== ZVUK DEBUG handleWaveSettingsRouter ===");
+	$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
+	$log->warn("  canFollowWeblinks: " . $canFollow);
+	if ($args) {
+		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+	} else {
+		$log->warn("  Args NOT present");
+	}
+	$log->warn("  Decision: useWebUI=" . $useWebUI . " (Reason: " . $reason . ")");
 
 		if ($useWebUI) {
 			# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
