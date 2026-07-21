@@ -698,7 +698,7 @@ sub getPersonalWave {
 	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings($self->accountId || 'default');
 
 	# Ensure all numeric values are proper floats for GraphQL NormalizedFloat type
-	my $popular = 0.0 + ($wave_settings->{popular} // 0.5);
+	my $popular = $wave_settings->{popular} // 0.5;
 	my $energy = 0.0 + ($wave_settings->{energy} // 0.5);
 	my $fun = 0.0 + ($wave_settings->{fun} // 0.5);
 
@@ -708,14 +708,21 @@ sub getPersonalWave {
 		waveSrc => "AMAZME",
 		first   => 3,
 		options => {
-			popular  => $popular,
 			mood     => $mood_str,
 		},
 	};
 
-	# Add optional settings if provided
-	$vars->{options}->{language} = $wave_settings->{language}
-		if defined $wave_settings->{language};
+	# Set popular to null (undef) if default (0.5), otherwise send float value
+	if (defined $popular && $popular != 0.5) {
+		$vars->{options}->{popular} = 0.0 + $popular;
+	} else {
+		$vars->{options}->{popular} = undef;
+	}
+
+	# Omit language if 'all' to avoid forcing the recommender to search for a literal language named "all"
+	if (defined $wave_settings->{language} && $wave_settings->{language} ne 'all') {
+		$vars->{options}->{language} = $wave_settings->{language};
+	}
 
 	# Convert vocal to proper float type for NormalizedFloat
 	if (defined $wave_settings->{vocal}) {
