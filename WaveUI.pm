@@ -205,9 +205,11 @@ sub _getWaveMenuItems {
 	my @items;
 
 	push @items, {
-		name => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
-		type => 'audio',
-		url  => 'zvuk://wave',
+		name      => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
+		type      => 'audio',
+		url       => 'zvuk://wave',
+		play      => 'zvuk://wave',
+		on_select => 'play',
 	};
 
 		# Detect client type and return appropriate item directly
@@ -279,7 +281,10 @@ sub handleWaveSettingsRouter {
 	my $useWebUI = 0;
 	my $reason = '';
 
-	if ($isWeb) {
+	if (!$args) {
+		$useWebUI = 0;
+		$reason = 'No args - classic player VFD';
+	} elsif ($isWeb) {
 		$useWebUI = 1;
 		$reason = 'isWeb=1 - show web sliders';
 	} elsif (!defined $isControl) {
