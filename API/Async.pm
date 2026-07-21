@@ -695,7 +695,7 @@ sub getPersonalWave {
 	};
 
 	# Use provided settings or defaults
-	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings('default');
+	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings($self->accountId || 'default');
 
 	# Ensure all numeric values are proper floats for GraphQL NormalizedFloat type
 	my $popular = 0.0 + ($wave_settings->{popular} // 0.5);
