@@ -200,6 +200,27 @@ sub handleSlider {
 	$callback->(_getSliderItems($client, $key));
 }
 
+sub _uiKind {
+	my ($client, $args) = @_;
+
+	# 1. Classic Web Skin
+	return 'classic_web' if $args && $args->{isWeb};
+
+	# 2. VFD buttons on classic hardware player (Boom, Transporter)
+	return 'player_buttons' if $args && $args->{isButton};
+
+	# 3. CLI / JSON-RPC / cometd (Material UI / Jive / SqueezePlay / mobile apps)
+	if ($client && Slim::Utils::Misc::canFollowWeblinks($client)) {
+		return 'weblink_capable'; # Material, iPeng, SqueezePad
+	}
+	if ($client && $client->controllerUA && $client->controllerUA =~ /^SqueezePlay/) {
+		return 'jive'; # Squeezebox Touch, Radio, Controller, desktop SqueezePlay
+	}
+
+	# 4. Unknown/fallback: default to jive/native UI
+	return 'jive';
+}
+
 sub _getWaveMenuItems {
 	my ($client, $args) = @_;
 	my @items;
@@ -212,61 +233,37 @@ sub _getWaveMenuItems {
 		on_select => 'play',
 	};
 
-		# Detect client type and return appropriate item directly
-		my $isWeb = $args && $args->{isWeb} ? 1 : 0;
-		my $isControl = $args && defined $args->{isControl} ? $args->{isControl} : undef;
-		
-		my $canFollow = $client ? (Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0) : 'undef';
-		
-		# Fallback to canFollowWeblinks for compatibility if we have no args
-		my $useWebUI = 0;
-		my $reason = '';
-		if ($args) {
-			if ($isWeb) {
-				$useWebUI = 1;
-				$reason = 'isWeb=1';
-			} elsif (!defined $isControl) {
-				$useWebUI = 1;
-				$reason = 'isControl undefined';
-			} elsif ($isControl && $client && Slim::Utils::Misc::canFollowWeblinks($client)) {
-				$useWebUI = 1;
-				$reason = 'isControl=1 AND canFollowWeblinks=1';
-			} else {
-				$reason = 'isControl=1 AND canFollowWeblinks=0';
-			}
-		} else {
-			$useWebUI = $client && Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0;
-			$reason = 'no args fallback to canFollowWeblinks=' . $useWebUI;
-		}
+	my $kind = _uiKind($client, $args);
+	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
 
-		$log->warn("=== ZVUK DEBUG _getWaveMenuItems ===");
-		$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
-		$log->warn("  canFollowWeblinks: " . $canFollow);
-		if ($args) {
-			$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
-		} else {
-			$log->warn("  Args NOT present");
-		}
-		$log->warn("  Decision: useWebUI=" . $useWebUI . " (Reason: " . $reason . ")");
-		
-		if ($useWebUI) {
-			# For Web/Material UI: direct link to standalone wave settings page
-			my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
-			my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
-			push @items, {
-				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type    => 'link',
-				weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
-				image   => 'plugins/zvuk/html/images/playlists.png',
-			};
-		} else {
-			# For Jive/SqueezePlay: link to router that shows native UI
-			push @items, {
-				name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type  => 'link',
-				url   => \&handleWaveSettingsRouter,
-			};
-		}
+	$log->warn("=== ZVUK DEBUG _getWaveMenuItems ===");
+	$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
+	$log->warn("  UI Kind: $kind");
+	if ($args) {
+		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+	} else {
+		$log->warn("  Args NOT present");
+	}
+	$log->warn("  Decision: useWebUI=$useWebUI");
+
+	if ($useWebUI) {
+		# For Web/Material UI: direct link to standalone wave settings page
+		my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
+		my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
+		push @items, {
+			name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			type    => 'link',
+			weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
+			image   => 'plugins/zvuk/html/images/playlists.png',
+		};
+	} else {
+		# For Jive/SqueezePlay: link to router that shows native UI
+		push @items, {
+			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			type  => 'link',
+			url   => \&handleWaveSettingsRouter,
+		};
+	}
 
 	return \@items;
 }
@@ -274,72 +271,30 @@ sub _getWaveMenuItems {
 sub handleWaveSettingsRouter {
 	my ($client, $callback, $args) = @_;
 
-	$log->info("=== Wave Settings Router Decision ===");
-	$log->info("Args received: " . (defined $args ? "YES" : "UNDEF"));
-
-	my $isWeb = $args && $args->{isWeb} ? 1 : 0;
-	my $isControl = $args && defined $args->{isControl} ? $args->{isControl} : undef;
-	my $quantity = $args && defined $args->{quantity} ? $args->{quantity} : undef;
-
-	$log->info("  isWeb=$isWeb");
-	$log->info("  isControl=" . (defined $isControl ? $isControl : 'undef'));
-	$log->info("  quantity=" . (defined $quantity ? $quantity : 'undef'));
-
-	if ($args) {
-		foreach my $key (sort keys %$args) {
-			next if $key =~ /^(isWeb|isControl|quantity)$/;
-			my $val = $args->{$key};
-			if (ref $val) {
-				$log->info("  $key => [" . ref($val) . "]");
-			} else {
-				$log->info("  $key => " . ($val // 'undef'));
-			}
-		}
-	}
-
-	my $useWebUI = 0;
-	my $reason = '';
-
-	my $canFollow = $client ? (Slim::Utils::Misc::canFollowWeblinks($client) ? 1 : 0) : 'undef';
-
-	if (!$args) {
-		$useWebUI = 0;
-		$reason = 'No args - classic player VFD';
-	} elsif ($isWeb) {
-		$useWebUI = 1;
-		$reason = 'isWeb=1 - show web sliders';
-	} elsif (!defined $isControl) {
-		$useWebUI = 1;
-		$reason = 'isControl undefined - web-like client';
-	} elsif ($isControl && $client && Slim::Utils::Misc::canFollowWeblinks($client)) {
-		$useWebUI = 1;
-		$reason = 'isControl=1 AND client can follow weblinks (Material UI)';
-	} else {
-		$useWebUI = 0;
-		$reason = 'isControl=1 AND client cannot follow weblinks - Jive/SqueezePlay/VFD';
-	}
+	my $kind = _uiKind($client, $args);
+	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
 
 	$log->warn("=== ZVUK DEBUG handleWaveSettingsRouter ===");
 	$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
-	$log->warn("  canFollowWeblinks: " . $canFollow);
+	$log->warn("  UI Kind: $kind");
 	if ($args) {
-		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
 	} else {
 		$log->warn("  Args NOT present");
 	}
-	$log->warn("  Decision: useWebUI=" . $useWebUI . " (Reason: " . $reason . ")");
+	$log->warn("  Decision: useWebUI=$useWebUI");
 
-		if ($useWebUI) {
-			# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
-			my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
-			my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
-			$callback->([{
-				name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
-				type    => 'link',
-				weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
-				image   => 'plugins/zvuk/html/images/playlists.png',
-			}]);
-		} else {
+	if ($useWebUI) {
+		# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)
+		my $pref_mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
+		my $ext = ($pref_mode eq 'iframe') ? '.html' : '';
+		$callback->([{
+			name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
+			type    => 'link',
+			weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
+			image   => 'plugins/zvuk/html/images/playlists.png',
+		}]);
+	} else {
 		# For Jive/SqueezePlay: show standard list settings
 		handleWaveSettings($client, $callback, $args);
 	}
