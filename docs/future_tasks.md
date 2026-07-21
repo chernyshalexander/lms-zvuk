@@ -58,3 +58,8 @@ Add support for the `/api/tiny/grid/content` endpoint to fetch and display curat
 ### 8. Authentication
 * **SMS OTP Login**: Add support for logging in via phone number and SMS code (`/api/tiny/login/otp`).
 * **SberID SSO**: Support SberID OAuth login.
+
+### 9. Library Transfer Tool (Перенос библиотеки)
+* **Library Migration**: Implement a script or built-in tool to copy a user's library (favorite tracks, albums, artists, and custom playlists) from one Zvuk account to another. 
+  * Read from source account using token A via `userCollection`/`paginatedCollection`.
+  * Batch-write to destination account using token B via `addCollectionItems` mutation (tracks, albums, artists) and playlist mutations (`createPlaylistV1` + `addItemsToPlaylist`).
