@@ -49,6 +49,16 @@ sub initPlugin {
 	});
 
 	Plugins::Zvuk::ProtocolHandler->register();
+	Plugins::Zvuk::Browse::InfoMenu->init();
+
+	eval {
+		if (defined &Slim::Menu::AlbumInfo::registerInfoProvider) {
+			Slim::Menu::AlbumInfo->registerInfoProvider( zvuk => (
+				after => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
+			) );
+		}
+	};
 	
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
@@ -812,16 +822,7 @@ sub _renderArtistItem {
 
 sub _renderReleaseItem {
 	my ($release) = @_;
-	my $artist_name = ($release->{artists} && @{$release->{artists}})
-		? $release->{artists}[0]{title}
-		: '';
-	return {
-		name     => $release->{title} . ($artist_name ? " - $artist_name" : ''),
-		type     => 'link',
-		url      => \&handleAlbum,
-		image    => Plugins::Zvuk::API->getImageUrl($release),
-		passthrough => [{ releaseId => $release->{id} }],
-	};
+	return _renderRelease($release);
 }
 
 sub _renderPlaylistItem {
@@ -862,17 +863,49 @@ sub _renderTrack {
 
 sub _getArtistName { Plugins::Zvuk::API->_getArtistName($_[0]) }
 
+sub _renderRelease {
+	my ($release) = @_;
+	my $releaseId = $release->{id};
+	my $artist    = _getArtistName($release);
+	my $title     = $release->{title};
+	my $url       = 'zvuk://album:' . $releaseId;
+
+	return {
+		name            => $title . ($artist ? " ($artist)" : ""),
+		favorites_title => $title . ($artist ? " - " . $artist : ""),
+		favorites_type  => 'playlist',
+		favorites_url   => $url,
+		line1           => $title,
+		line2           => $artist,
+		type            => 'playlist',
+		url             => \&handleAlbum,
+		play            => $url,
+		image           => Plugins::Zvuk::API->getImageUrl($release),
+		passthrough     => [{ id => $releaseId, releaseId => $releaseId }],
+		itemActions     => {
+			info => {
+				command     => ['zvuk_info', 'items'],
+				fixedParams => { type => 'album', id => $releaseId, url => $url, album => $title, artist => $artist },
+			},
+			play => {
+				command     => ['playlistcontrol'],
+				fixedParams => { cmd => 'load', url => $url },
+			},
+			add => {
+				command     => ['playlistcontrol'],
+				fixedParams => { cmd => 'add', url => $url },
+			},
+			insert => {
+				command     => ['playlistcontrol'],
+				fixedParams => { cmd => 'insert', url => $url },
+			},
+		},
+	};
+}
+
 sub _renderAlbum {
 	my ($album) = @_;
-	return {
-		name      => $album->{title},
-		line1     => $album->{title},
-		line2     => _getArtistName($album),
-		type      => 'link',
-		url       => \&handleAlbum,
-		passthrough => [{ id => $album->{id} }],
-		image     => Plugins::Zvuk::API->getImageUrl($album),
-	};
+	return _renderRelease($album);
 }
 
 sub _renderArtist {

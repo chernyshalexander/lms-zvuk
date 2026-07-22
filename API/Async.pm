@@ -1368,4 +1368,30 @@ sub getMusicRecommendations {
 	}, 'getMusicRecommendations', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 }
 
+# --- Collection Mutations ---
+
+sub likeRelease {
+	my ($self, $cb, $releaseId) = @_;
+
+	my $gql = q{
+		mutation likeRelease($id: String!) {
+			addCollectionItem(type: RELEASE, id: $id)
+		}
+	};
+
+	$self->_graphql($cb, 'likeRelease', $gql, { id => "$releaseId" });
+}
+
+sub unlikeRelease {
+	my ($self, $cb, $releaseId) = @_;
+
+	my $gql = q{
+		mutation unlikeRelease($id: String!) {
+			removeCollectionItem(type: RELEASE, id: $id)
+		}
+	};
+
+	$self->_graphql($cb, 'unlikeRelease', $gql, { id => "$releaseId" });
+}
+
 1;

@@ -571,3 +571,19 @@ PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_TAB
 	EN	New Browser Tab
 	RU	Новая вкладка браузера
 
+PLUGIN_ZVUK_ON_ZVUK
+	EN	On Zvuk...
+	RU	В Звуке...
+
+PLUGIN_ZVUK_LIKE_ALBUM
+	EN	Save Album to Collection
+	RU	Сохранить альбом в коллекцию
+
+PLUGIN_ZVUK_UNLIKE_ALBUM
+	EN	Remove Album from Collection
+	RU	Удалить альбом из коллекции
+
+PLUGIN_ZVUK_DONE
+	EN	Done
+	RU	Готово
+
