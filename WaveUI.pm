@@ -119,16 +119,16 @@ sub _updateSetting {
 }
 
 sub handleGenresMenu {
-	my ($client, $callback) = @_;
+	my ($client, $callback, $args) = @_;
 	$callback->({
 		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-		items => _getGenresMenu($client),
+		items => _getGenresMenu($client, $args),
 	});
 }
 
 sub _getGenresMenu {
-	my ($client) = @_;
+	my ($client, $args) = @_;
 	my $api = _getAPIHandler($client);
 	my $account_id = $api ? $api->accountId() : 'default';
 
@@ -136,17 +136,23 @@ sub _getGenresMenu {
 	my $selected_genres = $settings->{genres} || [];
 	my %selected = map { $_ => 1 } @$selected_genres;
 
+	my $kind = _uiKind($client, $args);
+	my $is_buttons = ($kind eq 'player_buttons');
+
 	my @genre_items;
 	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
 		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
 		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
-		push @genre_items, {
-			name       => "$checkbox_char " . cstring($client, $genre->{label}),
-			type       => 'link',
-			url        => \&handleGenreToggle,
+		my $item = {
+			name        => "$checkbox_char " . cstring($client, $genre->{label}),
+			type        => 'link',
+			url         => \&handleGenreToggle,
 			passthrough => [{ genre => $genre->{name} }],
-			nextWindow => 'refresh',
 		};
+		# Slim::Buttons::XMLBrowser crashes if nextWindow is 'refresh' (it pops all modes off stack).
+		# For Jive / WebUI we keep nextWindow => 'refresh'. For player_buttons, omit nextWindow.
+		$item->{nextWindow} = 'refresh' unless $is_buttons;
+		push @genre_items, $item;
 	}
 
 	push @genre_items, {
@@ -188,7 +194,7 @@ sub handleGenreToggle {
 	$callback->({
 		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-		items => _getGenresMenu($client),
+		items => _getGenresMenu($client, $args),
 	});
 }
 
@@ -235,19 +241,46 @@ sub _uiKind {
 	return 'jive';
 }
 
+sub handleStartWave {
+	my ($client, $callback, $args) = @_;
+	return unless $client;
+
+	$log->info("Starting Wave playback via menu item for client " . ($client->name || ref($client) || ''));
+
+	# On button VFD players (Squeezebox Boom/Classic/Transporter), onRight pushes a temporary
+	# xmlbrowser mode stack level before calling the url handler.
+	# We pop that temporary mode level first so the stack returns to the parent menu level,
+	# preventing an empty screen flicker and stack underflow when pressing BACK.
+	if (_uiKind($client, $args) eq 'player_buttons') {
+		if (defined &Slim::Buttons::Common::popMode && (Slim::Buttons::Common::mode($client) || '') eq 'xmlbrowser') {
+			Slim::Buttons::Common::popMode($client);
+		}
+	}
+
+	$client->execute(['playlist', 'play', 'zvuk://wave', cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START')]);
+
+	if (defined &Slim::Buttons::Common::pushModeLeft) {
+		if ((Slim::Buttons::Common::mode($client) || '') ne 'playlist') {
+			Slim::Buttons::Common::pushModeLeft($client, 'playlist');
+		}
+	}
+}
+
 sub _getWaveMenuItems {
 	my ($client, $args) = @_;
 	my @items;
 
+	my $kind = _uiKind($client, $args);
+	my $is_buttons = ($kind eq 'player_buttons');
+
 	push @items, {
 		name      => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START'),
 		type      => 'audio',
-		url       => 'zvuk://wave',
+		url       => $is_buttons ? \&handleStartWave : 'zvuk://wave',
 		play      => 'zvuk://wave',
 		on_select => 'play',
 	};
 
-	my $kind = _uiKind($client, $args);
 	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
 
 	$log->warn("=== ZVUK DEBUG _getWaveMenuItems ===");

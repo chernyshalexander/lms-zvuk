@@ -39,7 +39,7 @@ sub handleWaveWizardStart {
 }
 
 sub _getWizardStep {
-	my ($client, $step, $state) = @_;
+	my ($client, $step, $state, $args) = @_;
 
 	if ($step == 1) {
 		return _getWizardPopularityStep($client, $state);
@@ -55,10 +55,10 @@ sub _getWizardStep {
 			return _getWizardLanguageStep($client, $state);
 		} else {
 			# Skip language, go to genres
-			return _getWizardGenresStep($client, $state);
+			return _getWizardGenresStep($client, $state, $args);
 		}
 	} elsif ($step == 6) {
-		return _getWizardGenresStep($client, $state);
+		return _getWizardGenresStep($client, $state, $args);
 	} else {
 		return _getWizardLaunch($client, $state);
 	}
@@ -222,19 +222,23 @@ sub _getWizardVocalStep {
 }
 
 sub _getWizardGenresStep {
-	my ($client, $state) = @_;
+	my ($client, $state, $args) = @_;
 	my @genre_items;
+
+	my $kind = Plugins::Zvuk::WaveUI::_uiKind($client, $args);
+	my $is_buttons = ($kind eq 'player_buttons');
 
 	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
 		my $is_selected = grep { $_ eq $genre->{name} } @{$state->{genres}};
 		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
-		push @genre_items, {
+		my $item = {
 			name        => "$checkbox_char " . cstring($client, $genre->{label}),
 			type        => 'link',
 			url         => \&handleWizardGenreToggle,
 			passthrough => [{ genre => $genre->{name}, state => $state }],
-			nextWindow  => 'refresh',
 		};
+		$item->{nextWindow} = 'refresh' unless $is_buttons;
+		push @genre_items, $item;
 	}
 
 	push @genre_items, (
@@ -286,7 +290,7 @@ sub handleWizardGenreToggle {
 	$state->{genres} = \@genres;
 
 	# Refresh genres menu with updated checkmarks
-	$callback->(_getWizardGenresStep($client, $state));
+	$callback->(_getWizardGenresStep($client, $state, $args));
 }
 
 sub handleWizardGenresDone {
