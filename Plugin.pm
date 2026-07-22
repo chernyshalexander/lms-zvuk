@@ -24,6 +24,7 @@ use Plugins::Zvuk::WaveWizardUI;
 use Plugins::Zvuk::GigaMix;
 use Plugins::Zvuk::WaveUI;
 use Plugins::Zvuk::WebHandlers;
+use Plugins::Zvuk::Browse::InfoMenu;
 
 my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
