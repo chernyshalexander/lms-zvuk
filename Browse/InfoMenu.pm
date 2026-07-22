@@ -83,7 +83,7 @@ sub albumInfoMenu {
 			type  => 'link',
 			url   => sub {
 				my ($client, $cb) = @_;
-				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:add', "url:$targetUrl"]);
+				Slim::Control::Request::executeRequest($client, ['playlist', 'add', $targetUrl]);
 				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
 			},
 		},
@@ -92,7 +92,7 @@ sub albumInfoMenu {
 			type  => 'link',
 			url   => sub {
 				my ($client, $cb) = @_;
-				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:insert', "url:$targetUrl"]);
+				Slim::Control::Request::executeRequest($client, ['playlist', 'insert', $targetUrl]);
 				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
 			},
 		},
@@ -101,7 +101,7 @@ sub albumInfoMenu {
 			type  => 'link',
 			url   => sub {
 				my ($client, $cb) = @_;
-				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:load', "url:$targetUrl"]);
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $targetUrl]);
 				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
 			},
 		},
