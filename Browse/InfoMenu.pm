@@ -79,39 +79,78 @@ sub albumInfoMenu {
 
 	my @items = (
 		{
-			name  => cstring($client, 'ADD_TO_END'),
-			type  => 'link',
-			url   => sub {
+			name        => cstring($client, 'ADD_TO_END'),
+			type        => 'link',
+			nextWindow  => 'parent',
+			playcontrol => 'add',
+			url         => sub {
 				my ($client, $cb) = @_;
 				Slim::Control::Request::executeRequest($client, ['playlist', 'add', $targetUrl]);
-				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'add'],
+					params     => { url => $targetUrl },
+					nextWindow => 'parent',
+				},
 			},
 		},
 		{
-			name  => cstring($client, 'PLAY_NEXT'),
-			type  => 'link',
-			url   => sub {
+			name        => cstring($client, 'PLAY_NEXT'),
+			type        => 'link',
+			nextWindow  => 'parent',
+			playcontrol => 'insert',
+			url         => sub {
 				my ($client, $cb) = @_;
 				Slim::Control::Request::executeRequest($client, ['playlist', 'insert', $targetUrl]);
-				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'insert'],
+					params     => { url => $targetUrl },
+					nextWindow => 'parent',
+				},
 			},
 		},
 		{
-			name  => cstring($client, 'PLAY'),
-			type  => 'link',
-			url   => sub {
+			name        => cstring($client, 'PLAY'),
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			url         => sub {
 				my ($client, $cb) = @_;
 				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $targetUrl]);
-				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => $targetUrl },
+					nextWindow => 'nowPlaying',
+				},
 			},
 		},
 		{
-			name  => cstring($client, $favToken),
-			type  => 'link',
-			url   => sub {
+			name        => cstring($client, $favToken),
+			type        => 'link',
+			nextWindow  => 'parent',
+			url         => sub {
 				my ($client, $cb) = @_;
 				Slim::Control::Request::executeRequest($client, ['jivefavorites', $favCmd, "url:$targetUrl", "title:$favTitle", 'type:playlist']);
-				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['jivefavorites', $favCmd],
+					params     => { url => $targetUrl, title => $favTitle, type => 'playlist' },
+					nextWindow => 'parent',
+				},
 			},
 		},
 		{
