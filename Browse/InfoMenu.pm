@@ -58,24 +58,82 @@ sub albumInfoMenu {
 	}
 
 	return unless $albumId;
+	my $targetUrl = 'zvuk://album:' . $albumId;
+	my $albumTitle = ($remoteMeta && $remoteMeta->{album}) || ($album && blessed($album) && $album->can('title') ? $album->title : 'Zvuk Album');
+	my $artistTitle = ($remoteMeta && $remoteMeta->{artist}) || ($album && blessed($album) && $album->can('artist') ? $album->artist : '');
+	my $favTitle = $albumTitle . ($artistTitle ? " - $artistTitle" : "");
 
-	return {
-		name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
-		items => [
-			{
-				name        => cstring($client, 'PLUGIN_ZVUK_LIKE_ALBUM'),
-				type        => 'link',
-				url         => \&_doLikeRelease,
-				passthrough => [$api, $albumId],
+	# Check LMS Favorites status
+	my $favToken = 'JIVE_SAVE_TO_FAVORITES';
+	my $favCmd   = 'add';
+	if (defined &Slim::Utils::PluginManager::isEnabled && Slim::Utils::PluginManager->isEnabled('Slim::Plugin::Favorites::Plugin')) {
+		eval {
+			require Slim::Utils::Favorites;
+			my $favs = Slim::Utils::Favorites->new($client);
+			if (defined $favs->findUrl($targetUrl)) {
+				$favToken = 'JIVE_DELETE_FROM_FAVORITES';
+				$favCmd   = 'delete';
+			}
+		};
+	}
+
+	my @items = (
+		{
+			name  => cstring($client, 'ADD_TO_END'),
+			type  => 'link',
+			url   => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:add', "url:$targetUrl"]);
+				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
 			},
-			{
-				name        => cstring($client, 'PLUGIN_ZVUK_UNLIKE_ALBUM'),
-				type        => 'link',
-				url         => \&_doUnlikeRelease,
-				passthrough => [$api, $albumId],
+		},
+		{
+			name  => cstring($client, 'PLAY_NEXT'),
+			type  => 'link',
+			url   => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:insert', "url:$targetUrl"]);
+				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
 			},
-		],
-	};
+		},
+		{
+			name  => cstring($client, 'PLAY'),
+			type  => 'link',
+			url   => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlistcontrol', 'cmd:load', "url:$targetUrl"]);
+				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+			},
+		},
+		{
+			name  => cstring($client, $favToken),
+			type  => 'link',
+			url   => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['jivefavorites', $favCmd, "url:$targetUrl", "title:$favTitle", 'type:playlist']);
+				$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_DONE'), type => 'text' }] });
+			},
+		},
+		{
+			name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
+			items => [
+				{
+					name        => cstring($client, 'PLUGIN_ZVUK_LIKE_ALBUM'),
+					type        => 'link',
+					url         => \&_doLikeRelease,
+					passthrough => [$api, $albumId],
+				},
+				{
+					name        => cstring($client, 'PLUGIN_ZVUK_UNLIKE_ALBUM'),
+					type        => 'link',
+					url         => \&_doUnlikeRelease,
+					passthrough => [$api, $albumId],
+				},
+			],
+		},
+	);
+
+	return { items => \@items };
 }
 
 sub _doLikeRelease {
