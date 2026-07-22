@@ -304,7 +304,7 @@ sub _graphql {
 sub _getCacheTTL {
 	my ($operationName) = @_;
 
-	return 0 if $operationName =~ m/^(getStream|getPersonalWave)$/;
+	return 0 if $operationName =~ m/^(getStream|getPersonalWave|like.*|unlike.*|add.*|remove.*|hide.*)$/;
 	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userCollectionReleases|userCollectionArtists|userPaginatedPodcasts|userPaginatedEpisodes)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getPlaylistTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
@@ -1374,24 +1374,24 @@ sub likeRelease {
 	my ($self, $cb, $releaseId) = @_;
 
 	my $gql = q{
-		mutation likeRelease($id: String!) {
+		mutation likeRelease($id: ID!) {
 			addCollectionItem(type: RELEASE, id: $id)
 		}
 	};
 
-	$self->_graphql($cb, 'likeRelease', $gql, { id => "$releaseId" });
+	$self->_graphql($cb, 'likeRelease', $gql, { id => "$releaseId" }, { ttl => 0 });
 }
 
 sub unlikeRelease {
 	my ($self, $cb, $releaseId) = @_;
 
 	my $gql = q{
-		mutation unlikeRelease($id: String!) {
+		mutation unlikeRelease($id: ID!) {
 			removeCollectionItem(type: RELEASE, id: $id)
 		}
 	};
 
-	$self->_graphql($cb, 'unlikeRelease', $gql, { id => "$releaseId" });
+	$self->_graphql($cb, 'unlikeRelease', $gql, { id => "$releaseId" }, { ttl => 0 });
 }
 
 1;
