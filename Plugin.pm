@@ -888,18 +888,6 @@ sub _renderRelease {
 				command     => ['zvuk_info', 'items'],
 				fixedParams => { type => 'album', id => $releaseId, url => $url, album => $title, artist => $artist },
 			},
-			play => {
-				command     => ['playlistcontrol'],
-				fixedParams => { cmd => 'load', url => $url },
-			},
-			add => {
-				command     => ['playlistcontrol'],
-				fixedParams => { cmd => 'add', url => $url },
-			},
-			insert => {
-				command     => ['playlistcontrol'],
-				fixedParams => { cmd => 'insert', url => $url },
-			},
 		},
 	};
 }

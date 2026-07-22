@@ -57,10 +57,11 @@ sub albumInfoMenu {
 		$albumId = $1;
 	}
 
-	my $albumName = ($remoteMeta && $remoteMeta->{album}) || ($album && blessed($album) && $album->can('title') ? $album->title : (blessed($album) && $album->can('name') ? $album->name : undef)) || (ref $album ? '' : $album);
+	return unless $albumId;
 
-	if ($albumId) {
-		my @items = (
+	return {
+		name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
+		items => [
 			{
 				name        => cstring($client, 'PLUGIN_ZVUK_LIKE_ALBUM'),
 				type        => 'link',
@@ -73,32 +74,8 @@ sub albumInfoMenu {
 				url         => \&_doUnlikeRelease,
 				passthrough => [$api, $albumId],
 			},
-		);
-		if ($albumName && !ref $albumName) {
-			push @items, {
-				name        => cstring($client, 'SEARCH') . ' ' . cstring($client, 'ALBUMS') . " '$albumName'",
-				type        => 'link',
-				url         => \&_handleSearchAlbum,
-				image       => 'plugins/zvuk/html/images/albums.png',
-				passthrough => [$albumName],
-			};
-		}
-		return {
-			name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
-			items => \@items,
-		};
-	}
-
-	if ($albumName && !ref $albumName) {
-		return {
-			type        => 'link',
-			name        => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
-			url         => \&_handleSearchAlbum,
-			passthrough => [$albumName],
-		};
-	}
-
-	return;
+		],
+	};
 }
 
 sub _doLikeRelease {
@@ -117,22 +94,6 @@ sub _doUnlikeRelease {
 		my $msg = ($res && !$res->{error}) ? cstring($client, 'PLUGIN_ZVUK_DONE') : ("Error: " . ($res->{error} || 'failed'));
 		$cb->({ items => [{ name => $msg, type => 'text' }] });
 	}, $releaseId);
-}
-
-sub _handleSearchAlbum {
-	my ($client, $cb, $args, $albumQuery) = @_;
-	my $api = Plugins::Zvuk::Plugin::_get_api_client($client);
-	return unless $api;
-
-	$api->search(sub {
-		my $data = shift;
-		my $releases = $data->{search}{releases}{items} || [];
-		my @items;
-		foreach my $rel (@$releases) {
-			push @items, Plugins::Zvuk::Plugin::_renderRelease($rel);
-		}
-		$cb->({ items => @items ? \@items : [{ name => cstring($client, 'EMPTY'), type => 'text' }] });
-	}, { query => $albumQuery, limit => 20, tracks => 0, releases => 1, playlists => 0, artists => 0 });
 }
 
 1;
