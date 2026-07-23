@@ -1370,28 +1370,112 @@ sub getMusicRecommendations {
 
 # --- Collection Mutations ---
 
-sub likeRelease {
-	my ($self, $cb, $releaseId) = @_;
+sub addToCollection {
+	my ($self, $cb, $id, $type) = @_;
 
 	my $gql = q{
-		mutation likeRelease($id: ID!) {
-			addCollectionItem(type: RELEASE, id: $id)
+		mutation addItemToCollection($id: ID, $type: CollectionItemType) {
+			collection {
+				addItem(id: $id, type: $type)
+			}
 		}
 	};
 
-	$self->_graphql($cb, 'likeRelease', $gql, { id => "$releaseId" }, { ttl => 0 });
+	$self->_graphql(sub {
+		my $res = shift;
+		$cb->($res);
+	}, 'addItemToCollection', $gql, { id => "$id", type => "$type" }, { ttl => 0 });
+}
+
+sub removeFromCollection {
+	my ($self, $cb, $id, $type) = @_;
+
+	my $gql = q{
+		mutation removeItemFromCollection($id: ID, $type: CollectionItemType) {
+			collection {
+				removeItem(id: $id, type: $type)
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $res = shift;
+		$cb->($res);
+	}, 'removeItemFromCollection', $gql, { id => "$id", type => "$type" }, { ttl => 0 });
+}
+
+sub likeRelease {
+	my ($self, $cb, $releaseId) = @_;
+	$self->addToCollection($cb, $releaseId, 'release');
 }
 
 sub unlikeRelease {
 	my ($self, $cb, $releaseId) = @_;
+	$self->removeFromCollection($cb, $releaseId, 'release');
+}
+
+sub likeTrack {
+	my ($self, $cb, $trackId) = @_;
+	$self->addToCollection($cb, $trackId, 'track');
+}
+
+sub unlikeTrack {
+	my ($self, $cb, $trackId) = @_;
+	$self->removeFromCollection($cb, $trackId, 'track');
+}
+
+sub likeArtist {
+	my ($self, $cb, $artistId) = @_;
+	$self->addToCollection($cb, $artistId, 'artist');
+}
+
+sub unlikeArtist {
+	my ($self, $cb, $artistId) = @_;
+	$self->removeFromCollection($cb, $artistId, 'artist');
+}
+
+sub likePlaylist {
+	my ($self, $cb, $playlistId) = @_;
+	$self->addToCollection($cb, $playlistId, 'playlist');
+}
+
+sub unlikePlaylist {
+	my ($self, $cb, $playlistId) = @_;
+	$self->removeFromCollection($cb, $playlistId, 'playlist');
+}
+
+sub hideTrack {
+	my ($self, $cb, $trackId) = @_;
 
 	my $gql = q{
-		mutation unlikeRelease($id: ID!) {
-			removeCollectionItem(type: RELEASE, id: $id)
+		mutation addItemToHidden($id: ID!, $type: CollectionItemType!) {
+			hidden_collection {
+				addItem(id: $id, type: $type)
+			}
 		}
 	};
 
-	$self->_graphql($cb, 'unlikeRelease', $gql, { id => "$releaseId" }, { ttl => 0 });
+	$self->_graphql(sub {
+		my $res = shift;
+		$cb->($res);
+	}, 'addItemToHidden', $gql, { id => "$trackId", type => 'track' }, { ttl => 0 });
+}
+
+sub unhideTrack {
+	my ($self, $cb, $trackId) = @_;
+
+	my $gql = q{
+		mutation removeItemFromHidden($id: ID!, $type: CollectionItemType!) {
+			hidden_collection {
+				removeItem(id: $id, type: $type)
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $res = shift;
+		$cb->($res);
+	}, 'removeItemFromHidden', $gql, { id => "$trackId", type => 'track' }, { ttl => 0 });
 }
 
 1;
