@@ -312,82 +312,133 @@ sub _getCacheTTL {
 
 	# --- API Methods ---
 
-	# Helper method for HTTP GET requests with JSON parsing and error handling
+	# Helper method for HTTP GET requests with rate limiting, retry and optional caching
 	sub _http_get {
-		my ($self, $url, $params, $cb) = @_;
-		
-		# Build URL with query parameters
+		my ($self, $url, $params, $cb, $opts) = @_;
+		$opts ||= {};
+
+		# Build URL with query parameters using deterministic sort order
 		if ($params && %$params) {
 			my @param_pairs;
-			foreach my $key (keys %$params) {
+			foreach my $key (sort keys %$params) {
 				my $value = $params->{$key};
 				push @param_pairs, "$key=" . ($value // '');
 			}
-			$url .= '?' . join('&', @param_pairs);
+			$url .= ($url =~ /\?/ ? '&' : '?') . join('&', @param_pairs);
 		}
-		
-		$log->debug("HTTP GET: $url");
-		
-		my $http = Slim::Networking::SimpleAsyncHTTP->new(
-			sub {
-				my $response = shift;
-				my $content = $response->content;
-				my $code = $response->code;
-				
-				# Parse JSON response
-				my $data = eval { decode_json($content) };
-				if ($@) {
-					my $error = "JSON parse error: $@";
-					$log->error("HTTP GET $url: $error");
-					$cb->(undef, $error);
-					return;
-				}
-				
-				# Success callback with parsed data
-				$cb->($data, undef);
-			},
-			sub {
-				my ($http, $error) = @_;
-				$log->error("HTTP GET $url failed: $error");
-				$cb->(undef, $error);
+
+		my $ttl = $opts->{ttl} // 0;
+		my $cacheKey;
+		if ($ttl > 0) {
+			$cacheKey = "zvuk_rest:" . md5_hex($url);
+			if (my $cached = Plugins::Zvuk::API->cache->get($cacheKey)) {
+				$log->debug("Cache hit for REST GET: $url");
+				$cb->($cached, undef);
+				return;
 			}
-		);
-		
-		$http->get(
-				$url,
-				'x-auth-token' => Plugins::Zvuk::API->getToken($self->accountId),
-				'user-agent'   => Plugins::Zvuk::API::USER_AGENT
+		}
+
+		$log->debug("HTTP GET: $url");
+
+		# THROTTLE: Enforce rate limit (shared with GraphQL)
+		$throttler->acquire(sub {
+			my $throttle_delay = shift;
+			if ($throttle_delay > 0.1) {
+				$log->debug(sprintf("REST GET: throttled for %.3fs: %s", $throttle_delay, $url));
+			}
+
+			# RETRY: Execute with automatic retry on transient errors
+			$retry_mgr->execute(
+				sub {
+					my $result = shift;
+
+					if (!$result->{error}) {
+						if ($cacheKey && $ttl > 0 && $result->{data}) {
+							Plugins::Zvuk::API->cache->set($cacheKey, $result->{data}, $ttl);
+							$log->debug("REST GET: Cached $url for ${ttl}s");
+						}
+						$cb->($result->{data}, undef);
+						return;
+					}
+
+					$log->error("REST GET $url failed after retries: " . ($result->{error} || 'unknown'));
+					$cb->(undef, $result->{error}, $result->{code});
+				},
+				sub {
+					my $op_cb = shift;
+
+					my $http = Slim::Networking::SimpleAsyncHTTP->new(
+						sub {
+							my $response = shift;
+							my $content = $response->content;
+							my $code = $response->code;
+
+							if (!$content || length($content) == 0) {
+								$log->error("REST GET: Empty response for $url (HTTP $code)");
+								$op_cb->({ error => 'empty_response', code => $code });
+								return;
+							}
+
+							my $data = eval { decode_json($content) };
+							if ($@ || !$data) {
+								my $err = $@ ? "JSON parse error: $@" : "No data decoded";
+								$log->error("REST GET $url: $err");
+								$op_cb->({ error => $err, code => 400 });
+								return;
+							}
+
+							$op_cb->({ data => $data, code => $code });
+						},
+						sub {
+							my ($http, $error, $response) = @_;
+							my $code = $response ? $response->code : 0;
+							if ($code) {
+								$log->error("REST GET: HTTP $code for $url: $error");
+							} else {
+								$log->error("REST GET: Network error for $url: $error");
+							}
+							$op_cb->({ error => $error, code => $code });
+						},
+						{ timeout => $opts->{timeout} || 15 }
+					);
+
+					my $token = $opts->{headers} && $opts->{headers}{'x-auth-token'}
+						? $opts->{headers}{'x-auth-token'}
+						: (ref($self) && $self->can('accountId') ? Plugins::Zvuk::API->getToken($self->accountId) : Plugins::Zvuk::API->getToken());
+
+					my %headers = (
+						'user-agent' => Plugins::Zvuk::API::USER_AGENT,
+						%{ $opts->{headers} || {} },
+					);
+					if ($token && !$headers{'x-auth-token'}) {
+						$headers{'x-auth-token'} = $token;
+					}
+
+					$http->get($url, %headers);
+				}
 			);
+		});
 	}
 
 	# Get user profile to validate token and get real userId
 	sub getProfile {
-	my ($class, $cb, $token) = @_;
+		my ($class, $cb, $token) = @_;
 
-	my $http = Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $response = shift;
-			my $result = eval { decode_json($response->content) };
-			if ($@) {
-				$log->error("API::Async::getProfile: JSON parse error: $@");
-				$cb->({ error => "JSON parse error: $@" });
-			} else {
-				$cb->($result->{result});
-			}
-		},
-		sub {
-			my ($http, $error) = @_;
-			$log->error("API::Async::getProfile: HTTP error: $error");
-			$cb->({ error => $error });
-		}
-	);
-
-	$http->get(
-		Plugins::Zvuk::API::PROFILE_URL,
-		'x-auth-token' => $token,
-		'user-agent'   => Plugins::Zvuk::API::USER_AGENT
-	);
-}
+		$class->_http_get(
+			Plugins::Zvuk::API::PROFILE_URL,
+			undef,
+			sub {
+				my ($data, $error) = @_;
+				if ($error) {
+					$log->error("API::Async::getProfile failed: $error");
+					$cb->({ error => $error });
+				} else {
+					$cb->($data->{result} || $data);
+				}
+			},
+			{ headers => { 'x-auth-token' => $token } }
+		);
+	}
 
 # Search implementation
 sub search {
