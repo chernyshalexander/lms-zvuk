@@ -62,6 +62,30 @@ sub getToken {
     return $data->{token};
 }
 
+# Extract human-readable account display name from profile object
+sub extractAccountName {
+    my ($class, $profile, $userId) = @_;
+    my $accountName = "Account " . ($userId || '');
+
+    if ($profile && ref($profile) eq 'HASH') {
+        if ($profile->{external_profile} && ref($profile->{external_profile}) eq 'HASH') {
+            my $extProf = $profile->{external_profile};
+            my @nameParts;
+            push @nameParts, $extProf->{first_name} if $extProf->{first_name};
+            push @nameParts, $extProf->{middle_name} if $extProf->{middle_name};
+            push @nameParts, $extProf->{last_name} if $extProf->{last_name};
+            $accountName = join(' ', @nameParts) if @nameParts;
+        }
+        elsif ($profile->{name}) {
+            $accountName = $profile->{name};
+        }
+        elsif ($profile->{username}) {
+            $accountName = $profile->{username};
+        }
+    }
+    return $accountName;
+}
+
 # Return the configured quality preference
 # Centralized cache shared by all Zvuk modules (Plugin, ProtocolHandler, Async)
 my $cache = Slim::Utils::Cache->new();

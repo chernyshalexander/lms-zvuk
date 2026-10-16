@@ -280,35 +280,78 @@ sub handleSaveOAuthToken {
 		return;
 	}
 
-	# Save token immediately without waiting for profile fetch
-	my $prefs = preferences('plugin.zvuk');
-	my $accounts = $prefs->get('accounts') || {};
+	# Async profile fetch via getProfile to resolve real userId and account name
+	require Plugins::Zvuk::API::Async;
+	Plugins::Zvuk::API::Async->getProfile(
+		sub {
+			my $profile = shift;
 
-	# Generate temporary userId from token hash
-	my $tempUserId = substr($token, 0, 16);
-	$accounts->{$tempUserId} = {
-		token => $token,
-		name  => "Account $tempUserId",
-	};
-	$prefs->set('accounts', $accounts);
-	$log->info("OAuth: Token saved immediately with tempUserId=$tempUserId");
+			if ($profile && $profile->{id} && !$profile->{error}) {
+				my $userId = $profile->{id};
+				my $accountName = Plugins::Zvuk::API->extractAccountName($profile, $userId);
 
-	# Send immediate response to client
-	$response->code(200);
-	$response->content_type('application/json');
+				my $prefs = preferences('plugin.zvuk');
+				my $accounts = $prefs->get('accounts') || {};
 
-	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
-	my $json = $json_encoder->encode({
-		success => 1,
-		account => {
-			userId => $tempUserId,
-			name => "Account"
-		}
-	});
-	$log->debug("OAuth: Sending immediate response: $json");
-	$response->content_length(length($json));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
-	$log->debug("OAuth: Response sent immediately");
+				# Clean up old temporary account if present for this token
+				my $tempUserId = substr($token, 0, 16);
+				if (exists $accounts->{$tempUserId} && $tempUserId ne $userId) {
+					delete $accounts->{$tempUserId};
+					$log->info("OAuth: Removed legacy temp account $tempUserId");
+				}
+
+				$accounts->{$userId} = {
+					token => $token,
+					name  => $accountName,
+				};
+				$prefs->set('accounts', $accounts);
+
+				# Update defaultUserId if unset or if pointing to old temp account
+				if (!$prefs->get('defaultUserId') || $prefs->get('defaultUserId') eq $tempUserId) {
+					$prefs->set('defaultUserId', $userId);
+				}
+
+				# Migrate any connected players assigned to the tempUserId
+				if (UNIVERSAL::can('Slim::Player::Client', 'clients')) {
+					for my $client (Slim::Player::Client::clients()) {
+						if ($prefs->client($client)->get('userId') && $prefs->client($client)->get('userId') eq $tempUserId) {
+							$prefs->client($client)->set('userId', $userId);
+							$log->info("OAuth: Migrated client " . $client->id . " userId from $tempUserId to $userId");
+						}
+					}
+				}
+
+				$log->info("OAuth: Token saved with real userId=$userId, name=$accountName");
+
+				$response->code(200);
+				$response->content_type('application/json');
+
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({
+					success => 1,
+					account => {
+						userId => $userId,
+						name   => $accountName,
+					}
+				});
+				$log->debug("OAuth: Sending async response: $json");
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				$log->debug("OAuth: Response sent asynchronously");
+			}
+			else {
+				my $err = ($profile && $profile->{error}) ? $profile->{error} : 'Failed to validate profile';
+				$log->error("OAuth: Failed to fetch profile for token: $err");
+
+				$response->code(400);
+				$response->content_type('application/json');
+				my $json = encode_json({ success => 0, error => $err });
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			}
+		},
+		$token
+	);
 }
 
 sub handleOAuthCallback {

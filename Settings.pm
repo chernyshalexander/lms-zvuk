@@ -56,27 +56,7 @@ sub handler {
 					if ($profile && $profile->{id} && !$profile->{error}) {
 						my $userId = $profile->{id};
 
-						# Extract account name with priority:
-						# 1. external_profile with first_name, middle_name, last_name
-						# 2. Simple name field
-						# 3. username
-						# 4. fallback to Account ID
-						my $accountName = "Account $userId";
-
-						if ($profile->{external_profile} && $profile->{external_profile}->{first_name}) {
-							my $extProf = $profile->{external_profile};
-							my @nameParts = ();
-							push @nameParts, $extProf->{first_name} if $extProf->{first_name};
-							push @nameParts, $extProf->{middle_name} if $extProf->{middle_name};
-							push @nameParts, $extProf->{last_name} if $extProf->{last_name};
-							$accountName = join(' ', @nameParts) if @nameParts;
-						}
-						elsif ($profile->{name}) {
-							$accountName = $profile->{name};
-						}
-						elsif ($profile->{username}) {
-							$accountName = $profile->{username};
-						}
+						my $accountName = Plugins::Zvuk::API->extractAccountName($profile, $userId);
 
 						my $accounts = $prefs->get('accounts') || {};
 						$accounts->{$userId} = {

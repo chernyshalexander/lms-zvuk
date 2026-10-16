@@ -199,6 +199,7 @@ $INC{'Slim/Web/HTTP.pm'} = 1;
 package Slim::Player::Client;
 our %CLIENTS;
 sub getClient { my ($id) = @_; return $CLIENTS{$id}; }
+sub clients   { return values %CLIENTS; }
 $INC{'Slim/Player/Client.pm'} = 1;
 
 package Slim::Player::Playlist;

@@ -107,7 +107,8 @@
     - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
 
 ### [Фаза 0.3] Сохранение контекста и обратной связи Волны (`ProtocolHandler.pm`)
-* **Статус:** 🟢 Реализовано, протестировано (13/13 наборов тестов успешно пройдены, включая новый сьют `t/test_wave_feedback.pl`). Ожидает подтверждения ручной проверки перед коммитом.
+* **Статус:** 🟢 Выполнено и подтверждено пользователем (коммит `b464d0c`).
+* **Коммит:** `b464d0c` (`feat(wave): implement wave feedback loop and last track tracking (Phase 0.3)`)
 * **Выполненные изменения:**
   1. `ProtocolHandler.pm`:
      - В `getNextTrack` при старте воспроизведения трека Волны (`zvuk_wave_active`) сохраняется состояние текущего трека в `$client->pluginData(zvuk_wave_last_track => { id => $id, started => time(), duration => $duration })`.
@@ -139,4 +140,46 @@
     - `t/test_synthesis_playlists.pl` (ok)
     - `t/test_timer_absolute_time.pl` (ok)
     - `t/test_vfd_genres_knob.pl` (ok)
+    - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+
+### [Фаза 0.4] Асинхронный резолвинг `userId` и имени аккаунта (`WebHandlers.pm`, `API.pm`, `Settings.pm`)
+* **Статус:** 🟢 Реализовано, протестировано (14/14 наборов тестов успешно пройдены, включая новый сьют `t/test_oauth_user_id.pl` из 24 проверок). Ожидает подтверждения ручной проверки перед коммитом.
+* **Выполненные изменения:**
+  1. `API.pm`:
+     - Добавлен централизованный метод `extractAccountName($profile, $userId)` для консистентного извлечения отображаемого имени пользователя (приоритет: ФИО из `external_profile` ➔ простое поле `name` ➔ `username` ➔ `Account <id>`).
+  2. `Settings.pm`:
+     - Вызов ручного сохранения аккаунта переведен на единый метод `Plugins::Zvuk::API->extractAccountName`.
+  3. `WebHandlers.pm` (`handleSaveOAuthToken`):
+     - Устранено синхронное сохранение временного фейкового `tempUserId = substr($token, 0, 16)`.
+     - Реализован асинхронный вызов `Plugins::Zvuk::API::Async->getProfile` с токеном.
+     - После успешного ответа Звука аккаунт сохраняется с **настоящим числовым `userId`** и человекочитаемым именем (например, «Александр Черныш»).
+     - Выполняется автоматическая очистка устаревших временных записей `tempUserId` из настроек при обновлении или входе.
+     - Если к устаревшему `tempUserId` были привязаны плееры LMS (`client->userId`) или он был выбран по умолчанию (`defaultUserId`), они автоматически мигрируются на реальный `userId`.
+     - JSON-ответ клиенту кодируется с `JSON::XS->new->utf8(1)->canonical(1)`, что предотвращает искажения кодировки и гарантирует корректный заголовок `Content-Length`.
+     - При невалидном токене или сбое профиля возвращается понятная ошибка HTTP 400 без засорения настроек плагина.
+  4. `t/slim_mocks.pl`:
+     - Добавлен метод `clients` в мок `Slim::Player::Client` для корректного тестирования миграции плееров.
+  5. `t/test_oauth_user_id.pl`:
+     - Создан новый тестовый сьют (24 проверки), полностью верифицирующий:
+       - логику извлечения имени во всех 4 вариантах профиля,
+       - отклонение невалидных токенов (HTTP 400),
+       - асинхронный резолвинг реального `userId` и имени при успешной авторизации,
+       - корректное сохранение в преференсы `accounts` под реальным ID,
+       - удаление легаси-записи `tempUserId` и миграцию подключенных плееров,
+       - корректную обработку сетевых ошибок и HTTP 401 без сохранения мусора.
+* **Результаты тестов:**
+  - 14/14 тестовых сьютов успешно пройдены без ошибок:
+    - `t/test_oauth_user_id.pl` (24 проверки - ok)
+    - `t/test_wave_feedback.pl` (18 проверок - ok)
+    - `t/test_http_get.pl` (19 проверок - ok)
+    - `t/test_cache_batch.pl` (11 проверок - ok)
+    - `t/test_album_context_menu.pl` (25 проверок - ok)
+    - `t/test_editorial_playlists.pl` (6 проверок - ok)
+    - `t/test_episode_playback.pl` (7 проверок - ok)
+    - `t/test_graphql_error_classification.pl` (6 проверок - ok)
+    - `t/test_multi_page_recommendations.pl` (17 проверок - ok)
+    - `t/test_recommendations_menu.pl` (11 проверок - ok)
+    - `t/test_synthesis_playlists.pl` (6 проверок - ok)
+    - `t/test_timer_absolute_time.pl` (11 проверок - ok)
+    - `t/test_vfd_genres_knob.pl` (14 проверок - ok)
     - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
