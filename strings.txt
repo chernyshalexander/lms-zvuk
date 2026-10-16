@@ -50,6 +50,10 @@ PLUGIN_ZVUK_AUTH_FAILED
 	EN	Token validation failed. Please check the token and try again.
 	RU	Ошибка валидации токена. Проверьте токен и повторите попытку.
 
+PLUGIN_ZVUK_AUTH_EXPIRED
+	EN	Authorization expired. Please re-login in plugin settings.
+	RU	Срок авторизации истёк. Требуется повторный вход в настройках плагина.
+
 PLUGIN_ZVUK_QUALITY
 	EN	Streaming Quality
 	RU	Качество звука

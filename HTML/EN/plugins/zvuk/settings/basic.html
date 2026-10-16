@@ -168,6 +168,9 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 				<tr style="border-bottom:1px solid #eee;">
 					<td style="padding:6px 8px;">
 						<b>[% acc.name | html %]</b>
+						[% IF acc.stale %]
+							<span style="color:#d9534f; margin-left:8px; font-size:12px;">([% "PLUGIN_ZVUK_AUTH_EXPIRED" | string %])</span>
+						[% END %]
 					</td>
 					<td style="padding:6px 8px; text-align:right;">
 						<input type="submit" name="delete_[% acc.userId | html %]"

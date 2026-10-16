@@ -138,6 +138,7 @@ $INC{'Slim/Utils/Scanner/Remote.pm'} = 1;
 package Slim::Networking::SimpleAsyncHTTP;
 our @POST_LOG;
 our @RESPONSES;
+our @PENDING_CALLS;
 sub new {
     my ($class, $successCb, $errorCb, $opts) = @_;
     return bless { successCb => $successCb, errorCb => $errorCb, opts => $opts }, $class;
@@ -147,13 +148,21 @@ sub post {
     push @POST_LOG, { args => \@args };
     my $resp = shift(@RESPONSES) || { code => 200, content => '{"data":{}}' };
 
-    if ($resp->{network_error}) {
-        $self->{errorCb}->($self, $resp->{network_error}, undef);
-    } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
-        my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
-        $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
+    my $fire = sub {
+        if ($resp->{network_error}) {
+            $self->{errorCb}->($self, $resp->{network_error}, undef);
+        } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
+            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
+            $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
+        } else {
+            $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));
+        }
+    };
+
+    if ($resp->{defer}) {
+        push @PENDING_CALLS, $fire;
     } else {
-        $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));
+        $fire->();
     }
 }
 sub get {
@@ -161,13 +170,21 @@ sub get {
     push @POST_LOG, { args => \@args };
     my $resp = shift(@RESPONSES) || { code => 200, content => '{"data":{}}' };
 
-    if ($resp->{network_error}) {
-        $self->{errorCb}->($self, $resp->{network_error}, undef);
-    } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
-        my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
-        $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
+    my $fire = sub {
+        if ($resp->{network_error}) {
+            $self->{errorCb}->($self, $resp->{network_error}, undef);
+        } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
+            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
+            $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
+        } else {
+            $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));
+        }
+    };
+
+    if ($resp->{defer}) {
+        push @PENDING_CALLS, $fire;
     } else {
-        $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));
+        $fire->();
     }
 }
 $INC{'Slim/Networking/SimpleAsyncHTTP.pm'} = 1;

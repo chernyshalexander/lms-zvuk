@@ -49,6 +49,123 @@ sub accountId {
 	return $self->{userId} // 'default';
 }
 
+my %refreshInFlight;
+
+sub _resetThrottlerForTesting {
+	$throttler->{_task_logs} = [];
+	%refreshInFlight = ();
+}
+
+# Refresh access token via POST https://zvuk.com/api/tiny/refresh
+sub refreshToken {
+	my ($self, $cb, $explicitToken) = @_;
+	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
+	my $token = $explicitToken || ($userId ? Plugins::Zvuk::API->getToken($userId) : Plugins::Zvuk::API->getToken());
+
+	if (!$token) {
+		$log->error("refreshToken: No token available for user: " . ($userId || 'unknown'));
+		$cb->(undef, 'No token available') if $cb;
+		return;
+	}
+
+	# Coalesce multiple concurrent refresh calls for the same user
+	if ($userId && $refreshInFlight{$userId}) {
+		$log->debug("refreshToken: Refresh already in flight for user $userId, queuing callback");
+		push @{ $refreshInFlight{$userId} }, $cb if $cb;
+		return;
+	}
+
+	if ($userId) {
+		$refreshInFlight{$userId} = [ $cb ? ($cb) : () ];
+	}
+
+	my $finish = sub {
+		my ($newToken, $error) = @_;
+		my $waiters = $userId ? delete $refreshInFlight{$userId} : [ $cb ? ($cb) : () ];
+		$waiters ||= [ $cb ? ($cb) : () ];
+		for my $waiter_cb (@$waiters) {
+			eval { $waiter_cb->($newToken, $error) if $waiter_cb; };
+			$log->error("refreshToken callback error: $@") if $@;
+		}
+	};
+
+	$log->info("refreshToken: Requesting POST " . Plugins::Zvuk::API::REFRESH_URL . " for user " . ($userId || 'default'));
+
+	$throttler->acquire(sub {
+		my $http = Slim::Networking::SimpleAsyncHTTP->new(
+			sub {
+				my $response = shift;
+				my $content = $response->content;
+				my $code = $response->code;
+
+				my $data = eval { decode_json($content) };
+				my $newToken = $data && ($data->{result} && $data->{result}{token} || $data->{token});
+
+				if ($newToken) {
+					$log->info("refreshToken: Successfully refreshed token for user " . ($userId || 'default'));
+
+					# Save refreshed token into prefs
+					my $accounts = $prefs->get('accounts') || {};
+					if ($userId && $accounts->{$userId}) {
+						$accounts->{$userId}{token} = $newToken;
+						$accounts->{$userId}{stale} = 0;
+						$prefs->set('accounts', $accounts);
+					}
+
+					$finish->($newToken, undef);
+				}
+				else {
+					my $err = $data && $data->{error} ? $data->{error} : "No token in refresh response (HTTP $code)";
+					$log->error("refreshToken: Failed: $err");
+
+					# Mark account as stale
+					my $accounts = $prefs->get('accounts') || {};
+					if ($userId && $accounts->{$userId}) {
+						$accounts->{$userId}{stale} = 1;
+						$prefs->set('accounts', $accounts);
+						$log->warn("refreshToken: Marked user $userId as stale (needs relogin)");
+					}
+
+					$finish->(undef, $err);
+				}
+			},
+			sub {
+				my ($http, $error, $response) = @_;
+				my $code = $response ? $response->code : 0;
+				$log->error("refreshToken: HTTP/network error (code $code): $error");
+
+				# On 401 or permanent failure during refresh, mark account as stale
+				if ($code == 401 || $code == 403) {
+					my $accounts = $prefs->get('accounts') || {};
+					if ($userId && $accounts->{$userId}) {
+						$accounts->{$userId}{stale} = 1;
+						$prefs->set('accounts', $accounts);
+						$log->warn("refreshToken: Marked user $userId as stale after HTTP $code");
+					}
+				}
+
+				$finish->(undef, $error);
+			},
+			{ timeout => 15 }
+		);
+
+		my %headers = (
+			'x-auth-token' => $token,
+			'x-c-p'        => 'Q',
+			'x-app-name'   => Plugins::Zvuk::API::APP_NAME,
+			'user-agent'   => Plugins::Zvuk::API::USER_AGENT,
+			'content-type' => 'application/json',
+			'accept'       => 'application/json',
+		);
+
+		$http->post(
+			Plugins::Zvuk::API::REFRESH_URL,
+			%headers,
+			'{}'
+		);
+	});
+}
+
 =head2 _graphql($cb, $operationName, $query, $variables, $opts)
 
 Execute a GraphQL query with rate limiting (5 req/sec) and automatic retry (5 attempts).
@@ -183,6 +300,23 @@ sub _graphql {
 				# Error case: all retries exhausted OR permanent error detected
 				# Log error for debugging and pass to original callback
 				if ($result->{error}) {
+					# INTERCEPTOR: Check if error is HTTP 401 (Unauthorized) and not already refreshed
+					if (($result->{code} && $result->{code} == 401) && !$opts->{refreshed}) {
+						$log->warn("GraphQL: Received HTTP 401 for $operationName (user $userId), attempting token refresh");
+						$self->refreshToken(sub {
+							my ($newToken, $refreshErr) = @_;
+							if ($newToken) {
+								$log->info("GraphQL: Token refreshed successfully for user $userId, retrying $operationName");
+								my $newOpts = { %$opts, refreshed => 1 };
+								$self->_graphql($cb, $operationName, $query, $variables, $newOpts);
+							} else {
+								$log->error("GraphQL: Token refresh failed for user $userId: " . ($refreshErr || 'unknown error'));
+								$cb->($result);
+							}
+						});
+						return;
+					}
+
 					if ($result->{details}) {
 						$log->error("GraphQL error ($operationName): $result->{error} - $result->{details}");
 					} else {
@@ -223,17 +357,25 @@ sub _graphql {
 						if ($result->{errors}) {
 							my $errors = $result->{errors};
 							my @error_msgs;
+							my $is_auth_error = 0;
 							foreach my $err (@$errors) {
 								if (ref $err eq 'HASH') {
 									push @error_msgs, $err->{message} || 'Unknown error';
+									if (($err->{message} && $err->{message} =~ /unauthori[zs]ed|unauthenticated|token.*expired/i) ||
+										($err->{extensions} && ref $err->{extensions} eq 'HASH' && ($err->{extensions}{code} || '') =~ /UNAUTHENTICATED|UNAUTHORIZED/i)) {
+										$is_auth_error = 1;
+									}
 								} else {
 									push @error_msgs, $err;
+									if ($err =~ /unauthori[zs]ed|unauthenticated|token.*expired/i) {
+										$is_auth_error = 1;
+									}
 								}
 							}
 							my $msg = join('; ', @error_msgs);
 							$log->error("GraphQL API error ($operationName, HTTP $code): $msg");
 							# GraphQL validation errors are NOT retryable, return immediately
-							$op_cb->({ error => $msg, code => $code });
+							$op_cb->({ error => $msg, code => ($is_auth_error ? 401 : $code) });
 							return;
 						}
 
@@ -358,6 +500,26 @@ sub _getCacheTTL {
 							$log->debug("REST GET: Cached $url for ${ttl}s");
 						}
 						$cb->($result->{data}, undef);
+						return;
+					}
+
+					# INTERCEPTOR: Check if error is HTTP 401 (Unauthorized) and not already refreshed
+					if (($result->{code} && $result->{code} == 401) && !$opts->{refreshed}) {
+						$log->warn("REST GET: Received HTTP 401 for $url, attempting token refresh");
+						$self->refreshToken(sub {
+							my ($newToken, $refreshErr) = @_;
+							if ($newToken) {
+								$log->info("REST GET: Token refreshed successfully, retrying $url");
+								my $newOpts = { %$opts, refreshed => 1 };
+								if ($newOpts->{headers} && $newOpts->{headers}{'x-auth-token'}) {
+									$newOpts->{headers}{'x-auth-token'} = $newToken;
+								}
+								$self->_http_get($url, $params, $cb, $newOpts);
+							} else {
+								$log->error("REST GET: Token refresh failed: " . ($refreshErr || 'unknown error'));
+								$cb->(undef, $result->{error}, $result->{code});
+							}
+						});
 						return;
 					}
 

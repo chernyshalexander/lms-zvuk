@@ -102,6 +102,7 @@ sub beforeRender {
 		push @accounts_list, {
 			userId => $userId,
 			name   => $acc->{name} || $userId,
+			stale  => $acc->{stale} ? 1 : 0,
 		};
 	}
 	$params->{accounts} = \@accounts_list;

@@ -10,6 +10,7 @@ use Slim::Utils::Prefs;
 # --- URLs ---
 use constant GRAPHQL_URL  => 'https://zvuk.com/api/v1/graphql';
 use constant PROFILE_URL  => 'https://zvuk.com/api/tiny/profile';
+use constant REFRESH_URL  => 'https://zvuk.com/api/tiny/refresh';
 use constant TINY_API_URL => 'https://zvuk.com/api/tiny';
 
 # --- Cache TTLs (seconds) ---

@@ -143,7 +143,8 @@
     - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
 
 ### [Фаза 0.4] Асинхронный резолвинг `userId` и имени аккаунта (`WebHandlers.pm`, `API.pm`, `Settings.pm`)
-* **Статус:** 🟢 Реализовано, протестировано (14/14 наборов тестов успешно пройдены, включая новый сьют `t/test_oauth_user_id.pl` из 24 проверок). Ожидает подтверждения ручной проверки перед коммитом.
+* **Статус:** 🟢 Выполнено и подтверждено пользователем (коммит `4472b5d`).
+* **Коммит:** `4472b5d` (`fix(oauth): resolve real userId and account name asynchronously on token save (Phase 0.4)`)
 * **Выполненные изменения:**
   1. `API.pm`:
      - Добавлен централизованный метод `extractAccountName($profile, $userId)` для консистентного извлечения отображаемого имени пользователя (приоритет: ФИО из `external_profile` ➔ простое поле `name` ➔ `username` ➔ `Account <id>`).
@@ -169,6 +170,55 @@
        - корректную обработку сетевых ошибок и HTTP 401 без сохранения мусора.
 * **Результаты тестов:**
   - 14/14 тестовых сьютов успешно пройдены без ошибок:
+    - `t/test_oauth_user_id.pl` (24 проверки - ok)
+    - `t/test_wave_feedback.pl` (18 проверок - ok)
+    - `t/test_http_get.pl` (19 проверок - ok)
+    - `t/test_cache_batch.pl` (11 проверок - ok)
+    - `t/test_album_context_menu.pl` (25 проверок - ok)
+    - `t/test_editorial_playlists.pl` (6 проверок - ok)
+    - `t/test_episode_playback.pl` (7 проверок - ok)
+    - `t/test_graphql_error_classification.pl` (6 проверок - ok)
+    - `t/test_multi_page_recommendations.pl` (17 проверок - ok)
+    - `t/test_recommendations_menu.pl` (11 проверок - ok)
+    - `t/test_synthesis_playlists.pl` (6 проверок - ok)
+    - `t/test_timer_absolute_time.pl` (11 проверок - ok)
+    - `t/test_vfd_genres_knob.pl` (14 проверок - ok)
+    - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+
+### [Фаза 0.5] Автоматический Refresh токена при HTTP 401 (`API/Async.pm`, `API.pm`, `Settings.pm`, `basic.html`, `strings.txt`)
+* **Статус:** 🟢 Реализовано, протестировано (15/15 наборов тестов успешно пройдены, включая новый сьют `t/test_token_refresh.pl` из 29 проверок). Ожидает подтверждения ручной проверки перед коммитом.
+* **Выполненные изменения:**
+  1. `API.pm`:
+     - Добавлена константа `REFRESH_URL => 'https://zvuk.com/api/tiny/refresh'`.
+  2. `API/Async.pm`:
+     - Реализован метод `refreshToken($self, $cb, $explicitToken)`:
+       - Выполняет HTTP POST к `https://zvuk.com/api/tiny/refresh` с заголовками `x-auth-token`, `x-c-p: Q`, `user-agent`, `content-type: application/json`.
+       - Реализована дедупликация и коалесцирование конкурентных запросов на обновление (`%refreshInFlight`): если несколько параллельных запросов получают 401 одновременно, на сервер Звука отправляется ровно один POST refresh, а все ожидающие колбэки оповещаются полученным токеном.
+       - При успешном обновлении сохраняет новый токен в `accounts->{$userId}->{token}` и сбрасывает флаг `stale => 0`.
+       - При постоянной ошибке (HTTP 401/403 на самом refresh) помечает аккаунт флагом `stale => 1` («Требуется повторный вход»).
+     - В метод `_graphql` встроен прозрачный интерцептор 401:
+       - Перехватывает как HTTP 401 от транспортного уровня, так и ошибки `UNAUTHENTICATED`/`UNAUTHORIZED` в теле ответа GraphQL при коде 200.
+       - Проверяет флаг `!$opts->{refreshed}` (защита от зацикливания).
+       - Вызывает `refreshToken`, при успехе автоматически повторяет исходный GraphQL запрос с новым токеном.
+     - В метод `_http_get` встроен аналогичный прозрачный интерцептор 401 с автоматическим обновлением заголовка `x-auth-token` и повтором REST-запроса.
+  3. `Settings.pm` и `HTML/EN/plugins/zvuk/settings/basic.html`:
+     - В список аккаунтов веб-интерфейса настроек добавлена передача флага `stale`.
+     - При `stale == 1` рядом с именем аккаунта выводится предупреждение: `([% "PLUGIN_ZVUK_AUTH_EXPIRED" | string %])`.
+  4. `strings.txt`:
+     - Добавлен ключ локализации `PLUGIN_ZVUK_AUTH_EXPIRED` (EN/RU: «Срок авторизации истёк. Требуется повторный вход в настройках плагина.»).
+  5. `t/slim_mocks.pl`:
+     - Расширен мок `Slim::Networking::SimpleAsyncHTTP` поддержкой `@PENDING_CALLS` и флага `defer => 1` для детерминированного тестирования асинхронной конкурентности.
+  6. `t/test_token_refresh.pl`:
+     - Создан новый тестовый сьют (6 сценариев, 29 проверок), верифицирующий:
+       - прямой вызов `refreshToken` с успешной ротацией токена и проверкой заголовков (`X-C-P: Q`),
+       - коалесцирование 3 одновременных вызовов в ровно 1 HTTP POST,
+       - корректную установку флага `stale => 1` при сбое refresh,
+       - автоматический перехват 401 в `_graphql` с ретраем и возвратом данных,
+       - автоматический перехват GraphQL-ошибок `UNAUTHENTICATED` при HTTP 200,
+       - автоматический перехват 401 в REST GET (`_http_get`) с ретраем и возвратом данных.
+* **Результаты тестов:**
+  - 15/15 тестовых сьютов успешно пройдены без ошибок:
+    - `t/test_token_refresh.pl` (29 проверок - ok)
     - `t/test_oauth_user_id.pl` (24 проверки - ok)
     - `t/test_wave_feedback.pl` (18 проверок - ok)
     - `t/test_http_get.pl` (19 проверок - ok)
