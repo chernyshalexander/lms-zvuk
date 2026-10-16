@@ -108,6 +108,15 @@ sub getNextTrack {
 			Slim::Music::Info::setDuration($song->track, $duration);
 		}
 
+		# Record current track info for Wave feedback loop
+		if ($client && $client->pluginData('zvuk_wave_active')) {
+			$client->pluginData(zvuk_wave_last_track => {
+				id       => $id,
+				started  => time(),
+				duration => $duration || 0,
+			});
+		}
+
 		my $streamUrl;
 		my $format = 'mp3';
 
@@ -305,6 +314,7 @@ sub _explodeWave {
 	$client->pluginData(zvuk_wave_settings => $wave_settings) if $client;
 
 	$client->pluginData(zvuk_wave_active => 1) if $client;
+	$client->pluginData(zvuk_wave_last_track => undef) if $client;
 
 	_getAPIHandler($client)->getPersonalWave(sub {
 		my $items = shift || [];
@@ -333,12 +343,12 @@ sub _loadMoreWaveTracks {
 	my $last = $client->pluginData('zvuk_wave_last_track');
 	if ($last && $last->{id}) {
 		my $elapsed       = time() - ($last->{started} || time());
-		my $play_duration = $elapsed > $last->{duration} ? $last->{duration} : $elapsed;
-		my $is_skipped    = $play_duration < ($last->{duration} * 0.5) ? \1 : \0;
+		my $play_duration = ($last->{duration} && $elapsed > $last->{duration}) ? $last->{duration} : $elapsed;
+		my $is_skipped    = ($last->{duration} && $play_duration < ($last->{duration} * 0.5)) ? \1 : \0;
 
 		$content_input = {
 			trackId       => $last->{id},
-			trackDuration => $last->{duration},
+			trackDuration => int($last->{duration} || 0),
 			playDuration  => int($play_duration),
 			isSkipped     => $is_skipped,
 		};
@@ -362,7 +372,7 @@ sub _loadMoreWaveTracks {
 				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
 			);
 		}
-	}, $wave_settings);
+	}, $wave_settings, $content_input);
 }
 
 sub _loadMoreGigaMixTracks {

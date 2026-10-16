@@ -697,7 +697,7 @@ sub getPlaylistTracks {
 
 # Get personalized wave
 sub getPersonalWave {
-	my ($self, $cb, $wave_settings) = @_;
+	my ($self, $cb, $wave_settings, $content_input) = @_;
 
 	my $gql = q{
 		query getPersonalWave($contentInput: PersonalWaveContentInput, $first: PositiveInt! = 2, $options: PersonalWaveOptions, $waveInput: WaveInput, $waveSrc: MagicSource) {
@@ -762,6 +762,11 @@ sub getPersonalWave {
 			mood     => $mood_str,
 		},
 	};
+
+	# Pass content feedback input if provided (last track played, duration, skipped)
+	if ($content_input && ref($content_input) eq 'HASH' && $content_input->{trackId}) {
+		$vars->{contentInput} = $content_input;
+	}
 
 	# Set popular to null (undef) if default (0.5), otherwise send float value
 	if (defined $popular && $popular != 0.5) {

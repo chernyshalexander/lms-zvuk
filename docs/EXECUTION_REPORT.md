@@ -11,8 +11,8 @@
 | Фаза | Описание | Статус | Коммиты |
 |---|---|---|---|
 | **Фаза 0.1** | Пакетный коммит: мелкие багфиксы, утечка памяти в Retry, гигиена и мёртвый код | ✅ Завершено | `5624759` |
-| **Фаза 0.2** | Встраивание `_http_get` в конвейер `Throttle`/`Retry` | ✅ Завершено | [commit] |
-| **Фаза 0.3** | Сохранение обратной связи Волны (`ProtocolHandler.pm`) | 📋 Запланировано | - |
+| **Фаза 0.2** | Встраивание `_http_get` в конвейер `Throttle`/`Retry` | ✅ Завершено | `cb7eff9` |
+| **Фаза 0.3** | Сохранение обратной связи Волны (`ProtocolHandler.pm`) | 🔍 Готово к проверке | - |
 | **Фаза 0.4** | Асинхронный резолвинг `userId` в `WebHandlers.pm` | 📋 Запланировано | - |
 | **Фаза 0.5** | Автоматический refresh токена при HTTP 401 (`/api/tiny/refresh`) | 📋 Запланировано | - |
 | **Фаза 0.6** | Нативный вход по номеру телефона (SMS OTP) | 📋 Запланировано | - |
@@ -94,6 +94,41 @@
 * **Результаты тестов:**
   - 12/12 тестовых сьютов успешно пройдены без ошибок:
     - `t/test_http_get.pl` (6 сценариев, 18 проверок - все ok)
+    - `t/test_cache_batch.pl` (ok)
+    - `t/test_album_context_menu.pl` (ok)
+    - `t/test_editorial_playlists.pl` (ok)
+    - `t/test_episode_playback.pl` (ok)
+    - `t/test_graphql_error_classification.pl` (ok)
+    - `t/test_multi_page_recommendations.pl` (ok)
+    - `t/test_recommendations_menu.pl` (ok)
+    - `t/test_synthesis_playlists.pl` (ok)
+    - `t/test_timer_absolute_time.pl` (ok)
+    - `t/test_vfd_genres_knob.pl` (ok)
+    - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+
+### [Фаза 0.3] Сохранение контекста и обратной связи Волны (`ProtocolHandler.pm`)
+* **Статус:** 🟢 Реализовано, протестировано (13/13 наборов тестов успешно пройдены, включая новый сьют `t/test_wave_feedback.pl`). Ожидает подтверждения ручной проверки перед коммитом.
+* **Выполненные изменения:**
+  1. `ProtocolHandler.pm`:
+     - В `getNextTrack` при старте воспроизведения трека Волны (`zvuk_wave_active`) сохраняется состояние текущего трека в `$client->pluginData(zvuk_wave_last_track => { id => $id, started => time(), duration => $duration })`.
+     - В `_loadMoreWaveTracks` вычисленный объект `$content_input` (`trackId`, `trackDuration`, `playDuration`, `isSkipped`) теперь реально передается аргументом в `$api->getPersonalWave(..., $wave_settings, $content_input)`.
+     - При запуске новой Волны (`_explodeWave`) состояние `zvuk_wave_last_track` явно сбрасывается в `undef`.
+  2. `API/Async.pm` (`getPersonalWave`):
+     - Сигнатура расширена до `($self, $cb, $wave_settings, $content_input)`.
+     - Если `$content_input` передан, переменная `$vars->{contentInput}` включается в GraphQL-запрос к Звуку. Алгоритм рекомендаций Звука теперь получает информацию о дослушивании/скипе предыдущего трека.
+  3. `Plugin.pm` (`_onStop`):
+     - При остановке воспроизведения (`stop`) или очистке плейлиста (`playlist clear`) состояние `zvuk_wave_last_track` сбрасывается в `undef`.
+  4. `t/test_wave_feedback.pl`:
+     - Создан новый тестовый сьют (5 сценариев, 15 проверок), верифицирующий:
+       - отсутствие `contentInput` при первичном запросе волны,
+       - передачу `contentInput` со всеми полями (`trackId`, `trackDuration`, `playDuration`, `isSkipped`),
+       - запись `zvuk_wave_last_track` в `getNextTrack`,
+       - корректный расчет флага пропуска `isSkipped` (true при прослушивании менее 50% длительности трека),
+       - очистку состояния при остановке воспроизведения в `_onStop`.
+* **Результаты тестов:**
+  - 13/13 тестовых сьютов успешно пройдены без ошибок:
+    - `t/test_wave_feedback.pl` (ok)
+    - `t/test_http_get.pl` (ok)
     - `t/test_cache_batch.pl` (ok)
     - `t/test_album_context_menu.pl` (ok)
     - `t/test_editorial_playlists.pl` (ok)

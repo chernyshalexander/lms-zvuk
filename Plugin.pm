@@ -137,7 +137,8 @@ sub _onStop {
 	if ($action eq 'stop' || ($action eq 'playlist' && $request->getRequest(1) eq 'clear')) {
 		$client->pluginData(zvuk_wave_active => 0);
 		$client->pluginData(zvuk_gigamix_active => 0);
-		$log->debug("Cleared zvuk_wave_active and zvuk_gigamix_active flags");
+		$client->pluginData(zvuk_wave_last_track => undef);
+		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active and zvuk_wave_last_track flags");
 	}
 }
 

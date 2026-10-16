@@ -122,6 +122,10 @@ $INC{'Slim/Player/Protocols/HTTPS.pm'} = 1;
 package Slim::Networking::Async::HTTP;
 $INC{'Slim/Networking/Async/HTTP.pm'} = 1;
 
+package Slim::Utils::Scanner::Remote;
+sub parseRemoteHeader { }
+$INC{'Slim/Utils/Scanner/Remote.pm'} = 1;
+
 # ---- HTTP client used by API/Async.pm::_graphql ----
 # Scripted via @Slim::Networking::SimpleAsyncHTTP::RESPONSES: one descriptor
 # consumed per post() call, e.g. { code => 400 } (HTTP error response --
@@ -196,6 +200,27 @@ package Slim::Player::Client;
 our %CLIENTS;
 sub getClient { my ($id) = @_; return $CLIENTS{$id}; }
 $INC{'Slim/Player/Client.pm'} = 1;
+
+package Slim::Player::Playlist;
+sub count { return 10; }
+$INC{'Slim/Player/Playlist.pm'} = 1;
+
+package Slim::Player::Source;
+sub playingSongIndex { return 1; }
+$INC{'Slim/Player/Source.pm'} = 1;
+
+package Slim::Music::Info;
+sub setDuration { }
+sub setBitrate  { }
+$INC{'Slim/Music/Info.pm'} = 1;
+
+package Slim::Control::Request;
+our @EXECUTED_REQUESTS;
+sub executeRequest {
+    my ($client, $cmd) = @_;
+    push @EXECUTED_REQUESTS, { client => $client, cmd => $cmd };
+}
+$INC{'Slim/Control/Request.pm'} = 1;
 
 # ---- JSON (real JSON::PP under the hood; JSON::XS/.VersionOneAndTwo are XS-only and not installed here) ----
 package JSON::XS;
