@@ -283,15 +283,17 @@ sub _getWaveMenuItems {
 
 	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
 
-	$log->warn("=== ZVUK DEBUG _getWaveMenuItems ===");
-	$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
-	$log->warn("  UI Kind: $kind");
-	if ($args) {
-		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
-	} else {
-		$log->warn("  Args NOT present");
+	if ($log->is_debug) {
+		$log->debug("=== ZVUK DEBUG _getWaveMenuItems ===");
+		$log->debug("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
+		$log->debug("  UI Kind: $kind");
+		if ($args) {
+			$log->debug("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+		} else {
+			$log->debug("  Args NOT present");
+		}
+		$log->debug("  Decision: useWebUI=$useWebUI");
 	}
-	$log->warn("  Decision: useWebUI=$useWebUI");
 
 	if ($useWebUI) {
 		# For Web/Material UI: direct link to standalone wave settings page
@@ -321,15 +323,17 @@ sub handleWaveSettingsRouter {
 	my $kind = _uiKind($client, $args);
 	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
 
-	$log->warn("=== ZVUK DEBUG handleWaveSettingsRouter ===");
-	$log->warn("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
-	$log->warn("  UI Kind: $kind");
-	if ($args) {
-		$log->warn("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
-	} else {
-		$log->warn("  Args NOT present");
+	if ($log->is_debug) {
+		$log->debug("=== ZVUK DEBUG handleWaveSettingsRouter ===");
+		$log->debug("  Client: " . ($client ? ($client->name || ref($client)) : 'undef') . " (ref: " . ref($client) . ")");
+		$log->debug("  UI Kind: $kind");
+		if ($args) {
+			$log->debug("  Args present: isWeb=" . ($args->{isWeb} // 'undef') . ", isButton=" . ($args->{isButton} // 'undef') . ", isControl=" . ($args->{isControl} // 'undef') . ", quantity=" . ($args->{quantity} // 'undef'));
+		} else {
+			$log->debug("  Args NOT present");
+		}
+		$log->debug("  Decision: useWebUI=$useWebUI");
 	}
-	$log->warn("  Decision: useWebUI=$useWebUI");
 
 	if ($useWebUI) {
 		# For Web/Material UI: Provide direct link to wave settings web page via weblink (iframe modal)

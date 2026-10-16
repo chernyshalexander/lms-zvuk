@@ -118,20 +118,22 @@ sub getImageUrl {
 # Cache track metadata for getMetadataFor() in ProtocolHandler
 sub cacheTrackMetadata {
     my ($class, $tracks) = @_;
-    return [] unless $tracks && @$tracks;
+    return [] unless $tracks && ref $tracks eq 'ARRAY' && @$tracks;
 
-    return [ map {
-        my $track = $_;
-        my $id    = $track->{id} or next;
+    my @result;
+    for my $track (@$tracks) {
+        next unless $track && ref $track eq 'HASH';
+        my $id = $track->{id} or next;
 
-        # Check if already cached, skip if found
+        # Check if already cached, reuse if found
         if (my $cached = $cache->get("zvuk_meta_$id")) {
-            return $cached;
+            push @result, $cached;
+            next;
         }
 
-        my $icon  = $class->getImageUrl($track, 'usePlaceholder');
+        my $icon   = $class->getImageUrl($track, 'usePlaceholder');
         my $artist = $class->_getArtistName($track);
-        my $album = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
+        my $album  = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
 
         my $dur = int($track->{duration} || 0);
         my $meta = {
@@ -146,8 +148,10 @@ sub cacheTrackMetadata {
         };
 
         $cache->set( "zvuk_meta_$id", $meta, DEFAULT_TTL );
-        $meta;
-    } @$tracks ];
+        push @result, $meta;
+    }
+
+    return \@result;
 }
 
 sub _getArtistName {

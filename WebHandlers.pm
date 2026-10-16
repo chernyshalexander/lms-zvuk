@@ -496,6 +496,7 @@ tryAutoFetch();
 </html>
 END_HTML
 
+	$html = encode_utf8($html);
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
 	$response->content_length(length($html));

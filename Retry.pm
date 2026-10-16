@@ -76,14 +76,18 @@ sub execute {
 
             # Success case: no error
             if (!$result->{error}) {
-                $on_success_cb->($result);
+                my $cb = $on_success_cb;
+                undef $run_operation;
+                $cb->($result) if $cb;
                 return;
             }
 
             # Error case: check if retryable
             if (!$self->is_retryable($result->{code}, $result->{error})) {
                 # Non-retryable error, stop immediately
-                $on_success_cb->($result);
+                my $cb = $on_success_cb;
+                undef $run_operation;
+                $cb->($result) if $cb;
                 return;
             }
 
@@ -91,7 +95,9 @@ sub execute {
             $attempt++;
             if ($attempt >= $self->{max_attempts}) {
                 # Max attempts exhausted, give up
-                $on_success_cb->($result);
+                my $cb = $on_success_cb;
+                undef $run_operation;
+                $cb->($result) if $cb;
                 return;
             }
 

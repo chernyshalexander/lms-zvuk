@@ -30,7 +30,6 @@ require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::ProtocolHandler;
 require Plugins::Zvuk::Settings;
 require Plugins::Zvuk::WaveSettings;
-require Plugins::Zvuk::WaveWizardUI;
 require Plugins::Zvuk::WaveUI;
 require Plugins::Zvuk::WebHandlers;
 

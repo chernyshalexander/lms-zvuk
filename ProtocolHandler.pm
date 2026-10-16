@@ -16,9 +16,8 @@ use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
 use Plugins::Zvuk::WaveSettings;
 
-use constant CAN_FLAC_SEEK => UNIVERSAL::can('Slim::Utils::Scanner::Remote', 'parseFlacHeader');
-
 my $log   = logger('plugin.zvuk');
+my $prefs = preferences('plugin.zvuk');
 my @pendingMeta;
 
 sub new {
@@ -76,8 +75,8 @@ sub getNextTrack {
 		}
 	}
 
-	# auto-load next batch of GigaMix tracks when approaching end of queue
-	if ($client) {
+	# auto-load next batch of GigaMix tracks when approaching end of queue if autoplay enabled
+	if ($client && $prefs->get('gigamix_autoplay')) {
 		my $is_gigamix = $client->pluginData('zvuk_gigamix_active');
 		if ($is_gigamix) {
 			my $playlist_size = Slim::Player::Playlist::count($client);

@@ -20,7 +20,6 @@ use Plugins::Zvuk::API::Async;
 use Plugins::Zvuk::ProtocolHandler;
 use Plugins::Zvuk::Settings;
 use Plugins::Zvuk::WaveSettings;
-use Plugins::Zvuk::WaveWizardUI;
 use Plugins::Zvuk::GigaMix;
 use Plugins::Zvuk::WaveUI;
 use Plugins::Zvuk::WebHandlers;
@@ -83,6 +82,11 @@ sub initPlugin {
 			Slim::Web::Pages->addRawFunction(
 				'plugins/zvuk/saveWaveSettings',
 				\&Plugins::Zvuk::WebHandlers::handleSaveWaveSettingsWeb
+			);
+
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/getWaveSettings',
+				\&Plugins::Zvuk::WebHandlers::handleGetWaveSettingsWeb
 			);
 
 			Slim::Web::Pages->addRawFunction(
@@ -808,33 +812,6 @@ sub handleEditorialPlaylists {
 			$cb->({ items => \@items });
 		}, $ids);
 	});
-}
-
-sub _renderArtistItem {
-	my ($artist) = @_;
-	return {
-		name     => $artist->{title},
-		type     => 'link',
-		url      => \&handleArtist,
-		image    => Plugins::Zvuk::API->getImageUrl($artist),
-		passthrough => [{ artistId => $artist->{id} }],
-	};
-}
-
-sub _renderReleaseItem {
-	my ($release) = @_;
-	return _renderRelease($release);
-}
-
-sub _renderPlaylistItem {
-	my ($playlist) = @_;
-	return {
-		name     => $playlist->{title},
-		type     => 'link',
-		url      => \&handlePlaylist,
-		image    => Plugins::Zvuk::API->getImageUrl($playlist),
-		passthrough => [{ playlistId => $playlist->{id} }],
-	};
 }
 
 # --- Rendering Helpers ---

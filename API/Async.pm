@@ -143,8 +143,8 @@ sub _graphql {
 	};
 
 	$log->info("GraphQL Request: $operationName (userId: $userId, cache: " . ($cacheKey ? "TTL=$ttl" : 'off') . ")");
-	if ($operationName eq 'getPersonalWave') {
-		$log->warn("ZVUK DEBUG getPersonalWave variables: " . encode_json($variables));
+	if ($operationName eq 'getPersonalWave' && $log->is_debug) {
+		$log->debug("ZVUK DEBUG getPersonalWave variables: " . encode_json($variables));
 	}
 
 	# THROTTLE: Acquire a rate limit slot (max 5 requests per second)

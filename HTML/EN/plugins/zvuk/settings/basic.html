@@ -240,7 +240,10 @@ var zvukStrings = {
 	notFound: '[% "PLUGIN_ZVUK_OAUTH_NOT_FOUND" | string %]',
 	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string %]',
 	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string %]',
-	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]'
+	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]',
+	anonLoading: '[% "PLUGIN_ZVUK_ANONYMOUS_LOADING" | string %]',
+	anonSuccess: '[% "PLUGIN_ZVUK_ANONYMOUS_SUCCESS" | string %]',
+	anonError: '[% "PLUGIN_ZVUK_ANONYMOUS_ERROR" | string %]'
 };
 
 function setDivStatus(div, text, type) {
@@ -345,22 +348,20 @@ function saveToken(token) {
 
 function getAnonymousToken() {
 	var statusDiv = document.getElementById('anonStatus');
-	setDivStatus(statusDiv, 'Получаем анонимный токен...', 'info');
+	setDivStatus(statusDiv, zvukStrings.anonLoading, 'info');
 
-	require('Plugins::Zvuk::API::Async');
-	// This would be called via server-side if available
 	fetch('/plugins/zvuk/getAnonymousToken', { method: 'POST' })
-		.then(r => r.json())
-		.then(d => {
+		.then(function(r) { return r.json(); })
+		.then(function(d) {
 			if (d.success) {
-				setDivStatus(statusDiv, 'Анонимный доступ активирован!', 'ok');
-				setTimeout(() => { location.reload(); }, 1500);
+				setDivStatus(statusDiv, zvukStrings.anonSuccess, 'ok');
+				setTimeout(function() { location.reload(); }, 1500);
 			} else {
-				setDivStatus(statusDiv, 'Ошибка: ' + d.error, 'error');
+				setDivStatus(statusDiv, zvukStrings.anonError.replace('[error]', d.error || ''), 'error');
 			}
 		})
-		.catch(e => {
-			setDivStatus(statusDiv, 'Ошибка сети: ' + e.message, 'error');
+		.catch(function(e) {
+			setDivStatus(statusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
 		});
 }
 </script>
