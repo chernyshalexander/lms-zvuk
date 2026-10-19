@@ -163,6 +163,7 @@ use warnings 'redefine';
 
 Plugins::Zvuk::ProtocolHandler::_loadMoreRadioTracks($client);
 
+is($last_gql->{vars}{first}, 3, 'T4: loaded more tracks with limit 3');
 is($last_gql->{vars}{cursor}, 20, 'T4: loaded more tracks with cursor 20');
 is($client->pluginData('zvuk_radio_cursor'), 40, 'T4: cursor updated to 40');
 is(scalar(@executed_requests), 2, 'T4: executed 2 playlist add requests');
@@ -195,6 +196,8 @@ my $track_menu = Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu(
 );
 
 ok($track_menu, 'T6: trackInfoMenu returned a menu');
+is($track_menu->{name}, 'PLUGIN_ZVUK_ON_ZVUK', 'T6: trackInfoMenu is named PLUGIN_ZVUK_ON_ZVUK');
+is($track_menu->{type}, 'outline', 'T6: trackInfoMenu has type outline');
 my $t_items = $track_menu->{items};
 is(scalar(@$t_items), 3, 'T6: trackInfoMenu has 3 items (track radio, artist radio, album radio)');
 is($t_items->[0]{name}, 'PLUGIN_ZVUK_TRACK_RADIO', 'T6: item 1 is Track Radio');
@@ -215,6 +218,8 @@ my $artist_menu = Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu(
 	{ artist => 'Artist 1' }
 );
 ok($artist_menu, 'T6b: artistInfoMenu returned a menu');
+is($artist_menu->{name}, 'PLUGIN_ZVUK_ON_ZVUK', 'T6b: artistInfoMenu is named PLUGIN_ZVUK_ON_ZVUK');
+is($artist_menu->{type}, 'outline', 'T6b: artistInfoMenu has type outline');
 is($artist_menu->{items}[0]{name}, 'PLUGIN_ZVUK_ARTIST_RADIO', 'T6b: item is Artist Radio');
 is($artist_menu->{items}[0]{itemActions}{go}{params}{url}, 'zvuk://radio:artist:201', 'T6b: URL is zvuk://radio:artist:201');
 

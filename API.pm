@@ -47,25 +47,53 @@ use constant IMAGE_SIZE => '500x500';
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
-# Return userId of the first configured account
+# Return userId of the active or default configured account
 sub getSomeUserId {
-    my $accounts = $prefs->get('accounts') || {};
-    my ($account) = keys %$accounts;
-    return $account;
+    my $accounts = $prefs->get('accounts');
+    return unless ref $accounts eq 'HASH' && keys %$accounts;
+
+    my $defaultUserId = $prefs->get('defaultUserId');
+    if (defined $defaultUserId && length($defaultUserId) && $accounts->{$defaultUserId} && $accounts->{$defaultUserId}{token}) {
+        return $defaultUserId;
+    }
+
+    # Otherwise return the first account with a valid token
+    foreach my $id (sort keys %$accounts) {
+        if ($accounts->{$id} && $accounts->{$id}{token}) {
+            return $id;
+        }
+    }
+    return;
 }
 
 # Return account data for a given userId
 sub getUserdata {
-    my ($class, $userId) = @_;
-    return unless $userId;
+    my ($class, $userId);
+    if (@_ <= 1) {
+        $class = __PACKAGE__;
+        $userId = $_[0] if @_ == 1 && $_[0] ne __PACKAGE__;
+    } else {
+        ($class, $userId) = @_;
+    }
+    $userId ||= Plugins::Zvuk::API->getSomeUserId();
+    return unless defined $userId && length($userId);
     my $accounts = $prefs->get('accounts') || return;
+    return unless ref $accounts eq 'HASH';
     return $accounts->{$userId};
 }
 
 # Return the token for a given userId
 sub getToken {
-    my ($class, $userId) = @_;
-    my $data = $class->getUserdata($userId);
+    my ($class, $userId);
+    if (@_ <= 1) {
+        $class = __PACKAGE__;
+        $userId = $_[0] if @_ == 1 && $_[0] ne __PACKAGE__;
+    } else {
+        ($class, $userId) = @_;
+    }
+    $userId ||= Plugins::Zvuk::API->getSomeUserId();
+    return unless defined $userId && length($userId);
+    my $data = Plugins::Zvuk::API->getUserdata($userId);
     return unless $data;
     return $data->{token};
 }

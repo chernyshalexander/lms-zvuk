@@ -320,7 +320,12 @@ sub trackInfoMenu {
 		};
 	}
 
-	return { items => \@items };
+	return unless @items;
+	return {
+		name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
+		type  => 'outline',
+		items => \@items,
+	};
 }
 
 sub artistInfoMenu {
@@ -363,7 +368,12 @@ sub artistInfoMenu {
 		},
 	);
 
-	return { items => \@items };
+	return unless @items;
+	return {
+		name  => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
+		type  => 'outline',
+		items => \@items,
+	};
 }
 
 

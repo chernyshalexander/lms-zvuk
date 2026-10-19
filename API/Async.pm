@@ -49,6 +49,18 @@ sub accountId {
 	return $self->{userId} // 'default';
 }
 
+sub clearClient {
+	my ($class, $userId) = @_;
+	if (@_ == 1) {
+		$userId = $class;
+	}
+	if (defined $userId) {
+		delete $apiClients{$userId};
+	} else {
+		%apiClients = ();
+	}
+}
+
 my %refreshInFlight;
 
 sub _resetThrottlerForTesting {

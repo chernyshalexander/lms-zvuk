@@ -385,7 +385,7 @@ sub _explodeRadio {
 
 		my @urls = map { 'zvuk://' . $_->{id} } @$tracks;
 		$cb->(\@urls);
-	}, $id, $type, 20, 0);
+	}, $id, $type, 3, 0);
 }
 
 sub isRemote { 1 }
@@ -542,7 +542,7 @@ sub _loadMoreRadioTracks {
 				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
 			);
 		}
-	}, $id, $type, 20, $cursor);
+	}, $id, $type, 3, $cursor);
 }
 
 sub _getAPIHandler {

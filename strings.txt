@@ -624,8 +624,8 @@ PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_TAB
 	RU	Новая вкладка браузера
 
 PLUGIN_ZVUK_ON_ZVUK
-	EN	On Zvuk...
-	RU	В Звуке...
+	EN	On Zvuk
+	RU	В Звуке
 
 PLUGIN_ZVUK_LIKE_ALBUM
 	EN	Save Album to Collection

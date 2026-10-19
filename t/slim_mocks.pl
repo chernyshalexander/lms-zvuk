@@ -51,6 +51,7 @@ sub init {
 }
 sub get { my ($self, $key) = @_; return $Slim::Utils::Prefs::STORE{$self->{ns}}{$key}; }
 sub set { my ($self, $key, $val) = @_; $Slim::Utils::Prefs::STORE{$self->{ns}}{$key} = $val; }
+sub remove { my ($self, $key) = @_; delete $Slim::Utils::Prefs::STORE{$self->{ns}}{$key}; }
 sub client {
     my ($self, $client) = @_;
     my $cid = ref($client) ? $client->id : $client;
@@ -60,6 +61,7 @@ sub client {
 package Slim::Utils::Prefs::ClientNamespace;
 sub get { my ($self, $key) = @_; return $Slim::Utils::Prefs::CLIENT_STORE{$self->{ns}}{$self->{cid}}{$key}; }
 sub set { my ($self, $key, $val) = @_; $Slim::Utils::Prefs::CLIENT_STORE{$self->{ns}}{$self->{cid}}{$key} = $val; }
+sub remove { my ($self, $key) = @_; delete $Slim::Utils::Prefs::CLIENT_STORE{$self->{ns}}{$self->{cid}}{$key}; }
 
 # ---- cache ----
 package Slim::Utils::Cache;
@@ -113,6 +115,7 @@ $INC{'Slim/Plugin/OPMLBased.pm'} = 1;
 package Slim::Web::Settings;
 our $VERSION = 1;
 sub beforeRender { }
+sub handler { return ''; }
 $INC{'Slim/Web/Settings.pm'} = 1;
 
 package Slim::Player::Protocols::HTTPS;

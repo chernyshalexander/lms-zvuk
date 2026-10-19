@@ -169,9 +169,21 @@ sub _onStop {
 	}
 }
 
+sub _clear_api_client {
+	my $userId = @_ > 1 ? $_[1] : $_[0];
+	if (defined $userId) {
+		delete $api_clients{$userId};
+	} else {
+		%api_clients = ();
+	}
+}
+
 sub _init_api_client {
-	my ($userId) = @_;
-	my $accounts = $prefs->get('accounts') || {};
+	my $userId = @_ > 1 ? $_[1] : $_[0];
+	return unless defined $userId && length($userId);
+
+	my $accounts = $prefs->get('accounts');
+	return unless ref $accounts eq 'HASH';
 	my $account  = $accounts->{$userId};
 
 	if ($account && $account->{token}) {
@@ -184,16 +196,43 @@ sub _init_api_client {
 
 sub _getUserIdForClient {
 	my ($client) = @_;
+	my $accounts = $prefs->get('accounts');
+	$accounts = {} unless ref $accounts eq 'HASH';
+
 	my $userId = $client ? $prefs->client($client)->get('userId') : undef;
-	return $userId || Plugins::Zvuk::API->getSomeUserId();
+
+	# If client has a valid, existing account with a token, use it
+	if (defined $userId && length($userId) && $accounts->{$userId} && $accounts->{$userId}{token}) {
+		return $userId;
+	}
+
+	# Stale or non-existent client userId (or client has none set):
+	# Fall back to defaultUserId or any valid configured account
+	my $fallbackUserId = Plugins::Zvuk::API->getSomeUserId();
+
+	# Self-heal: update client's preference to valid account
+	if ($client && defined $fallbackUserId && length($fallbackUserId)) {
+		eval {
+			$prefs->client($client)->set('userId', $fallbackUserId);
+		};
+		my $clientId = (ref $client && $client->can('id')) ? $client->id : "$client";
+		$log->info("Zvuk: Auto-healed client $clientId userId: " . (defined $userId ? $userId : 'undef') . " -> $fallbackUserId");
+	}
+
+	return $fallbackUserId;
 }
 
 sub _get_api_client {
 	my ($client) = @_;
 	my $userId = _getUserIdForClient($client);
-	return $api_clients{$userId} if $userId && $api_clients{$userId};
-	return _init_api_client($userId) if $userId;
-	return;
+	return unless defined $userId && length($userId);
+
+	my $accounts = $prefs->get('accounts');
+	return unless ref $accounts eq 'HASH';
+	return unless $accounts->{$userId} && $accounts->{$userId}{token};
+
+	return $api_clients{$userId} if $api_clients{$userId};
+	return _init_api_client($userId);
 }
 
 sub handleFeed {

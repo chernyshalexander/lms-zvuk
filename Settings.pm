@@ -38,6 +38,21 @@ sub handler {
 				delete $accounts->{$userId};
 				$prefs->set('accounts', $accounts);
 				$log->info("Zvuk Settings: Deleted account userId=$userId");
+
+				# If deleted account was defaultUserId, reassign or clear
+				if ($prefs->get('defaultUserId') && $prefs->get('defaultUserId') eq $userId) {
+					my $newDefault = Plugins::Zvuk::API->getSomeUserId();
+					if ($newDefault) {
+						$prefs->set('defaultUserId', $newDefault);
+					} else {
+						$prefs->remove('defaultUserId');
+					}
+				}
+
+				# Clear cached API clients
+				Plugins::Zvuk::Plugin::_clear_api_client($userId);
+				require Plugins::Zvuk::API::Async;
+				Plugins::Zvuk::API::Async->clearClient($userId);
 			}
 		}
 	}
@@ -65,6 +80,14 @@ sub handler {
 						};
 						$prefs->set('accounts', $accounts);
 						$log->info("Zvuk Settings: Account added: userId=$userId, name=$accountName");
+
+						# Ensure defaultUserId is set
+						my $currDefault = $prefs->get('defaultUserId');
+						if (!$currDefault || !exists $accounts->{$currDefault} || !$accounts->{$currDefault}{token}) {
+							$prefs->set('defaultUserId', $userId);
+						}
+
+						Plugins::Zvuk::Plugin::_init_api_client($userId);
 					}
 					else {
 						$log->error("Zvuk Settings: Token validation failed.");

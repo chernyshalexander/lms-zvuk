@@ -320,10 +320,13 @@ sub handleSaveOAuthToken {
 				};
 				$prefs->set('accounts', $accounts);
 
-				# Update defaultUserId if unset or if pointing to old temp account
-				if (!$prefs->get('defaultUserId') || $prefs->get('defaultUserId') eq $tempUserId) {
+				# Update defaultUserId if unset, pointing to old temp account, or pointing to non-existent/invalid account
+				my $currDefault = $prefs->get('defaultUserId');
+				if (!$currDefault || $currDefault eq $tempUserId || !exists $accounts->{$currDefault} || !$accounts->{$currDefault}{token}) {
 					$prefs->set('defaultUserId', $userId);
 				}
+
+				Plugins::Zvuk::Plugin::_init_api_client($userId);
 
 				# Migrate any connected players assigned to the tempUserId
 				if (UNIVERSAL::can('Slim::Player::Client', 'clients')) {
@@ -915,9 +918,12 @@ sub handleVerifySmsCode {
 						};
 						$prefs->set('accounts', $accounts);
 
-						if (!$prefs->get('defaultUserId')) {
+						my $currDefault = $prefs->get('defaultUserId');
+						if (!$currDefault || !exists $accounts->{$currDefault} || !$accounts->{$currDefault}{token}) {
 							$prefs->set('defaultUserId', $userId);
 						}
+
+						Plugins::Zvuk::Plugin::_init_api_client($userId);
 
 						$log->info("SMS OTP: Account saved: userId=$userId, name=$accountName");
 
