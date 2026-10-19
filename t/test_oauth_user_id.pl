@@ -206,4 +206,74 @@ package Test::FakeHTTPHandlerResponse {
     ok(!exists $accounts->{substr($badToken, 0, 16)}, 'Bad token temp account was NOT created in accounts');
 }
 
+# -------------------------------------------------------------------------
+# Test 5: Full nested JSON profile payload passed directly
+# -------------------------------------------------------------------------
+{
+    my $fullProfileJson = '{"result":{"token":"aabbccddeeff00112233445566778899","id":112233,"name":"JSON User"}}';
+
+    @Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+        {
+            code => 200,
+            content => encode_json({
+                result => {
+                    id => 112233,
+                    name => 'JSON User'
+                }
+            })
+        }
+    );
+
+    @Slim::Web::HTTP::CAPTURED_RESPONSES = ();
+    my $req = Test::FakeHTTPRequest->new($fullProfileJson);
+    my $httpConn = Test::FakeHTTPConnection->new($req);
+    my $resp = Test::FakeHTTPHandlerResponse->new($req);
+
+    Plugins::Zvuk::WebHandlers::handleSaveOAuthToken($httpConn, $resp);
+
+    is(scalar @Slim::Web::HTTP::CAPTURED_RESPONSES, 1, 'Full JSON: response sent');
+    is($Slim::Web::HTTP::CAPTURED_RESPONSES[0]{response}->code, 200, 'Full JSON: HTTP 200');
+    my $body = decode_json($Slim::Web::HTTP::CAPTURED_RESPONSES[0]{body});
+    is($body->{success}, 1, 'Full JSON: success = 1');
+    is($body->{account}{userId}, 112233, 'Full JSON: extracted userId');
+
+    my $accounts = $Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts};
+    is($accounts->{112233}{token}, 'aabbccddeeff00112233445566778899', 'Full JSON: token correctly extracted');
+}
+
+# -------------------------------------------------------------------------
+# Test 6: Raw dirty text string with whitespace or key-value format
+# -------------------------------------------------------------------------
+{
+    my $dirtyTokenPayload = encode_json({ token => "   token: 99887766554433221100ffeeddccbbaa  \n" });
+
+    @Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+        {
+            code => 200,
+            content => encode_json({
+                result => {
+                    id => 445566,
+                    name => 'Regex User'
+                }
+            })
+        }
+    );
+
+    @Slim::Web::HTTP::CAPTURED_RESPONSES = ();
+    my $req = Test::FakeHTTPRequest->new($dirtyTokenPayload);
+    my $httpConn = Test::FakeHTTPConnection->new($req);
+    my $resp = Test::FakeHTTPHandlerResponse->new($req);
+
+    Plugins::Zvuk::WebHandlers::handleSaveOAuthToken($httpConn, $resp);
+
+    is(scalar @Slim::Web::HTTP::CAPTURED_RESPONSES, 1, 'Dirty token: response sent');
+    is($Slim::Web::HTTP::CAPTURED_RESPONSES[0]{response}->code, 200, 'Dirty token: HTTP 200');
+    my $body = decode_json($Slim::Web::HTTP::CAPTURED_RESPONSES[0]{body});
+    is($body->{success}, 1, 'Dirty token: success = 1');
+    is($body->{account}{userId}, 445566, 'Dirty token: extracted userId');
+
+    my $accounts = $Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts};
+    is($accounts->{445566}{token}, '99887766554433221100ffeeddccbbaa', 'Dirty token: clean 32-hex extracted');
+}
+
 done_testing();

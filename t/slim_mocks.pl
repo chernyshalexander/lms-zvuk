@@ -152,7 +152,7 @@ sub post {
         if ($resp->{network_error}) {
             $self->{errorCb}->($self, $resp->{network_error}, undef);
         } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
-            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
+            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code}, $resp->{content});
             $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
         } else {
             $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));
@@ -174,7 +174,7 @@ sub get {
         if ($resp->{network_error}) {
             $self->{errorCb}->($self, $resp->{network_error}, undef);
         } elsif ($resp->{code} && $resp->{code} !~ /^2/) {
-            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code});
+            my $fakeResponse = Test::FakeHTTPResponse->new($resp->{code}, $resp->{content});
             $self->{errorCb}->($self, "$resp->{code} " . ($resp->{message} || 'Error'), $fakeResponse);
         } else {
             $self->{successCb}->(Test::FakeHTTPResponse->new($resp->{code} // 200, $resp->{content}));

@@ -186,7 +186,8 @@
     - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
 
 ### [Фаза 0.5] Автоматический Refresh токена при HTTP 401 (`API/Async.pm`, `API.pm`, `Settings.pm`, `basic.html`, `strings.txt`)
-* **Статус:** 🟢 Реализовано, протестировано (15/15 наборов тестов успешно пройдены, включая новый сьют `t/test_token_refresh.pl` из 29 проверок). Ожидает подтверждения ручной проверки перед коммитом.
+* **Статус:** 🟢 Выполнено (коммит `fc89ac1`, ручная проверка отложена пользователем на потом).
+* **Коммит:** `fc89ac1` (`feat(auth): implement automatic token refresh on HTTP 401 via /api/tiny/refresh (Phase 0.5)`)
 * **Выполненные изменения:**
   1. `API.pm`:
      - Добавлена константа `REFRESH_URL => 'https://zvuk.com/api/tiny/refresh'`.
@@ -233,3 +234,91 @@
     - `t/test_timer_absolute_time.pl` (11 проверок - ok)
     - `t/test_vfd_genres_knob.pl` (14 проверок - ok)
     - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+
+### [Фаза 0.6] Вход по номеру телефона (SMS OTP) (`API.pm`, `Plugin.pm`, `WebHandlers.pm`, `basic.html`, `strings.txt`, `t/test_sms_otp.pl`)
+* **Статус:** 🟢 Выполнено и подтверждено пользователем (коммит `0222c87`).
+* **Коммит:** `0222c87` (`feat(auth): add SMS OTP WAF mapping and automated web login auto-capture (Phase 0.6)`)
+* **Выполненные изменения:**
+  1. `API.pm`:
+     - Добавлены константы эндпоинтов авторизации Звука по SMS из реверс-инжиниринга APK:
+       - `ROUTE_AUTH_URL => 'https://zvuk.com/api/tiny/route-authorization-type'` (маршрутизация способа входа)
+       - `GET_MCODE_URL => 'https://zvuk.com/api/tiny/get-mcode'` (запрос SMS)
+       - `LOGIN_OTP_URL => 'https://zvuk.com/api/tiny/login/otp'` (верификация 4-значного OTP)
+     - Добавлены константы мобильного клиента Звука для прохождения WAF:
+       - `APP_VERSION_ANDROID => '4.116.0rs'`
+       - `APP_BUILD_ANDROID   => '511600228'`
+  2. `Plugin.pm`:
+     - Зарегистрированы raw веб-эндпоинты в `initPlugin`:
+       - `plugins/zvuk/requestSmsCode` -> `Plugins::Zvuk::WebHandlers::handleRequestSmsCode`
+       - `plugins/zvuk/verifySmsCode` -> `Plugins::Zvuk::WebHandlers::handleVerifySmsCode`
+  3. `WebHandlers.pm`:
+     - `handleRequestSmsCode`:
+       - Нормализует телефонный номер (очистка от пробелов, скобок, тире; преобразование форматов `8XXXXXXXXXX` и `7XXXXXXXXXX` в E.164 `+7XXXXXXXXXX`).
+       - Валидирует формат E.164 (regex `^\+[1-9]\d{9,14}$`).
+       - Отправляет HTTP POST на `ROUTE_AUTH_URL` с параметром `phone` и мобильными заголовками (`X-C-P: Q`, `X-App-Version`, `X-App-Build`).
+       - Если Звук возвращает `authorization_type: "login_hint"` (номер привязан к Сбер ID или паролю), возвращает пользователю понятную локализованную подсказку о необходимости входа через кнопку «Войти через Zvuk» или ручной ввод токена.
+       - Если Звук возвращает `authorization_type: "otp"` (или при деградации ответа), отправляет POST к `GET_MCODE_URL` с корректными параметрами из APK: `phone`, `type=login`, `length=4`.
+       - Извлекает понятное сообщение об ошибке при сбое и возвращает JSON клиенту.
+     - `handleVerifySmsCode`:
+       - Проверяет код (очищает нецифровые символы, длина 4-6 цифр).
+       - Отправляет HTTP POST на `LOGIN_OTP_URL` в формате `application/x-www-form-urlencoded` с заголовком `X-C-P: Q`, мобильными заголовками и телом `phone=...&code=...`.
+       - При успешном получении auth-токена выполняет асинхронный запрос профиля через `Plugins::Zvuk::API::Async->getProfile`.
+       - Извлекает настоящее имя пользователя через `Plugins::Zvuk::API->extractAccountName` и реальный числовой `userId`.
+       - Сохраняет аккаунт в настройках плагина (`accounts->{$userId}`) с токеном, телефоном, именем и сброшенным флагом `stale => 0`.
+       - Назначает `defaultUserId`, если он ещё не был задан.
+       - Возвращает клиенту JSON с `success: 1` и данными аккаунта.
+  4. `HTML/EN/plugins/zvuk/settings/basic.html`:
+     - Добавлен нативный блок «Вход по номеру телефона (SMS)»:
+       - Поле ввода телефона с плейсхолдером `+7 (999) 123-45-67`.
+       - Кнопка «Получить код».
+       - Скрытый до отправки SMS блок ввода кода (4 цифры) и кнопка «Войти».
+       - Информационные статусные сообщения с анимацией ожидания и выводом ошибок.
+       - JavaScript функции `sendSmsCode()` и `verifySmsCode()` с автоматической перезагрузкой страницы настроек после успешного входа.
+  5. `strings.txt`:
+     - Добавлены 9 локализованных строк (EN и RU) для интерфейса SMS OTP, включая `PLUGIN_ZVUK_PHONE_LOGIN_HINT`.
+  6. `t/slim_mocks.pl`:
+     - Обновлен мок `Test::FakeHTTPResponse` для сохранения `$resp->{content}` при не-2xx ответах для тестирования извлечения текстов ошибок.
+  7. `t/test_sms_otp.pl`:
+     - Создан новый тестовый сьют (6 сценариев, 54 проверки):
+       - Сценарий 1: Валидация входных данных `requestSmsCode` (пустой телефон, некорректный формат).
+       - Сценарий 2: Корректная нормализация телефона `8 (999) 123-45-67` -> `+79991234567`, цепочка `route-authorization-type` (`auth_type: "otp"`) ➔ `get-mcode` с параметрами `phone`, `type=login`, `length=4` и заголовками `X-C-P: Q`, `X-App-Version: 4.116.0rs`, `X-App-Build: 511600228`.
+       - Сценарий 2b: Номер с `auth_type: "login_hint"` (Сбер ID / пароль) ➔ возврат HTTP 400 с информативным пояснением и блокировкой лишнего вызова `get-mcode`.
+       - Сценарий 3: Валидация входных данных `verifySmsCode` (отсутствие кода, слишком короткий код).
+       - Сценарий 4: Ошибка проверки кода со стороны Звука (HTTP 400) с передачей текста ошибки клиенту и отсутствием записей в преференсах.
+       - Сценарий 5: Успешная верификация кода, отправка form-urlencoded с полем `phone=...`, цепочка `getProfile`, парсинг имени, сохранение аккаунта с телефоном под реальным `userId`.
+* **Результаты тестов:**
+  - 16/16 тестовых сьютов успешно пройдены без ошибок:
+    - `t/test_sms_otp.pl` (54 проверки - ok)
+    - `t/test_token_refresh.pl` (29 проверок - ok)
+    - `t/test_oauth_user_id.pl` (34 проверки - ok)
+    - `t/test_wave_feedback.pl` (18 проверок - ok)
+    - `t/test_http_get.pl` (19 проверок - ok)
+    - `t/test_cache_batch.pl` (11 проверок - ok)
+    - `t/test_album_context_menu.pl` (25 проверок - ok)
+    - `t/test_editorial_playlists.pl` (6 проверок - ok)
+    - `t/test_episode_playback.pl` (7 проверок - ok)
+    - `t/test_graphql_error_classification.pl` (6 проверок - ok)
+    - `t/test_multi_page_recommendations.pl` (17 проверок - ok)
+    - `t/test_recommendations_menu.pl` (11 проверок - ok)
+    - `t/test_synthesis_playlists.pl` (6 проверок - ok)
+    - `t/test_timer_absolute_time.pl` (11 проверок - ok)
+    - `t/test_vfd_genres_knob.pl` (14 проверок - ok)
+    - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+* **Анализ расхождений и исправления на основе декомпиляции APK (`com/zvuk/login`):**
+  1. В `get-mcode` параметр называется `phone` (а не `phone_number`), `type=login` (а не `type=sms`), `length=4`.
+  2. Добавлен предварительный запрос к `route-authorization-type?phone=...`, определяющий способ входа для конкретного номера телефона.
+  3. В `login/otp` параметр в теле формы `phone` (а не `phone_number`).
+  4. Добавлены мобильные заголовки версии `X-App-Version: 4.116.0rs` и `X-App-Build: 511600228`.
+  5. Перехват блокировки Servicepipe WAF: при возврате HTTP 403 Forbidden с сервера Звука выдается понятное русскоязычное пояснение `PLUGIN_ZVUK_PHONE_AUTH_BLOCKED` с предложением использовать кнопку входа через браузер или ввод токена, без выброса необработанных исключений или зацикливания.
+  6. Реализована автоматизация входа через браузер («Войти через Звук»):
+     - **Способ 1 (ручной):** Традиционные шаги (авторизация -> окно профиля -> ручное копирование 32 hex символов token -> вставка в поле выше).
+     - **Способ 2 (быстрый, Smart Clipboard Auto-Capture & Global Paste):**
+       - Реализовано авто-извлечение токена из текста, буфера обмена и JSON-структур (regex `/(?:token["']?\s*:\s*["']?|\b)([a-f0-9]{32})\b/i`).
+       - Глобальный слушатель `paste` на всей странице настроек (пользователь может нажать Ctrl+V в любом месте).
+       - Слушатель `window.onfocus`: при возвращении фокуса на вкладку LMS автоматически проверяется `navigator.clipboard.readText()`.
+       - Добавлена кнопка «Вставить из буфера» в секции добавления аккаунта.
+       - Автоматическое закрытие всплывающего окна профиля после распознавания токена.
+     - **Бэкенд:** `handleSaveOAuthToken` в `WebHandlers.pm` обновлен для поддержки как чистых токенов, так и полного JSON-профиля или произвольного текста, с выводом ответов в UTF-8 JSON.
+     - Расширен тестовый сьют `t/test_oauth_user_id.pl` (34 теста: проверены вложенный JSON-профиль и неформатированный текст с пробелами).
+
+

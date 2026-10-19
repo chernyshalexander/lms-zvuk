@@ -188,14 +188,28 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 [% WRAPPER setting title="PLUGIN_ZVUK_ADD_ACCOUNT" desc="PLUGIN_ZVUK_ADD_ACCOUNT_DESC" %]
 	<div class="prefDesc">
 		<input type="password" name="new_account_token" id="new_account_token" value="" class="stdedit" size="40"
-			placeholder="[% 'PLUGIN_ZVUK_TOKEN_PLACEHOLDER' | string %]">
+			placeholder="[% 'PLUGIN_ZVUK_TOKEN_PLACEHOLDER' | string %]"
+			oninput="var t = extractTokenFromString(this.value); if (t && t !== this.value) { this.value = t; }">
+		<button type="button" onclick="pasteFromClipboard(); return false;" class="stdbutton" style="margin-left:8px;">[% "PLUGIN_ZVUK_PASTE_CLIPBOARD_BTN" | string %]</button>
 	</div>
+[% END %]
+
+[% WRAPPER setting title="PLUGIN_ZVUK_PHONE_AUTH_TITLE" desc="PLUGIN_ZVUK_PHONE_AUTH_DESC" %]
+	<div>
+		<input type="tel" id="zvuk_phone_input" placeholder="+7 999 123-45-67" class="stdedit" size="20">
+		<button type="button" id="btn_send_sms" onclick="sendSmsCode(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_SEND_SMS_BUTTON" | string %]</button>
+	</div>
+	<div id="smsCodeContainer" style="display:none; margin-top:10px;">
+		<input type="text" id="zvuk_sms_code_input" placeholder="[% 'PLUGIN_ZVUK_SMS_CODE_PLACEHOLDER' | string %]" maxlength="6" class="stdedit" size="12">
+		<button type="button" id="btn_verify_sms" onclick="verifySmsCode(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_LOGIN_BUTTON" | string %]</button>
+	</div>
+	<div id="smsStatus" style="margin-top:10px; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
 [% END %]
 
 [% WRAPPER setting title="PLUGIN_ZVUK_OAUTH_TITLE" desc="PLUGIN_ZVUK_OAUTH_DESC" %]
 	<button type="button" onclick="openZvukOAuthWindow(); return false;" class="stdbutton">[% "PLUGIN_ZVUK_OAUTH_BUTTON" | string %]</button>
 	<div id="oauthStatus" style="margin:10px 0; padding:8px; border-radius:4px; display:none; font-size:12px;"></div>
-	<div class="prefDesc" style="margin-top:10px; font-size:11px; max-width: 600px;">
+	<div class="prefDesc" style="margin-top:10px; font-size:11px; max-width: 650px; line-height: 1.5;">
 		[% "PLUGIN_ZVUK_OAUTH_INSTRUCTIONS" | string %]
 	</div>
 [% END %]
@@ -233,6 +247,9 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 <script>
 var zvukCallbackUrl = window.location.protocol + '//' + window.location.host + '/plugins/zvuk/saveOAuthToken';
 var zvukStatusDiv = null;
+var zvukOAuthInProgress = false;
+var zvukProfilePopup = null;
+
 var zvukStrings = {
 	openingWindow: '[% "PLUGIN_ZVUK_OAUTH_OPENING_WINDOW" | string %]',
 	popupError: '[% "PLUGIN_ZVUK_OAUTH_POPUP_ERROR" | string %]',
@@ -244,9 +261,13 @@ var zvukStrings = {
 	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string %]',
 	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string %]',
 	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]',
+	tokenDetected: '[% "PLUGIN_ZVUK_OAUTH_TOKEN_DETECTED" | string %]',
 	anonLoading: '[% "PLUGIN_ZVUK_ANONYMOUS_LOADING" | string %]',
 	anonSuccess: '[% "PLUGIN_ZVUK_ANONYMOUS_SUCCESS" | string %]',
-	anonError: '[% "PLUGIN_ZVUK_ANONYMOUS_ERROR" | string %]'
+	anonError: '[% "PLUGIN_ZVUK_ANONYMOUS_ERROR" | string %]',
+	smsCodeSent: '[% "PLUGIN_ZVUK_SMS_CODE_SENT" | string %]',
+	invalidPhone: '[% "PLUGIN_ZVUK_INVALID_PHONE" | string %]',
+	invalidCode: '[% "PLUGIN_ZVUK_INVALID_SMS_CODE" | string %]'
 };
 
 function setDivStatus(div, text, type) {
@@ -264,9 +285,86 @@ function setDivStatus(div, text, type) {
 	div.setAttribute('data-status', type);
 }
 
+function extractTokenFromString(str) {
+	if (!str || typeof str !== 'string') return null;
+	var trimmed = str.trim();
+	var m = trimmed.match(/(?:token["']?\s*:\s*["']?|\b)([a-f0-9]{32})\b/i);
+	return m ? m[1] : null;
+}
+
+function handleAutoPastedText(text) {
+	var token = extractTokenFromString(text);
+	if (token) {
+		console.log('Valid token auto-detected from text/clipboard');
+		var statusDiv = document.getElementById('oauthStatus');
+		zvukStatusDiv = statusDiv;
+		setDivStatus(statusDiv, zvukStrings.tokenDetected, 'ok');
+		if (zvukProfilePopup && !zvukProfilePopup.closed) {
+			try { zvukProfilePopup.close(); } catch(e) {}
+		}
+		zvukOAuthInProgress = false;
+		saveToken(token);
+		return true;
+	}
+	return false;
+}
+
+
+// Option 1: Global paste anywhere on page
+document.addEventListener('paste', function(e) {
+	var clip = e.clipboardData || window.clipboardData;
+	if (clip) {
+		var text = clip.getData('text');
+		if (text && handleAutoPastedText(text)) {
+			e.preventDefault();
+		}
+	}
+});
+
+// Option 1: Auto-check clipboard on window focus when OAuth is in progress
+window.addEventListener('focus', function() {
+	if (zvukOAuthInProgress && navigator.clipboard && navigator.clipboard.readText) {
+		navigator.clipboard.readText().then(function(text) {
+			if (text) {
+				handleAutoPastedText(text);
+			}
+		}).catch(function() {
+			// Permission or user gesture required in some browsers
+		});
+	}
+});
+
+function pasteFromClipboard() {
+	if (navigator.clipboard && navigator.clipboard.readText) {
+		navigator.clipboard.readText().then(function(text) {
+			var token = extractTokenFromString(text);
+			if (token) {
+				var input = document.getElementById('new_account_token');
+				if (input) input.value = token;
+				var statusDiv = document.getElementById('oauthStatus');
+				zvukStatusDiv = statusDiv;
+				setDivStatus(statusDiv, zvukStrings.tokenDetected, 'ok');
+				saveToken(token);
+			} else {
+				alert(zvukStrings.notFound || 'Токен не найден в буфере обмена');
+			}
+		}).catch(function(err) {
+			alert('Не удалось прочитать буфер обмена: ' + err.message);
+		});
+	} else {
+		var input = document.getElementById('new_account_token');
+		if (input) {
+			input.focus();
+			input.select();
+			alert('Нажмите Ctrl+V для вставки');
+		}
+	}
+}
+
 function openZvukOAuthWindow() {
 	var statusDiv = document.getElementById('oauthStatus');
 	zvukStatusDiv = statusDiv;
+	zvukOAuthInProgress = true;
 	setDivStatus(statusDiv, zvukStrings.openingWindow, 'info');
 
 	var width = 520, height = 620;
@@ -287,15 +385,24 @@ function openZvukOAuthWindow() {
 			setDivStatus(statusDiv, zvukStrings.gettingProfile, 'info');
 			// Open profile window for user to copy token
 			setTimeout(function() {
-				var profilePopup = window.open('https://zvuk.com/api/tiny/profile', 'zvukProfile',
+				zvukProfilePopup = window.open('https://zvuk.com/api/tiny/profile', 'zvukProfile',
 					'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top);
 				setDivStatus(statusDiv, zvukStrings.copyJsonInstruction, 'info');
 			}, 300);
 		}
 	}, 500);
+
+	// Reset in-progress flag after 10 minutes
+	setTimeout(function() {
+		zvukOAuthInProgress = false;
+	}, 600000);
 }
 
 function saveToken(token) {
+	if (!zvukStatusDiv) {
+		zvukStatusDiv = document.getElementById('oauthStatus');
+	}
+	setDivStatus(zvukStatusDiv, zvukStrings.saving, 'info');
 	console.log('saveToken called with URL: ' + zvukCallbackUrl);
 	return fetch(zvukCallbackUrl, {
 		method: 'POST',
@@ -304,17 +411,11 @@ function saveToken(token) {
 	})
 	.then(function(r) {
 		console.log('Response status: ' + r.status);
-		console.log('Response headers:', r.headers.get('content-type'));
 		if (!r.ok) {
 			console.error('HTTP error: ' + r.status + ' ' + r.statusText);
 			throw new Error('HTTP ' + r.status);
 		}
-		var text = r.text();
-		console.log('Response text (before parse):', text);
-		return text.then(function(txt) {
-			console.log('Response text content:', txt);
-			return JSON.parse(txt);
-		});
+		return r.json();
 	})
 	.then(function(d) {
 		console.log('Response data (parsed):', d);
@@ -324,13 +425,12 @@ function saveToken(token) {
 				message = zvukStrings.accountAdded.replace('[name]', d.account.name);
 			}
 			setDivStatus(zvukStatusDiv, message, 'ok');
-			// Clear input
-			var input = document.getElementById('zvuk_token_input');
+			var input = document.getElementById('new_account_token') || document.getElementById('zvuk_token_input');
 			if (input) {
 				input.value = '';
 			}
 		} else {
-			setDivStatus(zvukStatusDiv, zvukStrings.networkError.replace('[error]', d.error), 'error');
+			setDivStatus(zvukStatusDiv, zvukStrings.networkError.replace('[error]', (d && d.error) || 'Failed'), 'error');
 		}
 	})
 	.catch(function(e) {
@@ -338,13 +438,11 @@ function saveToken(token) {
 		setDivStatus(zvukStatusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
 	})
 	.finally(function() {
-		// Only reload after everything is complete
-		// Wait 2-3 seconds to allow getProfile to complete in background
 		if (zvukStatusDiv && zvukStatusDiv.getAttribute('data-status') === 'ok') {
-			console.log('Reloading page in 2.5 seconds...');
+			console.log('Reloading page in 2 seconds...');
 			setTimeout(function() {
 				window.location.reload(true);
-			}, 2500);
+			}, 2000);
 		}
 	});
 }
@@ -366,6 +464,75 @@ function getAnonymousToken() {
 		.catch(function(e) {
 			setDivStatus(statusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
 		});
+}
+
+function sendSmsCode() {
+	var statusDiv = document.getElementById('smsStatus');
+	var phoneInput = document.getElementById('zvuk_phone_input');
+	var phone = phoneInput ? phoneInput.value.trim() : '';
+
+	if (!phone) {
+		setDivStatus(statusDiv, zvukStrings.invalidPhone, 'error');
+		return;
+	}
+
+	setDivStatus(statusDiv, zvukStrings.saving, 'info');
+
+	fetch('/plugins/zvuk/requestSmsCode', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ phone: phone })
+	})
+	.then(function(r) { return r.json(); })
+	.then(function(d) {
+		if (d && d.success) {
+			setDivStatus(statusDiv, zvukStrings.smsCodeSent.replace('[phone]', d.phone || phone), 'ok');
+			var container = document.getElementById('smsCodeContainer');
+			if (container) container.style.display = 'block';
+			var codeInput = document.getElementById('zvuk_sms_code_input');
+			if (codeInput) codeInput.focus();
+		} else {
+			var errMsg = (d && d.error) ? d.error : zvukStrings.networkError.replace('[error]', 'Error');
+			setDivStatus(statusDiv, errMsg, 'error');
+		}
+	})
+	.catch(function(e) {
+		setDivStatus(statusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
+	});
+}
+
+function verifySmsCode() {
+	var statusDiv = document.getElementById('smsStatus');
+	var phoneInput = document.getElementById('zvuk_phone_input');
+	var codeInput = document.getElementById('zvuk_sms_code_input');
+	var phone = phoneInput ? phoneInput.value.trim() : '';
+	var code = codeInput ? codeInput.value.trim() : '';
+
+	if (!code) {
+		setDivStatus(statusDiv, zvukStrings.invalidCode, 'error');
+		return;
+	}
+
+	setDivStatus(statusDiv, zvukStrings.saving, 'info');
+
+	fetch('/plugins/zvuk/verifySmsCode', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ phone: phone, code: code })
+	})
+	.then(function(r) { return r.json(); })
+	.then(function(d) {
+		if (d && d.success) {
+			var msg = zvukStrings.accountAdded.replace('[name]', (d.account && d.account.name) || phone);
+			setDivStatus(statusDiv, msg, 'ok');
+			setTimeout(function() { window.location.reload(true); }, 1500);
+		} else {
+			setDivStatus(statusDiv, zvukStrings.networkError.replace('[error]', (d && d.error) || 'Invalid code'), 'error');
+		}
+	})
+	.catch(function(e) {
+		setDivStatus(statusDiv, zvukStrings.networkError.replace('[error]', e.message), 'error');
+	});
 }
 </script>
 

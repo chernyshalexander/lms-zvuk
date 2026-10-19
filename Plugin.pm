@@ -104,6 +104,16 @@ sub initPlugin {
 				\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
 			);
 
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/requestSmsCode',
+				\&Plugins::Zvuk::WebHandlers::handleRequestSmsCode
+			);
+
+			Slim::Web::Pages->addRawFunction(
+				'plugins/zvuk/verifySmsCode',
+				\&Plugins::Zvuk::WebHandlers::handleVerifySmsCode
+			);
+
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/imageproxy',
 			\&Plugins::Zvuk::WebHandlers::handleImageProxy

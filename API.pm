@@ -8,10 +8,17 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 
 # --- URLs ---
-use constant GRAPHQL_URL  => 'https://zvuk.com/api/v1/graphql';
-use constant PROFILE_URL  => 'https://zvuk.com/api/tiny/profile';
-use constant REFRESH_URL  => 'https://zvuk.com/api/tiny/refresh';
-use constant TINY_API_URL => 'https://zvuk.com/api/tiny';
+use constant GRAPHQL_URL    => 'https://zvuk.com/api/v1/graphql';
+use constant PROFILE_URL    => 'https://zvuk.com/api/tiny/profile';
+use constant REFRESH_URL    => 'https://zvuk.com/api/tiny/refresh';
+use constant ROUTE_AUTH_URL => 'https://zvuk.com/api/tiny/route-authorization-type';
+use constant GET_MCODE_URL  => 'https://zvuk.com/api/tiny/get-mcode';
+use constant LOGIN_OTP_URL  => 'https://zvuk.com/api/tiny/login/otp';
+use constant TINY_API_URL   => 'https://zvuk.com/api/tiny';
+
+# --- Mobile app constants (for Android OTP auth endpoints) ---
+use constant APP_VERSION_ANDROID => '4.116.0rs';
+use constant APP_BUILD_ANDROID   => '511600228';
 
 # --- Cache TTLs (seconds) ---
 use constant DEFAULT_TTL      => 86400;   # 24h  - albums, artists, static content

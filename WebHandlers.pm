@@ -254,27 +254,41 @@ sub handleSaveOAuthToken {
 	};
 
 	if ($@) {
-		$log->error("OAuth: Failed to parse JSON: $@");
+		$log->warn("OAuth: Failed to parse body as strict JSON: $@ (will try regex extraction)");
 	}
 
-	if ($@ || !$data || !$data->{token}) {
-		$log->error("OAuth: Failed to parse token request: $@ | data: " . ($data ? 'exists' : 'null') . " | token: " . ($data->{token} ? 'exists' : 'null'));
+	my $token = $data ? ($data->{token} || ($data->{result} && $data->{result}{token})) : undef;
+	if (!$token && $body) {
+		if ($body =~ /(?:token["']?\s*:\s*["']?|\b)([0-9a-f]{32})\b/i) {
+			$token = $1;
+		}
+	}
+
+	if ($token) {
+		$token =~ s/^\s+|\s+$//g;
+		if ($token =~ /(?:token["']?\s*:\s*["']?|\b)([0-9a-f]{32})\b/i) {
+			$token = $1;
+		}
+	}
+
+	if (!$token) {
+		$log->error("OAuth: Missing token in request: body=$body");
 		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Missing token' });
+		$response->content_type('application/json; charset=utf-8');
+		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+		my $json = $json_encoder->encode({ success => 0, error => 'Missing token' });
 		$response->content_length(length($json));
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
 	}
 
-	my $token = $data->{token};
-
 	# Validate token format (32 hex characters)
 	if ($token !~ /^[0-9a-f]{32}$/i) {
 		$log->error("OAuth: Invalid token format: $token");
 		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Invalid token format' });
+		$response->content_type('application/json; charset=utf-8');
+		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+		my $json = $json_encoder->encode({ success => 0, error => 'Invalid token format' });
 		$response->content_length(length($json));
 		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 		return;
@@ -344,8 +358,9 @@ sub handleSaveOAuthToken {
 				$log->error("OAuth: Failed to fetch profile for token: $err");
 
 				$response->code(400);
-				$response->content_type('application/json');
-				my $json = encode_json({ success => 0, error => $err });
+				$response->content_type('application/json; charset=utf-8');
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({ success => 0, error => $err });
 				$response->content_length(length($json));
 				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 			}
@@ -666,6 +681,306 @@ sub handleImageProxy {
 
 	$log->debug("Image proxy: fetching $url");
 	$http->get($url, %headers);
+}
+
+
+# Request SMS OTP code for a phone number
+sub handleRequestSmsCode {
+	my ($httpClient, $response) = @_;
+
+	$log->info("SMS OTP: Received code request");
+
+	my $request = $response->request;
+	my $body = $request->content_ref ? ${$request->content_ref} : '';
+
+	my $data = eval { decode_json($body) };
+	my $rawPhone = $data && $data->{phone};
+
+	if (!$rawPhone) {
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Missing phone number' });
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	# Normalize phone number (strip whitespace, dashes, parens)
+	my $phone = $rawPhone;
+	$phone =~ s/[\s\-\(\)\.]+//g;
+	$phone =~ s/^8/+7/;
+	$phone =~ s/^7/+7/;
+	$phone = "+$phone" unless $phone =~ /^\+/;
+
+	if ($phone !~ /^\+[1-9]\d{9,14}$/) {
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Invalid phone number format' });
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	require URI::Escape;
+	my %headers = (
+		'x-c-p'         => 'Q',
+		'x-app-name'    => Plugins::Zvuk::API::APP_NAME,
+		'x-app-version' => Plugins::Zvuk::API::APP_VERSION_ANDROID,
+		'x-app-build'   => Plugins::Zvuk::API::APP_BUILD_ANDROID,
+		'user-agent'    => Plugins::Zvuk::API::USER_AGENT,
+		'accept'        => 'application/json',
+		'content-type'  => 'application/json',
+	);
+
+	my $do_get_mcode = sub {
+		my $mcode_url = Plugins::Zvuk::API::GET_MCODE_URL . '?phone=' . URI::Escape::uri_escape($phone) . '&type=login&length=4';
+		$log->info("SMS OTP: Requesting code for $phone via $mcode_url");
+
+		my $http_mcode = Slim::Networking::SimpleAsyncHTTP->new(
+			sub {
+				my $resp = shift;
+				my $resp_content = $resp->content;
+				my $resp_code = $resp->code;
+
+				my $resp_data = eval { decode_json($resp_content) };
+				if ($resp_code == 200) {
+					$log->info("SMS OTP: Code successfully requested for $phone");
+					$response->code(200);
+					$response->content_type('application/json');
+					my $json = encode_json({ success => 1, phone => $phone });
+					$response->content_length(length($json));
+					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				} else {
+					my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "HTTP error $resp_code";
+					$log->error("SMS OTP: Failed to send code for $phone: $err");
+					$response->code(400);
+					$response->content_type('application/json');
+					my $json = encode_json({ success => 0, error => $err });
+					$response->content_length(length($json));
+					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				}
+			},
+			sub {
+				my ($http, $error, $resp) = @_;
+				my $code = $resp ? $resp->code : 500;
+				if ($code == 403 || ($error && $error =~ /403/)) {
+					$log->warn("SMS OTP: get-mcode rejected with 403 Forbidden by service security for $phone");
+					$response->code(400);
+					$response->content_type('application/json; charset=utf-8');
+					my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
+						|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
+					my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+					my $json = $json_encoder->encode({ success => 0, error => $err_text, blocked => 1 });
+					$response->content_length(length($json));
+					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+					return;
+				}
+
+				my $err_msg;
+				if ($resp && $resp->content) {
+					my $resp_data = eval { decode_json($resp->content) };
+					$err_msg = $resp_data && ($resp_data->{error} || $resp_data->{message});
+				}
+				$err_msg ||= $error || 'Network error';
+				$log->error("SMS OTP: Network/HTTP error requesting code for $phone: $err_msg");
+				$response->code(400);
+				$response->content_type('application/json; charset=utf-8');
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({ success => 0, error => $err_msg });
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			},
+			{ timeout => 15 }
+		);
+
+		$http_mcode->post($mcode_url, %headers, '{}');
+	};
+
+	# Step 1: Check authorization routing for this phone
+	my $route_url = Plugins::Zvuk::API::ROUTE_AUTH_URL . '?phone=' . URI::Escape::uri_escape($phone);
+	$log->info("SMS OTP: Checking authorization route for $phone via $route_url");
+
+	my $http_route = Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $resp = shift;
+			my $resp_content = $resp->content;
+			my $resp_data = eval { decode_json($resp_content) };
+
+			my $auth_type = $resp_data && ($resp_data->{result} && $resp_data->{result}{authorization_type} || $resp_data->{authorization_type});
+
+			if ($auth_type && lc($auth_type) eq 'login_hint') {
+				$log->info("SMS OTP: Phone $phone routed to login_hint (SberID/password required)");
+				$response->code(400);
+				$response->content_type('application/json');
+				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_LOGIN_HINT')
+					|| 'Этот номер использует вход по Сбер ID или паролю. Пожалуйста, используйте кнопку «Войти через Zvuk» или введите токен вручную.';
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({ success => 0, error => $err_text, auth_type => 'login_hint' });
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				return;
+			}
+
+			# Routed to OTP (or other): proceed with get-mcode
+			$do_get_mcode->();
+		},
+		sub {
+			my ($http, $error, $resp) = @_;
+			my $code = $resp ? $resp->code : 500;
+			if ($code == 403 || ($error && $error =~ /403/)) {
+				$log->warn("SMS OTP: route-authorization-type rejected with 403 Forbidden for $phone");
+				$response->content_type('application/json; charset=utf-8');
+				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
+					|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({ success => 0, error => $err_text, blocked => 1 });
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				return;
+			}
+			$log->warn("SMS OTP: route-authorization-type query failed ($error), falling back to get-mcode");
+			$do_get_mcode->();
+		},
+		{ timeout => 10 }
+	);
+
+	$http_route->post($route_url, %headers, '{}');
+}
+
+# Verify SMS OTP code and log in
+sub handleVerifySmsCode {
+	my ($httpClient, $response) = @_;
+
+	$log->info("SMS OTP: Received code verification request");
+
+	my $request = $response->request;
+	my $body = $request->content_ref ? ${$request->content_ref} : '';
+
+	my $data = eval { decode_json($body) };
+	my $phone = $data && $data->{phone};
+	my $code  = $data && $data->{code};
+
+	if (!$phone || !$code) {
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Missing phone or code' });
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	# Clean code (digits only)
+	$code =~ s/\D//g;
+	if (length($code) < 4 || length($code) > 6) {
+		$response->code(400);
+		$response->content_type('application/json');
+		my $json = encode_json({ success => 0, error => 'Invalid code length' });
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		return;
+	}
+
+	require URI::Escape;
+	my $form_body = 'phone=' . URI::Escape::uri_escape($phone) . '&code=' . URI::Escape::uri_escape($code);
+	$log->info("SMS OTP: Verifying code for $phone via " . Plugins::Zvuk::API::LOGIN_OTP_URL);
+
+	my $http = Slim::Networking::SimpleAsyncHTTP->new(
+		sub {
+			my $resp = shift;
+			my $resp_content = $resp->content;
+			my $resp_code = $resp->code;
+
+			my $resp_data = eval { decode_json($resp_content) };
+			my $token = $resp_data && ($resp_data->{result} && $resp_data->{result}{token} || $resp_data->{token});
+
+			if ($token) {
+				$log->info("SMS OTP: Verification successful for $phone, fetching profile");
+
+				# Fetch profile to get real userId and display name
+				require Plugins::Zvuk::API::Async;
+				Plugins::Zvuk::API::Async->getProfile(
+					sub {
+						my $profile = shift;
+						my $userId = ($profile && $profile->{id}) || ($resp_data->{result} && $resp_data->{result}{id}) || ($resp_data->{id}) || substr($token, 0, 16);
+						my $accountName = Plugins::Zvuk::API->extractAccountName($profile, $userId);
+
+						my $prefs = preferences('plugin.zvuk');
+						my $accounts = $prefs->get('accounts') || {};
+
+						$accounts->{$userId} = {
+							token => $token,
+							name  => $accountName,
+							phone => $phone,
+							stale => 0,
+						};
+						$prefs->set('accounts', $accounts);
+
+						if (!$prefs->get('defaultUserId')) {
+							$prefs->set('defaultUserId', $userId);
+						}
+
+						$log->info("SMS OTP: Account saved: userId=$userId, name=$accountName");
+
+						$response->code(200);
+						$response->content_type('application/json');
+						my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+						my $json = $json_encoder->encode({
+							success => 1,
+							account => {
+								userId => $userId,
+								name   => $accountName,
+							}
+						});
+						$response->content_length(length($json));
+						Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+					},
+					$token
+				);
+			} else {
+				my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "Invalid code or login failed (HTTP $resp_code)";
+				$log->error("SMS OTP: Login failed for $phone: $err");
+				$response->code(400);
+				$response->content_type('application/json; charset=utf-8');
+				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+				my $json = $json_encoder->encode({ success => 0, error => $err });
+				$response->content_length(length($json));
+				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			}
+		},
+		sub {
+			my ($http, $error, $resp) = @_;
+			my $code = $resp ? $resp->code : 500;
+			my $err_msg;
+			if ($code == 403 || ($error && $error =~ /403/)) {
+				$err_msg = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
+					|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
+			} elsif ($resp && $resp->content) {
+				my $resp_data = eval { decode_json($resp->content) };
+				$err_msg = $resp_data && ($resp_data->{error} || $resp_data->{message});
+			}
+			$err_msg ||= $error || 'Verification request failed';
+			$log->error("SMS OTP: Network/HTTP error verifying code for $phone: $err_msg");
+			$response->code(400);
+			$response->content_type('application/json; charset=utf-8');
+			my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+			my $json = $json_encoder->encode({ success => 0, error => $err_msg });
+			$response->content_length(length($json));
+			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		},
+		{ timeout => 15 }
+	);
+
+	my %headers = (
+		'x-c-p'         => 'Q',
+		'x-app-name'    => Plugins::Zvuk::API::APP_NAME,
+		'x-app-version' => Plugins::Zvuk::API::APP_VERSION_ANDROID,
+		'x-app-build'   => Plugins::Zvuk::API::APP_BUILD_ANDROID,
+		'user-agent'    => Plugins::Zvuk::API::USER_AGENT,
+		'accept'        => 'application/json',
+		'content-type'  => 'application/x-www-form-urlencoded',
+	);
+
+	$http->post(Plugins::Zvuk::API::LOGIN_OTP_URL, %headers, $form_body);
 }
 
 1;

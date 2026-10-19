@@ -54,6 +54,46 @@ PLUGIN_ZVUK_AUTH_EXPIRED
 	EN	Authorization expired. Please re-login in plugin settings.
 	RU	Срок авторизации истёк. Требуется повторный вход в настройках плагина.
 
+PLUGIN_ZVUK_PHONE_AUTH_TITLE
+	EN	Login via Phone Number (SMS)
+	RU	Вход по номеру телефона (SMS)
+
+PLUGIN_ZVUK_PHONE_AUTH_DESC
+	EN	Fast native authorization via SMS code directly from Zvuk
+	RU	Быстрый нативный вход по коду из SMS напрямую от сервиса Звук
+
+PLUGIN_ZVUK_SEND_SMS_BUTTON
+	EN	Get SMS Code
+	RU	Получить SMS-код
+
+PLUGIN_ZVUK_SMS_CODE_PLACEHOLDER
+	EN	Code from SMS
+	RU	Код из SMS
+
+PLUGIN_ZVUK_LOGIN_BUTTON
+	EN	Log in
+	RU	Войти
+
+PLUGIN_ZVUK_SMS_CODE_SENT
+	EN	Verification code sent to [phone]
+	RU	Код подтверждения отправлен на номер [phone]
+
+PLUGIN_ZVUK_INVALID_PHONE
+	EN	Invalid phone number format. Please enter as +7...
+	RU	Некорректный формат номера телефона. Введите в формате +7...
+
+PLUGIN_ZVUK_INVALID_SMS_CODE
+	EN	Please enter the SMS code
+	RU	Пожалуйста, введите код из SMS
+
+PLUGIN_ZVUK_PHONE_LOGIN_HINT
+	EN	This account uses Sber ID or password login. Please use "Login with Zvuk" or paste token manually.
+	RU	Этот номер использует вход по Сбер ID или паролю. Пожалуйста, используйте кнопку «Войти через Zvuk» или введите токен вручную.
+
+PLUGIN_ZVUK_PHONE_AUTH_BLOCKED
+	EN	Direct SMS authorization is unavailable: request rejected by service security (anti-bot protection). Please use "Login with Zvuk" button below or paste your token manually.
+	RU	Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.
+
 PLUGIN_ZVUK_QUALITY
 	EN	Streaming Quality
 	RU	Качество звука
@@ -360,8 +400,8 @@ PLUGIN_ZVUK_OAUTH_GETTING_PROFILE
 	RU	Откройте профиль для получения токена...
 
 PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION
-	EN	Copy JSON from profile window and paste below
-	RU	Скопируйте JSON из окна профиля и вставьте ниже
+	EN	In the profile window press Ctrl+A, Ctrl+C (select all and copy) and switch back here — token will be saved automatically!
+	RU	В окне профиля нажмите Ctrl+A, затем Ctrl+C (выделить всё и скопировать) и переключитесь обратно на эту страницу — токен сохранится автоматически!
 
 PLUGIN_ZVUK_OAUTH_ALGORITHM
 	EN	Steps to authorize:
@@ -399,9 +439,17 @@ PLUGIN_ZVUK_OAUTH_STEP_8
 	EN	Press ENTER or click Apply
 	RU	Нажмите ENTER или кнопку Apply
 
+PLUGIN_ZVUK_OAUTH_TOKEN_DETECTED
+	EN	Token recognized from clipboard! Saving account...
+	RU	Токен распознан из буфера обмена! Сохраняем аккаунт...
+
+PLUGIN_ZVUK_PASTE_CLIPBOARD_BTN
+	EN	Paste from clipboard
+	RU	Вставить из буфера
+
 PLUGIN_ZVUK_OAUTH_INSTRUCTIONS
-	EN	Click Login, sign in, close the window. Profile JSON opens automatically. Find "token" field (32 chars), copy it, paste in the field above, press ENTER.
-	RU	Нажмите Войти, авторизуйтесь, закройте окно. Профиль JSON откроется автоматически. Найдите поле "token" (32 символа), скопируйте его, вставьте в поле выше, нажмите ENTER.
+	EN	<b>Method 1:</b> Click "Login with Zvuk", sign in, close the "Zvuk" service window. In the opened profile window find "token" field (32 chars), copy it, paste in the field above, press ENTER.<br><br><b>Method 2:</b> Click "Login with Zvuk", sign in, close the "Zvuk" service window. In the opened profile window press Ctrl+A, then Ctrl+C (select all and copy) and switch back to this page — the token will be saved automatically!
+	RU	<b>Способ 1:</b> Нажмите «Войти через Звук», авторизуйтесь, окно сервиса "Звук" закройте. В открывшемся окне профиля найдите поле "token" (32 символа), скопируйте его, вставьте в поле выше, нажмите ENTER.<br><br><b>Способ 2:</b> Нажмите «Войти через Звук», авторизуйтесь, окно сервиса "Звук" закройте. В открывшемся окне профиля нажмите Ctrl+A, затем Ctrl+C (выделить всё и скопировать) и переключитесь обратно на эту страницу — токен сохранится автоматически!
 
 PLUGIN_ZVUK_OAUTH_SAVING
 	EN	Saving token...
