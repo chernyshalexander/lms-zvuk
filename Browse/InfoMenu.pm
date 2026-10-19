@@ -28,16 +28,26 @@ sub menuInfoCLI {
 	my $url     = $request->getParam('url')  || ($type && $id ? "zvuk://$type:$id" : '');
 	my $album   = $request->getParam('album')  || '';
 	my $artist  = $request->getParam('artist') || '';
+	my $artist_id  = $request->getParam('artist_id') || '';
+	my $track      = $request->getParam('track')  || '';
+	my $release_id = $request->getParam('release_id') || '';
 
 	my $remoteMeta = {
-		album  => $album,
-		artist => $artist,
-		url    => $url,
+		album      => $album,
+		artist     => $artist,
+		artist_id  => $artist_id,
+		track      => $track,
+		release_id => $release_id,
+		url        => $url,
 	};
 
 	my $feed;
-	if ($type eq 'album' || $url =~ m{zvuk://(?:album[:/])?(\d+)}) {
+	if ($type eq 'album' || $url =~ m{^zvuk://album[:/](\d+)}) {
 		$feed = albumInfoMenu($client, $url, undef, $remoteMeta);
+	} elsif ($type eq 'artist' || $url =~ m{^zvuk://artist[:/](\d+)}) {
+		$feed = artistInfoMenu($client, $url, undef, $remoteMeta);
+	} elsif ($type eq 'track' || $url =~ m{^zvuk://(?:track[:/])?(\d+)}) {
+		$feed = trackInfoMenu($client, $url, undef, $remoteMeta);
 	}
 
 	$feed ||= { items => [{ name => cstring($client, 'EMPTY'), type => 'text' }] };
@@ -136,6 +146,26 @@ sub albumInfoMenu {
 			},
 		},
 		{
+			name        => cstring($client, 'PLUGIN_ZVUK_ALBUM_RADIO'),
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			image       => 'html/images/radio.png',
+			url         => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', 'zvuk://radio:release:' . $albumId]);
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => 'zvuk://radio:release:' . $albumId },
+					nextWindow => 'nowPlaying',
+				},
+			},
+		},
+		{
 			name        => cstring($client, $favToken),
 			type        => 'link',
 			nextWindow  => 'parent',
@@ -174,6 +204,168 @@ sub albumInfoMenu {
 
 	return { items => \@items };
 }
+
+sub trackInfoMenu {
+	my ($client, $url, $track, $remoteMeta) = @_;
+
+	my $trackUrl = $url || ($track && blessed($track) && $track->can('url') ? $track->url : '') || ($remoteMeta ? ($remoteMeta->{url} || '') : '') || '';
+	my $trackId;
+	if ($trackUrl =~ m{zvuk://(?:track[:/])?(\d+)}) {
+		$trackId = $1;
+	}
+
+	return unless $trackId;
+
+	my $api = Plugins::Zvuk::Plugin::_get_api_client($client);
+	return unless $api;
+
+	my $trackTitle  = ($remoteMeta && $remoteMeta->{track}) || ($track && blessed($track) && $track->can('title') ? $track->title : '');
+	my $artistTitle = ($remoteMeta && $remoteMeta->{artist}) || ($track && blessed($track) && $track->can('artist') ? $track->artist : '');
+	my $artistId    = ($remoteMeta && $remoteMeta->{artist_id});
+	my $albumTitle  = ($remoteMeta && $remoteMeta->{album}) || ($track && blessed($track) && $track->can('album') ? $track->album : '');
+	my $releaseId   = ($remoteMeta && $remoteMeta->{release_id});
+
+	# If missing details, try retrieving from track cache
+	if (!$artistId || !$artistTitle || !$trackTitle) {
+		if (my $cached = Plugins::Zvuk::API->cache->get("zvuk_meta_$trackId")) {
+			$trackTitle  ||= $cached->{title};
+			$artistTitle ||= $cached->{artist};
+			if ($cached->{artists} && ref $cached->{artists} eq 'ARRAY' && $cached->{artists}->[0]) {
+				$artistId ||= $cached->{artists}->[0]->{id};
+			}
+			if ($cached->{release} && ref $cached->{release} eq 'HASH') {
+				$releaseId  ||= $cached->{release}->{id};
+				$albumTitle ||= $cached->{release}->{title};
+			}
+		}
+	}
+
+	my $radioTrackUrl  = 'zvuk://radio:track:' . $trackId;
+	my $radioArtistUrl = $artistId ? ('zvuk://radio:artist:' . $artistId) : undef;
+	my $radioAlbumUrl  = $releaseId ? ('zvuk://radio:release:' . $releaseId) : undef;
+
+	my @items;
+
+	# 1. Track Radio
+	push @items, {
+		name        => cstring($client, 'PLUGIN_ZVUK_TRACK_RADIO'),
+		type        => 'link',
+		nextWindow  => 'nowPlaying',
+		playcontrol => 'play',
+		image       => 'html/images/radio.png',
+		url         => sub {
+			my ($client, $cb) = @_;
+			Slim::Control::Request::executeRequest($client, ['playlist', 'play', $radioTrackUrl]);
+			$cb->({ items => [] });
+		},
+		itemActions => {
+			go => {
+				player     => 0,
+				cmd        => ['playlist', 'play'],
+				params     => { url => $radioTrackUrl },
+				nextWindow => 'nowPlaying',
+			},
+		},
+	};
+
+	# 2. Artist Radio (if artist is known)
+	if ($radioArtistUrl) {
+		my $name = cstring($client, 'PLUGIN_ZVUK_ARTIST_RADIO');
+		$name .= " ($artistTitle)" if $artistTitle;
+		push @items, {
+			name        => $name,
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			image       => 'html/images/radio.png',
+			url         => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $radioArtistUrl]);
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => $radioArtistUrl },
+					nextWindow => 'nowPlaying',
+				},
+			},
+		};
+	}
+
+	# 3. Album Radio (if album is known)
+	if ($radioAlbumUrl) {
+		my $name = cstring($client, 'PLUGIN_ZVUK_ALBUM_RADIO');
+		$name .= " ($albumTitle)" if $albumTitle;
+		push @items, {
+			name        => $name,
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			image       => 'html/images/radio.png',
+			url         => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $radioAlbumUrl]);
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => $radioAlbumUrl },
+					nextWindow => 'nowPlaying',
+				},
+			},
+		};
+	}
+
+	return { items => \@items };
+}
+
+sub artistInfoMenu {
+	my ($client, $url, $artist, $remoteMeta) = @_;
+
+	my $artistUrl = $url || ($artist && blessed($artist) && $artist->can('url') ? $artist->url : '') || ($remoteMeta ? ($remoteMeta->{url} || '') : '') || '';
+	my $artistId;
+	if ($artistUrl =~ m{zvuk://(?:artist[:/])?(\d+)}) {
+		$artistId = $1;
+	}
+
+	return unless $artistId;
+
+	my $api = Plugins::Zvuk::Plugin::_get_api_client($client);
+	return unless $api;
+
+	my $artistTitle = ($remoteMeta && $remoteMeta->{artist}) || ($artist && blessed($artist) && $artist->can('name') ? $artist->name : '');
+	my $radioUrl = 'zvuk://radio:artist:' . $artistId;
+
+	my @items = (
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_ARTIST_RADIO'),
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			image       => 'html/images/radio.png',
+			url         => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $radioUrl]);
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => $radioUrl },
+					nextWindow => 'nowPlaying',
+				},
+			},
+		},
+	);
+
+	return { items => \@items };
+}
+
 
 sub _doLikeRelease {
 	my ($client, $cb, $args, $api, $releaseId) = @_;

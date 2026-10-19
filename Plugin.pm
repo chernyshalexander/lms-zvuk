@@ -58,6 +58,18 @@ sub initPlugin {
 				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
 			) );
 		}
+		if (defined &Slim::Menu::TrackInfo::registerInfoProvider) {
+			Slim::Menu::TrackInfo->registerInfoProvider( zvuk => (
+				after => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu,
+			) );
+		}
+		if (defined &Slim::Menu::ArtistInfo::registerInfoProvider) {
+			Slim::Menu::ArtistInfo->registerInfoProvider( zvuk => (
+				after => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu,
+			) );
+		}
 	};
 	
 	if (main::WEBUI) {
@@ -147,8 +159,13 @@ sub _onStop {
 	if ($action eq 'stop' || ($action eq 'playlist' && $request->getRequest(1) eq 'clear')) {
 		$client->pluginData(zvuk_wave_active => 0);
 		$client->pluginData(zvuk_gigamix_active => 0);
+		$client->pluginData(zvuk_radio_active => 0);
+		$client->pluginData(zvuk_radio_entity_id => undef);
+		$client->pluginData(zvuk_radio_entity_type => undef);
+		$client->pluginData(zvuk_radio_cursor => undef);
+		$client->pluginData(zvuk_radio_loading => 0);
 		$client->pluginData(zvuk_wave_last_track => undef);
-		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active and zvuk_wave_last_track flags");
+		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active, zvuk_radio_active and zvuk_wave_last_track flags");
 	}
 }
 
@@ -406,8 +423,29 @@ sub _searchGeneric {
 sub handleArtist {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
+	my $radioUrl = 'zvuk://radio:artist:' . $id;
 
 	$cb->({ items => [
+		{
+			name        => cstring($client, 'PLUGIN_ZVUK_ARTIST_RADIO'),
+			type        => 'link',
+			nextWindow  => 'nowPlaying',
+			playcontrol => 'play',
+			image       => 'html/images/radio.png',
+			url         => sub {
+				my ($client, $cb) = @_;
+				Slim::Control::Request::executeRequest($client, ['playlist', 'play', $radioUrl]);
+				$cb->({ items => [] });
+			},
+			itemActions => {
+				go => {
+					player     => 0,
+					cmd        => ['playlist', 'play'],
+					params     => { url => $radioUrl },
+					nextWindow => 'nowPlaying',
+				},
+			},
+		},
 		{
 			name        => cstring($client, 'SONGS'),
 			type        => 'link',
@@ -831,6 +869,8 @@ sub _renderTrack {
 	my ($track, $showArtist) = @_;
 	my $url = 'zvuk://' . $track->{id};
 	my $artist = _getArtistName($track);
+	my $artist_id = ($track->{artists} && ref $track->{artists} eq 'ARRAY' && $track->{artists}->[0]) ? $track->{artists}->[0]->{id} : '';
+	my $release_id = ($track->{release} && ref $track->{release} eq 'HASH') ? $track->{release}->{id} : '';
 
 	return {
 		name            => $track->{title} . ($showArtist ? " - " . $artist : ""),
@@ -847,6 +887,21 @@ sub _renderTrack {
 		playall         => 1,
 		type            => 'audio',
 		image           => Plugins::Zvuk::API->getImageUrl($track),
+		itemActions     => {
+			info => {
+				command     => ['zvuk_info', 'items'],
+				fixedParams => {
+					type       => 'track',
+					id         => $track->{id},
+					url        => $url,
+					track      => $track->{title},
+					artist     => $artist,
+					artist_id  => $artist_id,
+					album      => ($track->{release}->{title} || ''),
+					release_id => $release_id,
+				},
+			},
+		},
 	};
 }
 
@@ -887,12 +942,19 @@ sub _renderAlbum {
 
 sub _renderArtist {
 	my ($artist) = @_;
+	my $url = 'zvuk://artist:' . $artist->{id};
 	return {
-		name      => $artist->{title},
-		type      => 'link',
-		url       => \&handleArtist,
+		name        => $artist->{title},
+		type        => 'link',
+		url         => \&handleArtist,
 		passthrough => [{ id => $artist->{id} }],
-		image     => Plugins::Zvuk::API->getImageUrl($artist),
+		image       => Plugins::Zvuk::API->getImageUrl($artist),
+		itemActions => {
+			info => {
+				command     => ['zvuk_info', 'items'],
+				fixedParams => { type => 'artist', id => $artist->{id}, url => $url, artist => $artist->{title} },
+			},
+		},
 	};
 }
 

@@ -1,0 +1,61 @@
+#!/usr/bin/env perl
+# Fake LMS client + fake raw-HTTP-request objects for t/reproduce_p0_multiaccount_bugs.pl
+use strict;
+use warnings;
+
+package Test::FakeClient;
+my $next_id = 1;
+sub new {
+    my ($class, %args) = @_;
+    my $self = bless {
+        id          => $args{id} || ('fakeclient' . $next_id++),
+        name        => $args{name} || 'FakeClient',
+        _pluginData => {},
+    }, $class;
+    $Slim::Player::Client::CLIENTS{$self->{id}} = $self;
+    return $self;
+}
+sub id   { return $_[0]->{id}; }
+sub name { return $_[0]->{name}; }
+sub pluginData {
+    my $self = shift;
+    if (@_ == 2) {
+        my ($key, $val) = @_;
+        $self->{_pluginData}{$key} = $val;
+        return $val;
+    }
+    elsif (@_ == 1) {
+        return $self->{_pluginData}{$_[0]};
+    }
+    return $self->{_pluginData};
+}
+
+package Test::FakeURI;
+sub new { my ($class, %params) = @_; return bless { params => { %params } }, $class; }
+sub query_param { my ($self, $key) = @_; return $self->{params}{$key}; }
+
+package Test::FakeRequest;
+sub new {
+    my ($class, %args) = @_;
+    return bless {
+        client  => $args{client},
+        cmd     => $args{cmd} || [],
+        uri     => Test::FakeURI->new(%{ $args{query} || {} }),
+        headers => $args{headers} || {},
+        content => $args{content},
+    }, $class;
+}
+sub client         { return $_[0]->{client}; }
+sub getRequest     { my ($self, $idx) = @_; return $self->{cmd}[$idx]; }
+sub uri            { return $_[0]->{uri}; }
+sub header         { my ($self, $name) = @_; return $self->{headers}{$name}; }
+sub content_ref    { my $c = $_[0]->{content}; return \$c; }
+
+package Test::FakeResponse;
+sub new { my ($class, $request) = @_; return bless { request => $request }, $class; }
+sub request      { return $_[0]->{request}; }
+sub code         { my $self = shift; $self->{code} = shift if @_; return $self->{code}; }
+sub content_type { my $self = shift; $self->{content_type} = shift if @_; return $self->{content_type}; }
+sub content_length { my $self = shift; $self->{content_length} = shift if @_; return $self->{content_length}; }
+
+1;

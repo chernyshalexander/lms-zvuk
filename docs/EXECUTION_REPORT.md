@@ -12,11 +12,11 @@
 |---|---|---|---|
 | **Фаза 0.1** | Пакетный коммит: мелкие багфиксы, утечка памяти в Retry, гигиена и мёртвый код | ✅ Завершено | `5624759` |
 | **Фаза 0.2** | Встраивание `_http_get` в конвейер `Throttle`/`Retry` | ✅ Завершено | `cb7eff9` |
-| **Фаза 0.3** | Сохранение обратной связи Волны (`ProtocolHandler.pm`) | 🔍 Готово к проверке | - |
-| **Фаза 0.4** | Асинхронный резолвинг `userId` в `WebHandlers.pm` | 📋 Запланировано | - |
-| **Фаза 0.5** | Автоматический refresh токена при HTTP 401 (`/api/tiny/refresh`) | 📋 Запланировано | - |
-| **Фаза 0.6** | Нативный вход по номеру телефона (SMS OTP) | 📋 Запланировано | - |
-| **Фаза 1.1** | Потоковое радио по треку/артисту/альбому (`recommenderRadio`) | 📋 Запланировано | - |
+| **Фаза 0.3** | Сохранение обратной связи Волны (`ProtocolHandler.pm`) | ✅ Завершено | `b464d0c` |
+| **Фаза 0.4** | Асинхронный резолвинг `userId` в `WebHandlers.pm` | ✅ Завершено | `4472b5d` |
+| **Фаза 0.5** | Автоматический refresh токена при HTTP 401 (`/api/tiny/refresh`) | ✅ Завершено | `fc89ac1` |
+| **Фаза 0.6** | Нативный вход по номеру телефона (SMS OTP) и автозахват токена | ✅ Завершено | `0ab8770` |
+| **Фаза 1.1** | Потоковое радио по треку/артисту/альбому (`recommenderRadio`) | 🔍 Готово к проверке | `8275f4d` |
 | **Фаза 1.2** | Интеграция с плагином LMS «Don't Stop The Music» (DSTM) | 📋 Запланировано | - |
 | **Фаза 1.3** | Синхронизированные тексты песен (Musixmatch) | 📋 Запланировано | - |
 | **Фаза 1.4** | Эфирные цифровые радиостанции (`getRadioStations`) | 📋 Запланировано | - |
@@ -320,5 +320,85 @@
        - Автоматическое закрытие всплывающего окна профиля после распознавания токена.
      - **Бэкенд:** `handleSaveOAuthToken` в `WebHandlers.pm` обновлен для поддержки как чистых токенов, так и полного JSON-профиля или произвольного текста, с выводом ответов в UTF-8 JSON.
      - Расширен тестовый сьют `t/test_oauth_user_id.pl` (34 теста: проверены вложенный JSON-профиль и неформатированный текст с пробелами).
+
+### [Фаза 1.1] Потоковое бесконечное радио по сущности (`recommenderRadio`)
+* **Статус:** 🔍 Готово к проверке / ожидает ручной проверки.
+* **Коммит:** `8275f4d` (`feat(radio): implement recommenderRadio infinite stream and context menus (Phase 1.1)`)
+* **Выполненные изменения:**
+  1. `API/Async.pm`:
+     - Добавлен метод `getRecommenderRadio($self, $cb, $id, $type, $limit, $cursor)`:
+       - GraphQL операция `recommenderRadio` на основе реверс-инжиниринга APK 4.116.0rs (`query_recommenderRadio.graphql`).
+       - Поддержка сущностей перечисления `RecommenderRadioEntityType`: `TRACK`, `ARTIST`, `RELEASE`, `PLAYLIST` (с авто-маппингом `album` ➔ `RELEASE`).
+       - Поддержка пагинации по числовому курсору `cursor`.
+       - Принудительный TTL = 0 (потоковое динамическое радио не кэшируется между сессиями).
+     - В `_getCacheTTL` добавлено исключение для `recommenderRadio`.
+  2. `ProtocolHandler.pm`:
+     - Регистрация URI схемы бесконечного радио: `zvuk://radio:track:<id>`, `zvuk://radio:artist:<id>`, `zvuk://radio:release:<id>`.
+     - `getFormatForURL`: возвращает `undef` для `zvuk://radio:*` и `zvuk://wave`, предотвращая ошибочные попытки парсинга контейнеров как аудиопотоков.
+     - `getMetadataFor`: возвращает `{}` для `zvuk://radio:*` и `zvuk://wave`.
+     - `explodePlaylist`: перехватывает URI `^zvuk://radio:(\w+):(\d+)` и передает в `_explodeRadio`.
+     - `_explodeRadio`:
+       - Переводит плеер в режим радио (`zvuk_radio_active = 1`, `zvuk_radio_entity_id`, `zvuk_radio_entity_type`, `zvuk_radio_cursor = 0`).
+       - Сбрасывает взаимоисключающие режимы Волны и GigaMix (`zvuk_wave_active = 0`, `zvuk_gigamix_active = 0`).
+       - Запрашивает первую пачку из 20 треков, сохраняет следующий `cursor`, кэширует метаданные треков в `Plugins::Zvuk::API->cache` и возвращает список URL `zvuk://<id>`.
+     - `getNextTrack`: при остатке в очереди плейлиста $\le 2$ треков автоматически вызывает `_loadMoreRadioTracks($client)`.
+     - `_loadMoreRadioTracks`:
+       - Защищен от параллельных дублирующих вызовов флагом `zvuk_radio_loading`.
+       - Выполняет запрос следующей пачки треков с сохраненным `cursor`.
+       - Бесшовно дописывает треки в конец очереди воспроизведения через `Slim::Control::Request::executeRequest($client, ['playlist', 'add', ...])`.
+       - Обновляет `zvuk_radio_cursor`.
+  3. `Plugin.pm`:
+     - `initPlugin`: зарегистрированы провайдеры контекстных меню LMS:
+       - `Slim::Menu::TrackInfo->registerInfoProvider(zvuk => ...)`
+       - `Slim::Menu::ArtistInfo->registerInfoProvider(zvuk => ...)`
+       - (в дополнение к уже существовавшему `Slim::Menu::AlbumInfo`).
+     - `_onStop`: при остановке воспроизведения (`stop`) или очистке очереди (`playlist clear`) сбрасывает все флаги состояния радио (`zvuk_radio_active`, `zvuk_radio_entity_id`, `zvuk_radio_entity_type`, `zvuk_radio_cursor`, `zvuk_radio_loading`).
+     - `handleArtist`: в верхнюю позицию меню артиста добавлен пункт прямого запуска радио артиста (`PLUGIN_ZVUK_ARTIST_RADIO`) с иконкой радио и мгновенной очисткой/стартом воспроизведения.
+     - `_renderTrack`: добавлено свойство `itemActions->{info}`, связывающее трек с контекстным меню `zvuk_info` (передает `type => 'track'`, `id`, `url`, `artist_id`, `release_id`).
+     - `_renderArtist`: добавлено свойство `itemActions->{info}`, связывающее артиста с контекстным меню `zvuk_info`.
+  4. `Browse/InfoMenu.pm`:
+     - `menuInfoCLI`: расширен роутинг для обработки параметров `type => 'track'` и `type => 'artist'` с парсингом `artist_id` и `release_id`.
+     - `albumInfoMenu`: добавлен пункт «Радио по альбому» (`PLUGIN_ZVUK_ALBUM_RADIO`) с запуском `zvuk://radio:release:<id>`.
+     - `trackInfoMenu`: сформировано контекстное меню трека:
+       - «Включить радио по треку» (`PLUGIN_ZVUK_TRACK_RADIO` ➔ `zvuk://radio:track:<id>`);
+       - «Радио артиста» (`PLUGIN_ZVUK_ARTIST_RADIO` ➔ `zvuk://radio:artist:<artist_id>`);
+       - «Радио по альбому» (`PLUGIN_ZVUK_ALBUM_RADIO` ➔ `zvuk://radio:release:<release_id>`).
+     - `artistInfoMenu`: сформировано контекстное меню артиста с пунктом «Радио артиста».
+     - При выборе любого радио выполняется `playlist play`, очищающий очередь и немедленно запускающий потоковую станцию.
+  5. `strings.txt`:
+     - Добавлены строки: `PLUGIN_ZVUK_RADIO`, `PLUGIN_ZVUK_TRACK_RADIO`, `PLUGIN_ZVUK_ARTIST_RADIO`, `PLUGIN_ZVUK_ALBUM_RADIO` (EN и RU).
+  6. `t/test_helpers.pl`:
+     - В мок `Test::FakeRequest` добавлены методы `client` и `getRequest`.
+  7. `t/test_album_context_menu.pl`:
+     - Обновлены ассерты меню альбома с учетом нового пункта «Радио по альбому» (26/26 проверок ok).
+  8. `t/test_recommender_radio.pl`:
+     - Создан новый комплексный тестовый сьют (8 сценариев, 62 проверки), тестирующий:
+       - формирование GraphQL запроса `recommenderRadio`, маппинг типов, лимит и курсор;
+       - распознавание и фильтрацию URL в `ProtocolHandler`;
+       - очистку и разворачивание плейлиста в `explodePlaylist` с установкой флагов клиента;
+       - авто-пагинацию `_loadMoreRadioTracks` с добавлением треков в очередь;
+       - сброс состояния в `_onStop`;
+       - генерацию элементов контекстного меню в `trackInfoMenu`, `artistInfoMenu`, `albumInfoMenu`;
+       - интеграцию в меню артиста `handleArtist` и `_renderTrack`.
+* **Результаты тестов:**
+  - 17/17 тестовых сьютов успешно пройдены (100%):
+    - `t/test_recommender_radio.pl` (62 проверки - ok)
+    - `t/test_album_context_menu.pl` (26 проверок - ok)
+    - `t/test_sms_otp.pl` (54 проверки - ok)
+    - `t/test_token_refresh.pl` (29 проверок - ok)
+    - `t/test_oauth_user_id.pl` (34 проверки - ok)
+    - `t/test_wave_feedback.pl` (18 проверок - ok)
+    - `t/test_http_get.pl` (19 проверок - ok)
+    - `t/test_cache_batch.pl` (11 проверок - ok)
+    - `t/test_editorial_playlists.pl` (6 проверок - ok)
+    - `t/test_episode_playback.pl` (7 проверок - ok)
+    - `t/test_graphql_error_classification.pl` (6 проверок - ok)
+    - `t/test_multi_page_recommendations.pl` (17 проверок - ok)
+    - `t/test_recommendations_menu.pl` (11 проверок - ok)
+    - `t/test_synthesis_playlists.pl` (6 проверок - ok)
+    - `t/test_timer_absolute_time.pl` (11 проверок - ok)
+    - `t/test_vfd_genres_knob.pl` (14 проверок - ok)
+    - `t/reproduce_p0_multiaccount_bugs.pl` (ok)
+
 
 

@@ -639,3 +639,19 @@ PLUGIN_ZVUK_DONE
 	EN	Done
 	RU	Готово
 
+PLUGIN_ZVUK_RADIO
+	EN	Radio
+	RU	Радио
+
+PLUGIN_ZVUK_TRACK_RADIO
+	EN	Track Radio
+	RU	Включить радио по треку
+
+PLUGIN_ZVUK_ARTIST_RADIO
+	EN	Artist Radio
+	RU	Радио артиста
+
+PLUGIN_ZVUK_ALBUM_RADIO
+	EN	Album Radio
+	RU	Радио по альбому
+

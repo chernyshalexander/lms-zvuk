@@ -88,6 +88,19 @@ sub getNextTrack {
 		}
 	}
 
+	# auto-load next batch of radio tracks when approaching end of queue
+	if ($client) {
+		my $is_radio = $client->pluginData('zvuk_radio_active');
+		if ($is_radio) {
+			my $playlist_size = Slim::Player::Playlist::count($client);
+			my $current_index = Slim::Player::Source::playingSongIndex($client);
+			if (defined $playlist_size && defined $current_index
+					&& ($playlist_size - $current_index) <= 2) {
+				_loadMoreRadioTracks($client);
+			}
+		}
+	}
+
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 
 	_getAPIHandler($client)->getStream(sub {
@@ -189,6 +202,8 @@ sub getNextTrack {
 sub getMetadataFor {
 	my ($class, $client, $url) = @_;
 
+	return {} if $url =~ m{^zvuk://(?:album|playlist|artist|radio):} || $url eq 'zvuk://wave';
+
 	my $id = _parseZvukId($url);
 	return {} unless $id;
 
@@ -255,7 +270,7 @@ sub getHeaders {
 
 sub getFormatForURL {
 	my ($class, $url) = @_;
-	return if $url =~ m{zvuk://(?:album|playlist|artist):};
+	return if $url =~ m{^zvuk://(?:album|playlist|artist|radio):} || $url eq 'zvuk://wave';
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 	return $prefQuality eq 'flac' ? 'flc' : 'mp3';
 }
@@ -267,6 +282,12 @@ sub scanUrl {
 
 sub explodePlaylist {
 	my ($class, $client, $url, $cb) = @_;
+
+	# Handle Recommender Radio
+	if ($url =~ m{^zvuk://radio:(\w+):(\d+)}) {
+		my ($entity_type, $entity_id) = ($1, $2);
+		return _explodeRadio($client, $entity_type, $entity_id, $cb);
+	}
 
 	my ($type, $id) = $url =~ m{zvuk://(\w+)(?::(\d+))?};
 	return $cb->([$url]) unless $type;
@@ -326,6 +347,45 @@ sub _explodeWave {
 		my @urls = map { 'zvuk://' . $_->{id} } @$items;
 		$cb->(\@urls);
 	}, $wave_settings);
+}
+
+sub _explodeRadio {
+	my ($client, $type, $id, $cb) = @_;
+
+	$type = uc($type // 'TRACK');
+	$type = 'RELEASE' if $type eq 'ALBUM';
+
+	$log->info("Starting Recommender Radio for $type $id");
+
+	if ($client) {
+		$client->pluginData(zvuk_wave_active => 0);
+		$client->pluginData(zvuk_gigamix_active => 0);
+		$client->pluginData(zvuk_radio_active => 1);
+		$client->pluginData(zvuk_radio_entity_id => $id);
+		$client->pluginData(zvuk_radio_entity_type => $type);
+		$client->pluginData(zvuk_radio_cursor => 0);
+		$client->pluginData(zvuk_radio_loading => 0);
+	}
+
+	my $api = _getAPIHandler($client);
+	$api->getRecommenderRadio(sub {
+		my $res = shift || {};
+		my $tracks = $res->{tracks} || [];
+		my $cursor = $res->{cursor};
+
+		if (!@$tracks) {
+			$log->warn("No tracks returned for radio $type $id");
+			$client->pluginData(zvuk_radio_active => 0) if $client;
+			return $cb->([]);
+		}
+
+		$client->pluginData(zvuk_radio_cursor => $cursor) if $client && defined $cursor;
+		$log->info("Got " . scalar(@$tracks) . " radio tracks, cursor: " . ($cursor // 'none'));
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		my @urls = map { 'zvuk://' . $_->{id} } @$tracks;
+		$cb->(\@urls);
+	}, $id, $type, 20, 0);
 }
 
 sub isRemote { 1 }
@@ -432,6 +492,57 @@ sub _loadMoreGigaMixTracks {
 
 		$log->info("GigaMix: auto-extended playlist with " . scalar(@$tracks) . " tracks");
 	}, { cursor => $cursor, limit => 5 });
+}
+
+sub _loadMoreRadioTracks {
+	my ($client) = @_;
+	return unless $client;
+
+	if ($client->pluginData('zvuk_radio_loading')) {
+		$log->debug("Radio batch already loading, skipping duplicate request");
+		return;
+	}
+
+	my $id     = $client->pluginData('zvuk_radio_entity_id');
+	my $type   = $client->pluginData('zvuk_radio_entity_type');
+	my $cursor = $client->pluginData('zvuk_radio_cursor') // 0;
+	return unless defined $id && defined $type;
+
+	my $api = _getAPIHandler($client);
+	return unless $api;
+
+	$client->pluginData(zvuk_radio_loading => 1);
+	$log->info("Auto-loading more radio tracks for $type $id at cursor $cursor");
+
+	$api->getRecommenderRadio(sub {
+		my $res = shift || {};
+		$client->pluginData(zvuk_radio_loading => 0) if $client;
+
+		if ($res->{error}) {
+			$log->error("Radio auto-load failed: $res->{error}");
+			$client->pluginData(zvuk_radio_active => 0) if $client;
+			return;
+		}
+
+		my $tracks = $res->{tracks} || [];
+		unless (@$tracks) {
+			$log->info("Radio complete: no more tracks available from Zvuk");
+			$client->pluginData(zvuk_radio_active => 0) if $client;
+			return;
+		}
+
+		my $new_cursor = $res->{cursor};
+		$client->pluginData(zvuk_radio_cursor => $new_cursor) if $client && defined $new_cursor;
+
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+		$log->info("Radio: auto-extended playlist with " . scalar(@$tracks) . " tracks, next cursor: " . ($new_cursor // 'none'));
+
+		for my $track (@$tracks) {
+			Slim::Control::Request::executeRequest(
+				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
+			);
+		}
+	}, $id, $type, 20, $cursor);
 }
 
 sub _getAPIHandler {

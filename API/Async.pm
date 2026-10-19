@@ -446,7 +446,7 @@ sub _graphql {
 sub _getCacheTTL {
 	my ($operationName) = @_;
 
-	return 0 if $operationName =~ m/^(getStream|getPersonalWave|like.*|unlike.*|add.*|remove.*|hide.*)$/;
+	return 0 if $operationName =~ m/^(getStream|getPersonalWave|recommenderRadio|like.*|unlike.*|add.*|remove.*|hide.*)$/;
 	return Plugins::Zvuk::API::USER_CONTENT_TTL if $operationName =~ m/^(getPaginatedCollection|getUserPlaylists|userTracks|userCollection|userCollectionReleases|userCollectionArtists|userPaginatedPodcasts|userPaginatedEpisodes)$/;
 	return Plugins::Zvuk::API::DYNAMIC_TTL if $operationName =~ m/^(getSearch|quickSearch|search|searchTracks|searchArtists|searchReleases|searchPlaylists|getTracks|getPlaylistTracks|getArtistAlbums|getPodcastEpisodes)$/;
 	return Plugins::Zvuk::API::DEFAULT_TTL;
@@ -956,6 +956,63 @@ sub getPersonalWave {
 		my $data = shift;
 		$cb->($data->{personalWaveContent} || []);
 	}, 'getPersonalWave', $gql, $vars, { ttl => 0 });
+}
+
+# Get recommender radio tracks for an entity (TRACK, ARTIST, RELEASE, PLAYLIST)
+sub getRecommenderRadio {
+	my ($self, $cb, $id, $type, $limit, $cursor) = @_;
+	$type = uc($type // 'TRACK');
+	$type = 'RELEASE' if $type eq 'ALBUM';
+	$limit = int($limit // 20);
+	$cursor = defined $cursor ? int($cursor) : 0;
+
+	my $gql = q{
+		query recommenderRadio($id: ID!, $type: RecommenderRadioEntityType!, $first: NonNegativeInt! = 20, $cursor: NonNegativeInt = 0) {
+			recommenderRadio(onEntity: { id: $id, type: $type }, first: $first, cursor: $cursor) {
+				cursor
+				tracks {
+					id
+					title
+					duration
+					explicit
+					hasFlac
+					artists {
+						id
+						title
+						image {
+							src
+						}
+					}
+					release {
+						id
+						title
+						image {
+							src
+						}
+					}
+					streamV2 {
+						preview
+					}
+				}
+			}
+		}
+	};
+
+	my $vars = {
+		id     => "$id",
+		type   => $type,
+		first  => $limit,
+		cursor => $cursor,
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if ($data && $data->{recommenderRadio}) {
+			$cb->($data->{recommenderRadio});
+		} else {
+			$cb->($data || { error => 'No radio data' });
+		}
+	}, 'recommenderRadio', $gql, $vars, { ttl => 0 });
 }
 
 # Get user collection (favorite tracks, albums, artists)
