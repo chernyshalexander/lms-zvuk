@@ -101,6 +101,19 @@ sub getNextTrack {
 		}
 	}
 
+	# auto-load next batch of atlas tracks when approaching end of queue
+	if ($client) {
+		my $is_atlas = $client->pluginData('zvuk_atlas_active');
+		if ($is_atlas) {
+			my $playlist_size = Slim::Player::Playlist::count($client);
+			my $current_index = Slim::Player::Source::playingSongIndex($client);
+			if (defined $playlist_size && defined $current_index
+					&& ($playlist_size - $current_index) <= 2) {
+				_loadMoreAtlasTracks($client);
+			}
+		}
+	}
+
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 
 	_getAPIHandler($client)->getStream(sub {
@@ -202,7 +215,7 @@ sub getNextTrack {
 sub getMetadataFor {
 	my ($class, $client, $url) = @_;
 
-	return {} if $url =~ m{^zvuk://(?:album|playlist|artist|radio):} || $url eq 'zvuk://wave';
+	return {} if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas):} || $url eq 'zvuk://wave';
 
 	my $id = _parseZvukId($url);
 	return {} unless $id;
@@ -270,7 +283,7 @@ sub getHeaders {
 
 sub getFormatForURL {
 	my ($class, $url) = @_;
-	return if $url =~ m{^zvuk://(?:album|playlist|artist|radio):} || $url eq 'zvuk://wave';
+	return if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas):} || $url eq 'zvuk://wave';
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 	return $prefQuality eq 'flac' ? 'flc' : 'mp3';
 }
@@ -282,6 +295,12 @@ sub scanUrl {
 
 sub explodePlaylist {
 	my ($class, $client, $url, $cb) = @_;
+
+	# Handle Atlas Island Wave
+	if ($url =~ m{^zvuk://atlas:([0-9a-fA-F-]+)}) {
+		my $island_id = $1;
+		return _explodeAtlas($client, $island_id, $cb);
+	}
 
 	# Handle Recommender Radio
 	if ($url =~ m{^zvuk://radio:(\w+):(\d+)}) {
@@ -386,6 +405,64 @@ sub _explodeRadio {
 		my @urls = map { 'zvuk://' . $_->{id} } @$tracks;
 		$cb->(\@urls);
 	}, $id, $type, 3, 0);
+}
+
+sub _explodeAtlas {
+	my ($client, $island_id, $cb) = @_;
+
+	$log->info("Starting Atlas Island Wave for island $island_id");
+
+	if ($client) {
+		$client->pluginData(zvuk_wave_active     => 0);
+		$client->pluginData(zvuk_gigamix_active  => 0);
+		$client->pluginData(zvuk_radio_active    => 0);
+		$client->pluginData(zvuk_atlas_active    => 1);
+		$client->pluginData(zvuk_atlas_island_id => $island_id);
+		$client->pluginData(zvuk_atlas_cursor    => undef);
+		$client->pluginData(zvuk_atlas_loading   => 0);
+	}
+
+	my $api = _getAPIHandler($client);
+	unless ($api) {
+		$log->error("No API handler available for client");
+		$client->pluginData(zvuk_atlas_active => 0) if $client;
+		return $cb->([]);
+	}
+
+	my $fetchWave = sub {
+		$api->getAtlasIslandWave(sub {
+			my ($res, $err) = @_;
+			my $tracks = ($res && ref $res eq 'HASH' && $res->{tracks}) ? $res->{tracks} : [];
+			my $cursor = $res ? $res->{next_cursor} : undef;
+
+			if (!@$tracks) {
+				$log->warn("No tracks returned for atlas island wave $island_id: " . ($err || 'empty'));
+				$client->pluginData(zvuk_atlas_active => 0) if $client;
+				return $cb->([]);
+			}
+
+			$client->pluginData(zvuk_atlas_cursor => $cursor) if $client && defined $cursor;
+			$log->info("Got " . scalar(@$tracks) . " atlas wave tracks, cursor: " . ($cursor // 'none'));
+
+			Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+			my @urls = map { 'zvuk://' . ($_->{id} || $_->{track_id}) } @$tracks;
+			$cb->(\@urls);
+		}, $island_id, 20);
+	};
+
+	# Optionally notify backend of wave start (PUT)
+	if ($api->can('startAtlasIslandWave')) {
+		$api->startAtlasIslandWave(sub {
+			my ($res, $err) = @_;
+			if ($err) {
+				$log->debug("startAtlasIslandWave notice: $err (proceeding with GET wave)");
+			}
+			$fetchWave->();
+		}, $island_id);
+	} else {
+		$fetchWave->();
+	}
 }
 
 sub isRemote { 1 }
@@ -543,6 +620,57 @@ sub _loadMoreRadioTracks {
 			);
 		}
 	}, $id, $type, 3, $cursor);
+}
+
+sub _loadMoreAtlasTracks {
+	my ($client) = @_;
+	return unless $client;
+
+	if ($client->pluginData('zvuk_atlas_loading')) {
+		$log->debug("Atlas batch already loading, skipping duplicate request");
+		return;
+	}
+
+	my $island_id = $client->pluginData('zvuk_atlas_island_id');
+	my $cursor    = $client->pluginData('zvuk_atlas_cursor');
+	return unless defined $island_id;
+
+	my $api = _getAPIHandler($client);
+	return unless $api;
+
+	$client->pluginData(zvuk_atlas_loading => 1);
+	$log->info("Auto-loading more atlas tracks for island $island_id at cursor " . ($cursor // 'none'));
+
+	$api->getAtlasIslandWave(sub {
+		my ($res, $err) = @_;
+		$client->pluginData(zvuk_atlas_loading => 0) if $client;
+
+		if ($err || !$res) {
+			$log->error("Atlas auto-load failed: " . ($err || 'no response'));
+			$client->pluginData(zvuk_atlas_active => 0) if $client;
+			return;
+		}
+
+		my $tracks = ($res && ref $res eq 'HASH' && $res->{tracks}) ? $res->{tracks} : [];
+		unless (@$tracks) {
+			$log->info("Atlas wave complete: no more tracks available from Zvuk");
+			$client->pluginData(zvuk_atlas_active => 0) if $client;
+			return;
+		}
+
+		my $new_cursor = $res->{next_cursor};
+		$client->pluginData(zvuk_atlas_cursor => $new_cursor) if $client && defined $new_cursor;
+
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+		$log->info("Atlas: auto-extended playlist with " . scalar(@$tracks) . " tracks, next cursor: " . ($new_cursor // 'none'));
+
+		for my $track (@$tracks) {
+			my $tid = $track->{id} || $track->{track_id};
+			Slim::Control::Request::executeRequest(
+				$client, ['playlist', 'add', 'zvuk://' . $tid]
+			);
+		}
+	}, $island_id, 20, $cursor);
 }
 
 sub _getAPIHandler {

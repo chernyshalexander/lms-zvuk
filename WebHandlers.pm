@@ -989,4 +989,58 @@ sub handleVerifySmsCode {
 	$http->post(Plugins::Zvuk::API::LOGIN_OTP_URL, %headers, $form_body);
 }
 
+# --- Atlas of Taste Web Handlers ---
+
+sub handleAtlasStandalone {
+	my ($httpClient, $response) = @_;
+
+	require Slim::Web::HTTP;
+	my $request = $response->request;
+	my $client = _clientForWebRequest($request);
+	my $userId = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : Plugins::Zvuk::API->getSomeUserId();
+
+	my $vars = {
+		webroot  => '/html/',
+		playerid => ($client ? $client->id : ''),
+		userId   => ($userId || ''),
+	};
+
+	my $template = 'plugins/zvuk/atlasStandalone.html';
+	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
+	my $output_bytes = encode_utf8($$output_ref);
+
+	$response->code(200);
+	$response->content_type('text/html; charset=utf-8');
+	$response->content_length(length($output_bytes));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
+}
+
+sub handleGetAtlasMapWeb {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $client = _clientForWebRequest($request);
+	my $userId = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : Plugins::Zvuk::API->getSomeUserId();
+
+	require Plugins::Zvuk::API::Atlas;
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $userId });
+
+	$atlas->getMap(sub {
+		my ($map, $err) = @_;
+		my $json;
+		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+
+		if ($err || !$map) {
+			$response->code(500);
+			$json = $json_encoder->encode({ success => 0, error => ($err || 'Failed to load Atlas map') });
+		} else {
+			$response->code(200);
+			$json = $json_encoder->encode({ success => 1, map => $map });
+		}
+		$response->content_type('application/json; charset=utf-8');
+		$response->content_length(length($json));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+	});
+}
+
 1;

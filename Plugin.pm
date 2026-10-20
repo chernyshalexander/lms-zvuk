@@ -24,6 +24,7 @@ use Plugins::Zvuk::GigaMix;
 use Plugins::Zvuk::WaveUI;
 use Plugins::Zvuk::WebHandlers;
 use Plugins::Zvuk::Browse::InfoMenu;
+use Plugins::Zvuk::AtlasUI;
 
 my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
@@ -109,6 +110,21 @@ sub initPlugin {
 			'plugins/zvuk/imageproxy',
 			\&Plugins::Zvuk::WebHandlers::handleImageProxy
 		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/atlasStandalone',
+			\&Plugins::Zvuk::WebHandlers::handleAtlasStandalone
+		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/atlasStandalone.html',
+			\&Plugins::Zvuk::WebHandlers::handleAtlasStandalone
+		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/getAtlasMap',
+			\&Plugins::Zvuk::WebHandlers::handleGetAtlasMapWeb
+		);
 	}
 
 	$class->SUPER::initPlugin(
@@ -168,8 +184,12 @@ sub _onStop {
 		$client->pluginData(zvuk_radio_entity_type => undef);
 		$client->pluginData(zvuk_radio_cursor => undef);
 		$client->pluginData(zvuk_radio_loading => 0);
+		$client->pluginData(zvuk_atlas_active => 0);
+		$client->pluginData(zvuk_atlas_island_id => undef);
+		$client->pluginData(zvuk_atlas_cursor => undef);
+		$client->pluginData(zvuk_atlas_loading => 0);
 		$client->pluginData(zvuk_wave_last_track => undef);
-		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active, zvuk_radio_active and zvuk_wave_last_track flags");
+		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active, zvuk_radio_active, zvuk_atlas_active and zvuk_wave_last_track flags");
 	}
 }
 
@@ -270,6 +290,12 @@ sub _buildRootMenu {
 			type  => 'link',
 			image => 'plugins/zvuk/html/images/radio.png',
 			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client, $args),
+		},
+		{
+			name  => cstring($client, 'PLUGIN_ZVUK_ATLAS'),
+			type  => 'outline',
+			image => 'plugins/zvuk/html/images/playlists.png',
+			url   => \&Plugins::Zvuk::AtlasUI::handleAtlasMenu,
 		},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),

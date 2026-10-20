@@ -15,17 +15,20 @@ use constant ROUTE_AUTH_URL => 'https://zvuk.com/api/tiny/route-authorization-ty
 use constant GET_MCODE_URL  => 'https://zvuk.com/api/tiny/get-mcode';
 use constant LOGIN_OTP_URL  => 'https://zvuk.com/api/tiny/login/otp';
 use constant TINY_API_URL   => 'https://zvuk.com/api/tiny';
+use constant ATLAS_BASE_URL => 'https://atlas.zvuk.com';
 
 # --- Mobile app constants (for Android OTP auth endpoints) ---
 use constant APP_VERSION_ANDROID => '4.116.0rs';
 use constant APP_BUILD_ANDROID   => '511600228';
 
 # --- Cache TTLs (seconds) ---
-use constant DEFAULT_TTL      => 86400;   # 24h  - albums, artists, static content
-use constant DYNAMIC_TTL      => 3600;    # 1h   - playlists, search
-use constant USER_CONTENT_TTL => 300;     # 5m   - user collection, saved tracks
-use constant GIGAMIX_CACHE_TTL => 10;     # 10s  - GigaMix remix (short cache for fresh content)
-use constant STREAM_TTL       => 0;       # no cache for stream URLs
+use constant DEFAULT_TTL        => 86400;   # 24h  - albums, artists, static content
+use constant DYNAMIC_TTL        => 3600;    # 1h   - playlists, search
+use constant USER_CONTENT_TTL   => 300;     # 5m   - user collection, saved tracks
+use constant GIGAMIX_CACHE_TTL  => 10;      # 10s  - GigaMix remix (short cache for fresh content)
+use constant STREAM_TTL         => 0;       # no cache for stream URLs
+use constant ATLAS_MAP_TTL      => 3600;    # 1h   - Atlas taste map
+use constant ATLAS_ISLAND_TTL   => 86400;   # 24h  - Atlas island track listings
 
 # --- API pagination ---
 use constant DEFAULT_LIMIT => 50;
@@ -183,14 +186,14 @@ sub cacheTrackMetadata {
     my @result;
     for my $track (@$tracks) {
         next unless $track && ref $track eq 'HASH';
-        my $id = $track->{id} or next;
+        my $id = $track->{id} || $track->{track_id} or next;
 
-        my $icon   = $class->getImageUrl($track, 'usePlaceholder');
-        my $artist = $class->_getArtistName($track);
-        my $album  = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
+        my $icon   = $track->{cover_url} || $class->getImageUrl($track, 'usePlaceholder');
+        my $artist = $track->{artist} || $class->_getArtistName($track);
+        my $album  = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : ($track->{album} || '');
 
         my $artist_id = ($track->{artists} && ref $track->{artists} eq 'ARRAY' && $track->{artists}->[0])
-            ? $track->{artists}->[0]->{id}
+            ? ($track->{artists}->[0]->{id})
             : ($track->{artist_id} || '');
         my $release_id = ($track->{release} && ref $track->{release} eq 'HASH')
             ? $track->{release}->{id}

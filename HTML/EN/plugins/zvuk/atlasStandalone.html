@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>[% "PLUGIN_ZVUK_ATLAS" | string %] — Zvuk</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	background: #0d1117;
+	color: #e6edf3;
+	overflow: hidden;
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+header {
+	height: 56px;
+	background: rgba(22, 27, 34, 0.95);
+	backdrop-filter: blur(8px);
+	border-bottom: 1px solid #30363d;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 20px;
+	z-index: 10;
+}
+.header-left {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+.header-left h1 {
+	font-size: 16px;
+	font-weight: 600;
+	letter-spacing: 0.5px;
+	color: #58a6ff;
+	text-transform: uppercase;
+}
+.header-meta {
+	font-size: 13px;
+	color: #8b949e;
+}
+.header-right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+select.player-select {
+	background: #21262d;
+	color: #c9d1d9;
+	border: 1px solid #30363d;
+	padding: 6px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	outline: none;
+}
+.view-mode-btn {
+	background: #238636;
+	color: #fff;
+	border: none;
+	padding: 6px 14px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+.view-mode-btn:hover {
+	background: #2ea043;
+}
+#canvasContainer {
+	flex: 1;
+	position: relative;
+	width: 100%;
+	height: calc(100vh - 56px);
+}
+canvas#atlasCanvas {
+	position: absolute;
+	top: 0; left: 0;
+	width: 100%; height: 100%;
+	display: block;
+	cursor: grab;
+}
+canvas#atlasCanvas:active {
+	cursor: grabbing;
+}
+#tooltip {
+	position: absolute;
+	display: none;
+	background: rgba(22, 27, 34, 0.95);
+	border: 1px solid #58a6ff;
+	border-radius: 8px;
+	padding: 14px;
+	pointer-events: auto;
+	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+	min-width: 240px;
+	max-width: 300px;
+	z-index: 20;
+	backdrop-filter: blur(10px);
+}
+#tooltip h3 {
+	font-size: 15px;
+	color: #fff;
+	margin-bottom: 6px;
+}
+#tooltip .meta-line {
+	font-size: 12px;
+	color: #8b949e;
+	margin-bottom: 4px;
+}
+#tooltip .covers-row {
+	display: flex;
+	gap: 6px;
+	margin: 10px 0;
+}
+#tooltip .covers-row img {
+	width: 44px;
+	height: 44px;
+	border-radius: 4px;
+	object-fit: cover;
+	background: #21262d;
+}
+#tooltip .play-btn {
+	width: 100%;
+	background: #1f6feb;
+	color: #fff;
+	border: none;
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	margin-top: 6px;
+}
+#tooltip .play-btn:hover {
+	background: #388bfd;
+}
+#loadingOverlay {
+	position: absolute;
+	top: 0; left: 0;
+	width: 100%; height: 100%;
+	background: #0d1117;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	z-index: 30;
+	color: #8b949e;
+}
+.spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid #30363d;
+	border-top-color: #58a6ff;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
+#toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: #238636;
+	color: #fff;
+	padding: 10px 20px;
+	border-radius: 6px;
+	font-size: 14px;
+	display: none;
+	z-index: 100;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+</style>
+</head>
+<body>
+
+<header>
+	<div class="header-left">
+		<h1>[% "PLUGIN_ZVUK_ATLAS" | string %]</h1>
+		<div class="header-meta" id="headerMeta">Загрузка данных карты...</div>
+	</div>
+	<div class="header-right">
+		<select class="player-select" id="playerSelect">
+			<option value="[% playerid %]">Плеер по умолчанию</option>
+		</select>
+		<button class="view-mode-btn" id="resetZoomBtn">Сброс зума</button>
+	</div>
+</header>
+
+<div id="canvasContainer">
+	<canvas id="atlasCanvas"></canvas>
+	<div id="tooltip"></div>
+	<div id="loadingOverlay">
+		<div class="spinner"></div>
+		<div>Загрузка Атласа вкуса...</div>
+	</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function() {
+	var canvas = document.getElementById('atlasCanvas');
+	var ctx = canvas.getContext('2d');
+	var container = document.getElementById('canvasContainer');
+	var tooltip = document.getElementById('tooltip');
+	var loadingOverlay = document.getElementById('loadingOverlay');
+	var headerMeta = document.getElementById('headerMeta');
+	var playerSelect = document.getElementById('playerSelect');
+	var resetZoomBtn = document.getElementById('resetZoomBtn');
+	var toast = document.getElementById('toast');
+
+	var mapData = null;
+	var islands = [];
+	var hoveredIsland = null;
+
+	var camera = {
+		x: 0,
+		y: 0,
+		zoom: 1
+	};
+	var isDragging = false;
+	var dragStart = { x: 0, y: 0 };
+
+	function resize() {
+		canvas.width = container.clientWidth * window.devicePixelRatio;
+		canvas.height = container.clientHeight * window.devicePixelRatio;
+		ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+		render();
+	}
+	window.addEventListener('resize', resize);
+
+	function fetchPlayers() {
+		fetch('/jsonrpc.js', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				id: 1,
+				method: 'slim.request',
+				params: ['', ['players', 0, 100]]
+			})
+		})
+		.then(function(r) { return r.json(); })
+		.then(function(data) {
+			if (data && data.result && data.result.players_loop) {
+				var players = data.result.players_loop;
+				playerSelect.innerHTML = '';
+				players.forEach(function(p) {
+					var opt = document.createElement('option');
+					opt.value = p.playerid;
+					opt.textContent = p.name;
+					if (p.playerid === '[% playerid %]') opt.selected = true;
+					playerSelect.appendChild(opt);
+				});
+			}
+		})
+		.catch(function(e) {
+			console.log('Error fetching players:', e);
+		});
+	}
+
+	function loadMap() {
+		var url = '/plugins/zvuk/getAtlasMap';
+		var currentPid = playerSelect.value;
+		if (currentPid) url += '?player=' + encodeURIComponent(currentPid);
+
+		fetch(url)
+		.then(function(r) { return r.json(); })
+		.then(function(res) {
+			loadingOverlay.style.display = 'none';
+			if (res && res.success && res.map) {
+				mapData = res.map;
+				islands = mapData.islands || [];
+				headerMeta.textContent = (mapData.user_name || 'Профиль') + ' • ' + (mapData.total_tracks || 0) + ' треков • ' + islands.length + ' островов';
+				resetCamera();
+				render();
+			} else {
+				headerMeta.textContent = 'Ошибка: ' + (res.error || 'Не удалось загрузить карту');
+			}
+		})
+		.catch(function(err) {
+			loadingOverlay.style.display = 'none';
+			headerMeta.textContent = 'Ошибка загрузки карты: ' + err;
+		});
+	}
+
+	function resetCamera() {
+		camera.x = container.clientWidth / 2;
+		camera.y = container.clientHeight / 2;
+		camera.zoom = Math.min(container.clientWidth, container.clientHeight) * 0.42;
+	}
+
+	resetZoomBtn.addEventListener('click', function() {
+		resetCamera();
+		render();
+	});
+
+	function worldToScreen(wx, wy) {
+		return {
+			x: camera.x + wx * camera.zoom,
+			y: camera.y - wy * camera.zoom // Invert Y: Energy +1 is up
+		};
+	}
+
+	function screenToWorld(sx, sy) {
+		return {
+			x: (sx - camera.x) / camera.zoom,
+			y: -(sy - camera.y) / camera.zoom
+		};
+	}
+
+	function getIslandColor(valence, energy) {
+		if (valence >= 0 && energy >= 0) return '#f59e0b'; // Amber / Joy
+		if (valence < 0 && energy >= 0)  return '#ef4444'; // Red / Drive
+		if (valence < 0 && energy < 0)   return '#3b82f6'; // Blue / Melancholy
+		return '#10b981';                                  // Emerald / Calm
+	}
+
+	function render() {
+		var w = container.clientWidth;
+		var h = container.clientHeight;
+		ctx.clearRect(0, 0, w, h);
+
+		// Background grid & quadrants
+		drawQuadrants(w, h);
+
+		if (!islands.length) return;
+
+		// Draw connections
+		ctx.lineWidth = 1;
+		ctx.strokeStyle = 'rgba(88, 166, 255, 0.15)';
+		var islandMap = {};
+		islands.forEach(function(isl) { islandMap[isl.id] = isl; });
+
+		islands.forEach(function(isl) {
+			var p1 = worldToScreen(isl.valence, isl.energy);
+			if (isl.connections && isl.connections.right) {
+				isl.connections.right.forEach(function(targetId) {
+					var target = islandMap[targetId];
+					if (target) {
+						var p2 = worldToScreen(target.valence, target.energy);
+						ctx.beginPath();
+						ctx.moveTo(p1.x, p1.y);
+						ctx.lineTo(p2.x, p2.y);
+						ctx.stroke();
+					}
+				});
+			}
+		});
+
+		// Draw islands
+		islands.forEach(function(isl) {
+			var p = worldToScreen(isl.valence, isl.energy);
+			var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
+			var isHovered = (hoveredIsland === isl);
+			var color = getIslandColor(isl.valence, isl.energy);
+
+			// Glow
+			if (isHovered) {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, radius + 8, 0, Math.PI * 2);
+				ctx.fillStyle = 'rgba(88, 166, 255, 0.3)';
+				ctx.fill();
+			}
+
+			// Main circle
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+			ctx.fillStyle = color;
+			ctx.fill();
+			ctx.lineWidth = isHovered ? 2.5 : 1.5;
+			ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.7)';
+			ctx.stroke();
+
+			// Label
+			ctx.fillStyle = isHovered ? '#ffffff' : '#c9d1d9';
+			ctx.font = (isHovered ? 'bold 12px' : '11px') + ' sans-serif';
+			ctx.textAlign = 'center';
+			ctx.fillText(isl.title, p.x, p.y + radius + 14);
+		});
+	}
+
+	function drawQuadrants(w, h) {
+		var center = worldToScreen(0, 0);
+
+		// Quadrant tints
+		ctx.fillStyle = 'rgba(239, 68, 68, 0.03)';   // Q2: top-left
+		ctx.fillRect(0, 0, center.x, center.y);
+		ctx.fillStyle = 'rgba(245, 158, 11, 0.03)';  // Q1: top-right
+		ctx.fillRect(center.x, 0, w - center.x, center.y);
+		ctx.fillStyle = 'rgba(59, 130, 246, 0.03)';  // Q3: bottom-left
+		ctx.fillRect(0, center.y, center.x, h - center.y);
+		ctx.fillStyle = 'rgba(16, 185, 129, 0.03)';  // Q4: bottom-right
+		ctx.fillRect(center.x, center.y, w - center.x, h - center.y);
+
+		// Axes
+		ctx.lineWidth = 1;
+		ctx.strokeStyle = 'rgba(48, 54, 61, 0.8)';
+		ctx.beginPath();
+		ctx.moveTo(center.x, 0); ctx.lineTo(center.x, h);
+		ctx.moveTo(0, center.y); ctx.lineTo(w, center.y);
+		ctx.stroke();
+
+		// Axis Labels
+		ctx.fillStyle = 'rgba(139, 148, 158, 0.6)';
+		ctx.font = '10px sans-serif';
+		ctx.textAlign = 'right';
+		ctx.fillText('Позитив →', w - 16, center.y - 8);
+		ctx.textAlign = 'left';
+		ctx.fillText('← Негатив', 16, center.y - 8);
+		ctx.textAlign = 'center';
+		ctx.fillText('↑ Энергия', center.x + 36, 20);
+		ctx.fillText('↓ Покой', center.x + 30, h - 16);
+	}
+
+	// Mouse interaction
+	container.addEventListener('mousedown', function(e) {
+		if (e.target === canvas) {
+			isDragging = true;
+			dragStart.x = e.clientX - camera.x;
+			dragStart.y = e.clientY - camera.y;
+		}
+	});
+
+	window.addEventListener('mousemove', function(e) {
+		if (isDragging) {
+			camera.x = e.clientX - dragStart.x;
+			camera.y = e.clientY - dragStart.y;
+			render();
+			tooltip.style.display = 'none';
+			return;
+		}
+
+		var rect = canvas.getBoundingClientRect();
+		var mx = e.clientX - rect.left;
+		var my = e.clientY - rect.top;
+
+		var found = null;
+		for (var i = islands.length - 1; i >= 0; i--) {
+			var isl = islands[i];
+			var p = worldToScreen(isl.valence, isl.energy);
+			var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
+			var dist = Math.hypot(p.x - mx, p.y - my);
+			if (dist <= radius + 4) {
+				found = isl;
+				break;
+			}
+		}
+
+		if (found !== hoveredIsland) {
+			hoveredIsland = found;
+			render();
+
+			if (found) {
+				showTooltip(found, e.clientX, e.clientY);
+			} else {
+				tooltip.style.display = 'none';
+			}
+		}
+	});
+
+	window.addEventListener('mouseup', function() {
+		isDragging = false;
+	});
+
+	container.addEventListener('wheel', function(e) {
+		e.preventDefault();
+		var factor = e.deltaY < 0 ? 1.15 : 0.85;
+		var rect = canvas.getBoundingClientRect();
+		var mx = e.clientX - rect.left;
+		var my = e.clientY - rect.top;
+
+		camera.x = mx - (mx - camera.x) * factor;
+		camera.y = my - (my - camera.y) * factor;
+		camera.zoom *= factor;
+		render();
+	}, { passive: false });
+
+	function showTooltip(isl, clientX, clientY) {
+		var coversHtml = '';
+		if (isl.covers && isl.covers.length) {
+			coversHtml = '<div class="covers-row">';
+			isl.covers.slice(0, 4).forEach(function(c) {
+				coversHtml += '<img src="' + c.cover_url + '" title="' + (c.title || '') + ' - ' + (c.artist || '') + '"/>';
+			});
+			coversHtml += '</div>';
+		}
+
+		var sharePct = (isl.share ? (isl.share * 100).toFixed(1) : '0') + '%';
+
+		tooltip.innerHTML =
+			'<h3>' + isl.title + '</h3>' +
+			'<div class="meta-line">Жанр: ' + (isl.genre || '—') + ' • Настроение: ' + (isl.mood || '—') + '</div>' +
+			'<div class="meta-line">' + (isl.track_count || 0) + ' треков • Доля: ' + sharePct + '</div>' +
+			coversHtml +
+			'<button class="play-btn" id="playIslandBtn">▶ Слушать поток острова</button>';
+
+		var x = clientX + 15;
+		var y = clientY + 15;
+		if (x + 300 > window.innerWidth) x = clientX - 310;
+		if (y + 200 > window.innerHeight) y = clientY - 210;
+
+		tooltip.style.left = x + 'px';
+		tooltip.style.top = y + 'px';
+		tooltip.style.display = 'block';
+
+		document.getElementById('playIslandBtn').onclick = function() {
+			playIsland(isl.id, isl.title);
+		};
+	}
+
+	canvas.addEventListener('click', function(e) {
+		if (hoveredIsland) {
+			playIsland(hoveredIsland.id, hoveredIsland.title);
+		}
+	});
+
+	function playIsland(islandId, title) {
+		var pid = playerSelect.value;
+		var cmd = ['playlist', 'play', 'zvuk://atlas:' + islandId];
+
+		fetch('/jsonrpc.js', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				id: 1,
+				method: 'slim.request',
+				params: [pid, cmd]
+			})
+		})
+		.then(function(r) { return r.json(); })
+		.then(function(res) {
+			showToast('Воспроизведение: ' + title);
+		})
+		.catch(function(e) {
+			showToast('Ошибка воспроизведения: ' + e);
+		});
+	}
+
+	function showToast(msg) {
+		toast.textContent = msg;
+		toast.style.display = 'block';
+		setTimeout(function() {
+			toast.style.display = 'none';
+		}, 3000);
+	}
+
+	fetchPlayers();
+	loadMap();
+	resize();
+})();
+</script>
+</body>
+</html>

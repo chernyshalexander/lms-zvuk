@@ -1,0 +1,468 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use utf8;
+use FindBin qw($Bin);
+use File::Temp qw(tempdir);
+use Test::More;
+
+require "$Bin/slim_mocks.pl";
+require "$Bin/test_helpers.pl";
+
+my $repo_root = "$Bin/..";
+my $tmpdir = tempdir(CLEANUP => 1);
+mkdir "$tmpdir/Plugins" or die $!;
+symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
+unshift @INC, $tmpdir;
+
+require Plugins::Zvuk::API;
+require Plugins::Zvuk::API::Atlas;
+require Plugins::Zvuk::API::Async;
+require Plugins::Zvuk::AtlasUI;
+require Plugins::Zvuk::ProtocolHandler;
+require Plugins::Zvuk::Plugin;
+
+# Set up test prefs and client
+my $client = Test::FakeClient->new(id => 'player_atlas_1');
+{
+	no warnings 'once';
+	$Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts} = {
+		user_atlas => { token => '0123456789abcdef0123456789abcdef', name => 'Atlas User' },
+	};
+	$Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId} = 'user_atlas';
+}
+
+# Load fixture data if available, or fallback to mock
+my $capture_dir = "$Bin/../.research/atlas-research/capture";
+my $map_json_content;
+if (-f "$capture_dir/api_v1_map_full.json") {
+	open my $fh, '<:raw', "$capture_dir/api_v1_map_full.json" or die $!;
+	local $/;
+	$map_json_content = <$fh>;
+	close $fh;
+}
+
+my $islands_json_content;
+if (-f "$capture_dir/api_v1_map_islands_coldrock.json") {
+	open my $fh, '<:raw', "$capture_dir/api_v1_map_islands_coldrock.json" or die $!;
+	local $/;
+	$islands_json_content = <$fh>;
+	close $fh;
+}
+
+my $wave_json_content;
+if (-f "$capture_dir/verify_wave_jazz_r2.json") {
+	open my $fh, '<:raw', "$capture_dir/verify_wave_jazz_r2.json" or die $!;
+	local $/;
+	$wave_json_content = <$fh>;
+	close $fh;
+}
+
+# ===================================================================
+# SECTION 1: Atlas API Client (Plugins::Zvuk::API::Atlas)
+# ===================================================================
+
+# Test 1.1: getMap - Endpoint, Headers, Cookie Auth, NO x-auth-token
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $map_json_content }
+	);
+	Plugins::Zvuk::API->cache->clear();
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($map_res, $map_err);
+	$atlas->getMap(sub {
+		($map_res, $map_err) = @_;
+	});
+
+	is($map_err, undef, 'T1.1: getMap succeeded without error');
+	ok(ref $map_res eq 'HASH', 'T1.1: getMap returned hash ref');
+	is($map_res->{user_id}, 777701291, 'T1.1: parsed user_id correctly');
+	is(scalar(@{ $map_res->{islands} }), 79, 'T1.1: parsed all 79 islands from taste map');
+	is(scalar(@{ $map_res->{trees} }), 2, 'T1.1: parsed 2 connected component trees');
+
+	# Check request details
+	my $last_req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	ok($last_req, 'T1.1: HTTP request was captured');
+	my ($url, %headers) = @{ $last_req->{args} };
+	is($url, 'https://atlas.zvuk.com/api/v1/map', 'T1.1: Target URL is https://atlas.zvuk.com/api/v1/map');
+	is($headers{'accept'}, 'application/json', 'T1.1: accept header is application/json');
+	is($headers{'cookie'}, 'auth=0123456789abcdef0123456789abcdef; in_webkit=true', 'T1.1: Cookie header contains auth=<token>; in_webkit=true');
+	ok(!exists $headers{'x-auth-token'}, 'T1.1: CRITICAL: x-auth-token header is NOT present (rejected by atlas)');
+	like($headers{'referer'}, qr{atlas\.zvuk\.com}, 'T1.1: Referer header contains atlas.zvuk.com');
+
+	# Test 1.2: Cache Hit on second getMap
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	my ($cached_res, $cached_err);
+	$atlas->getMap(sub {
+		($cached_res, $cached_err) = @_;
+	});
+	is($cached_err, undef, 'T1.2: cached getMap returned without error');
+	is(scalar(@{ $cached_res->{islands} }), 79, 'T1.2: cached getMap returned 79 islands');
+	is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 0, 'T1.2: No HTTP request made on cache hit (served from Slim::Utils::Cache)');
+}
+
+# Test 1.3: getIslandTracks
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $islands_json_content }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($isl_res, $isl_err);
+	my $island_id = '1511fc72-2331-59d2-913f-9ce8ed2b04ad';
+	$atlas->getIslandTracks(sub {
+		($isl_res, $isl_err) = @_;
+	}, $island_id);
+
+	is($isl_err, undef, 'T1.3: getIslandTracks succeeded without error');
+	is($isl_res->{title}, 'Холодный рок', 'T1.3: title parsed correctly');
+	is(scalar(@{ $isl_res->{tracks} }), 50, 'T1.3: 50 island tracks returned');
+
+	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url, %headers) = @{ $req->{args} };
+	is($url, "https://atlas.zvuk.com/api/v1/map/islands/$island_id", 'T1.3: target URL matches island_id');
+	is($headers{'cookie'}, 'auth=0123456789abcdef0123456789abcdef; in_webkit=true', 'T1.3: Cookie header passed');
+}
+
+# Test 1.4: startIslandWave (PUT)
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => '{"island_alive":true,"island_id":"621ceafb-995c-5510-b601-5d4b14f02c08"}' }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($start_res, $start_err);
+	my $island_id = '621ceafb-995c-5510-b601-5d4b14f02c08';
+	$atlas->startIslandWave(sub {
+		($start_res, $start_err) = @_;
+	}, $island_id);
+
+	is($start_err, undef, 'T1.4: startIslandWave succeeded');
+	ok($start_res->{island_alive}, 'T1.4: returned island_alive = true');
+
+	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	is($req->{method}, 'PUT', 'T1.4: HTTP method is PUT');
+	my ($url, @rest) = @{ $req->{args} };
+	my $body = pop @rest;
+	my %headers = @rest;
+	is($url, "https://atlas.zvuk.com/api/v1/map/islands/$island_id/wave", 'T1.4: Target is PUT wave URL');
+	is($headers{'content-type'}, 'application/json', 'T1.4: Content-Type is application/json');
+}
+
+# Test 1.5: getIslandWave (GET with limit and cursor)
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $wave_json_content }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($wave_res, $wave_err);
+	my $island_id = '621ceafb-995c-5510-b601-5d4b14f02c08';
+	$atlas->getIslandWave(sub {
+		($wave_res, $wave_err) = @_;
+	}, $island_id, 20, 'cursor_token_abc');
+
+	is($wave_err, undef, 'T1.5: getIslandWave succeeded');
+	is(scalar(@{ $wave_res->{tracks} }), 20, 'T1.5: 20 wave tracks returned');
+	ok(defined $wave_res->{next_cursor} && length($wave_res->{next_cursor}), 'T1.5: next_cursor present');
+
+	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url, %headers) = @{ $req->{args} };
+	like($url, qr{/api/v1/map/islands/$island_id/wave\?cursor=cursor_token_abc&limit=20}, 'T1.5: URL contains cursor and limit query params');
+}
+
+# Test 1.6: Automatic Token Refresh on HTTP 401
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	Plugins::Zvuk::API->cache->clear();
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+	Plugins::Zvuk::API::Async::_resetThrottlerForTesting();
+
+	# Scenario: 401 on map request -> refreshToken succeeds -> retry with new token succeeds
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 401, message => 'Unauthorized' },
+		{ code => 200, content => '{"token":"refreshed_token_xyz987"}' }, # refresh POST
+		{ code => 200, content => $map_json_content },                   # retried map GET
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($auth_res, $auth_err);
+	$atlas->getMap(sub {
+		($auth_res, $auth_err) = @_;
+	});
+
+	is($auth_err, undef, 'T1.6: getMap succeeded after automatic 401 refresh');
+	is(scalar(@{ $auth_res->{islands} }), 79, 'T1.6: retrieved map data after refresh');
+
+	# Check that prefs were updated with new token
+	my $updated_tok = Plugins::Zvuk::API->getToken('user_atlas');
+	is($updated_tok, 'refreshed_token_xyz987', 'T1.6: User token in prefs updated to refreshed token');
+
+	# Verify retried request sent the new token in Cookie header
+	my $retry_req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($retry_url, %retry_headers) = @{ $retry_req->{args} };
+	is($retry_headers{'cookie'}, 'auth=refreshed_token_xyz987; in_webkit=true', 'T1.6: Retried request sent updated Cookie');
+}
+
+# ===================================================================
+# SECTION 2: Multi-client LMS Navigation UI (Plugins::Zvuk::AtlasUI)
+# ===================================================================
+
+# Test 2.1: Root menu integration
+{
+	my $root_menu;
+	Plugins::Zvuk::Plugin::_buildRootMenu($client, sub { $root_menu = shift; });
+	ok(ref $root_menu eq 'HASH' && ref $root_menu->{items} eq 'ARRAY', 'T2.1: Root menu built successfully');
+
+	my ($atlas_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleAtlasMenu } @{ $root_menu->{items} };
+	ok(defined $atlas_item, 'T2.1: Root menu contains Taste Atlas (PLUGIN_ZVUK_ATLAS) menu item');
+	ok(defined $atlas_item->{name} && length($atlas_item->{name}), 'T2.1: Atlas item has localized display name');
+}
+
+# Test 2.2: Root Atlas menu structure (All Islands, Genre Families, Moods, Random Island, Web Map)
+{
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $map_json_content }
+	);
+	Plugins::Zvuk::API->cache->clear();
+
+	my $atlas_menu;
+	# Test with weblink_capable client
+	my $web_client = Test::FakeClient->new(id => 'web_client_1');
+	{
+		no warnings 'redefine', 'once';
+		local *Slim::Utils::Misc::canFollowWeblinks = sub { return 1; };
+		Plugins::Zvuk::AtlasUI::handleAtlasMenu($client, sub { $atlas_menu = shift; }, {});
+	}
+
+	ok(ref $atlas_menu eq 'HASH' && ref $atlas_menu->{items} eq 'ARRAY', 'T2.2: handleAtlasMenu returns menu');
+	my @items = @{ $atlas_menu->{items} };
+
+	my ($all_isl) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleAllIslands } @items;
+	ok(defined $all_isl, 'T2.2: Menu contains "All Islands" item');
+
+	my ($genres_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleGenresMenu } @items;
+	ok(defined $genres_item, 'T2.2: Menu contains "By Genre Families" item');
+
+	my ($moods_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleMoodsMenu } @items;
+	ok(defined $moods_item, 'T2.2: Menu contains "By Moods" item');
+
+	my ($random_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave } @items;
+	ok(defined $random_item, 'T2.2: Menu contains "Random Island (I am feeling lucky)" item');
+
+	# Test 2.3: All Islands sorting by share / track_count
+	my $all_islands_menu;
+	Plugins::Zvuk::AtlasUI::handleAllIslands($client, sub { $all_islands_menu = shift; }, {});
+	ok(ref $all_islands_menu eq 'HASH', 'T2.3: handleAllIslands returned menu');
+	is(scalar(@{ $all_islands_menu->{items} }), 79, 'T2.3: All 79 islands displayed');
+
+	my $first_island = $all_islands_menu->{items}[0];
+	like($first_island->{name}, qr/Одинокая классика/, 'T2.3: Top island by share (Одинокая классика, 6.7%) is first');
+	is($first_island->{play}, 'zvuk://atlas:b97564c8-6b97-5a31-8078-e2dcd7748a27', 'T2.3: play URL is zvuk://atlas:<id>');
+	ok(defined $first_island->{image}, 'T2.3: Island artwork cover is present');
+}
+
+# Test 2.4: Genre Families grouping (53 genres)
+{
+	my $genres_menu;
+	Plugins::Zvuk::AtlasUI::handleGenresMenu($client, sub { $genres_menu = shift; }, {});
+	ok(ref $genres_menu eq 'HASH', 'T2.4: handleGenresMenu returned menu');
+
+	my @genres = @{ $genres_menu->{items} };
+	is(scalar(@genres), 53, 'T2.4: Exactly 53 unique genre families generated');
+
+	# Top genre should be Rock or Jazz (based on track sum)
+	my ($rock_genre) = grep { $_->{passthrough}[0]{genre} eq 'рок' } @genres;
+	ok(defined $rock_genre, 'T2.4: "рок" genre family exists');
+	like($rock_genre->{name}, qr/Рок\s*\(5/, 'T2.4: Rock genre shows 5 islands count');
+
+	# Drilldown into Genre: handleGenreIslands
+	my $genre_islands;
+	Plugins::Zvuk::AtlasUI::handleGenreIslands($client, sub { $genre_islands = shift; }, {}, { genre => 'рок' });
+	is(scalar(@{ $genre_islands->{items} }), 5, 'T2.4: Rock genre contains exactly 5 islands');
+	my ($cold_rock) = grep { $_->{passthrough}[0]{island_id} eq '1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @{ $genre_islands->{items} };
+	ok(defined $cold_rock, 'T2.4: "Холодный рок" island is inside rock genre folder');
+}
+
+# Test 2.5: Moods grouping (36 moods)
+{
+	my $moods_menu;
+	Plugins::Zvuk::AtlasUI::handleMoodsMenu($client, sub { $moods_menu = shift; }, {});
+	ok(ref $moods_menu eq 'HASH', 'T2.5: handleMoodsMenu returned menu');
+
+	my @moods = @{ $moods_menu->{items} };
+	is(scalar(@moods), 36, 'T2.5: Exactly 36 unique mood folders generated');
+
+	# Drilldown into Mood: handleMoodIslands
+	my $mood_islands;
+	Plugins::Zvuk::AtlasUI::handleMoodIslands($client, sub { $mood_islands = shift; }, {}, { mood => 'одиночество' });
+	ok(scalar(@{ $mood_islands->{items} }) >= 1, 'T2.5: Mood drilldown returned islands');
+	my ($lonely_classical) = grep { $_->{passthrough}[0]{island_id} eq 'b97564c8-6b97-5a31-8078-e2dcd7748a27' } @{ $mood_islands->{items} };
+	ok(defined $lonely_classical, 'T2.5: "Одинокая классика" is inside "одиночество" mood folder');
+}
+
+# Test 2.6: Island Detail and Track List
+{
+	my $island_detail;
+	Plugins::Zvuk::AtlasUI::handleIslandDetail($client, sub { $island_detail = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	ok(ref $island_detail eq 'HASH', 'T2.6: handleIslandDetail returned menu');
+	my @detail_items = @{ $island_detail->{items} };
+
+	my ($play_stream_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @detail_items;
+	ok(defined $play_stream_item, 'T2.6: Island detail has "Play Island Wave" item');
+
+	my ($tracks_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleIslandTrackList } @detail_items;
+	ok(defined $tracks_item, 'T2.6: Island detail has "Island Tracks" item');
+
+	# Test track list fetching
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $islands_json_content }
+	);
+	my $tracks_menu;
+	Plugins::Zvuk::AtlasUI::handleIslandTrackList($client, sub { $tracks_menu = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	is(scalar(@{ $tracks_menu->{items} }), 50, 'T2.6: handleIslandTrackList returned 50 playable tracks');
+	my $first_track = $tracks_menu->{items}[0];
+	is($first_track->{url}, 'zvuk://47730977', 'T2.6: Track URL format is zvuk://<id>');
+	is($first_track->{play}, 'zvuk://47730977', 'T2.6: Track play format is zvuk://<id>');
+	is($first_track->{type}, 'audio', 'T2.6: Track type is audio');
+
+	# Verify track metadata was cached
+	my $cached_meta = Plugins::Zvuk::API->cache->get('zvuk_meta_47730977');
+	ok(defined $cached_meta, 'T2.6: Track metadata cached in Slim::Utils::Cache');
+	is($cached_meta->{title}, 'Satisfied', 'T2.6: Track title cached correctly');
+	is($cached_meta->{artist}, 'Skunk Anansie', 'T2.6: Track artist cached correctly');
+}
+
+# Test 2.7: Vintage Button / Rotary Knob Players (Squeezebox Boom / Classic)
+{
+	# 1. Verify no nextWindow => 'refresh' in menus for button players
+	my $button_all_islands;
+	Plugins::Zvuk::AtlasUI::handleAllIslands($client, sub { $button_all_islands = shift; }, { isButton => 1 });
+	my @refresh_items = grep { ($_->{nextWindow} // '') eq 'refresh' } @{ $button_all_islands->{items} };
+	is(scalar(@refresh_items), 0, 'T2.7: Button player items do NOT contain nextWindow => refresh (prevents mode pop crash)');
+
+	# 2. Island detail on button player uses CODE ref for playback
+	my $button_detail;
+	Plugins::Zvuk::AtlasUI::handleIslandDetail($client, sub { $button_detail = shift; }, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	my ($btn_play_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @{ $button_detail->{items} };
+	ok(ref $btn_play_item->{url} eq 'CODE', 'T2.7: Play stream item uses CODE ref for button player (enables rotary knob click)');
+
+	# 3. Test handleStartIslandWave pops mode and executes playlist play
+	my @executed_cmds;
+	no warnings 'once';
+	local *Test::FakeClient::execute = sub {
+		my ($self, $cmd) = @_;
+		push @executed_cmds, $cmd;
+	};
+
+	my @mode_stack = ('xmlbrowser');
+	no warnings 'redefine', 'once';
+	local *Slim::Buttons::Common::mode = sub { return $mode_stack[-1]; };
+	local *Slim::Buttons::Common::popMode = sub { return pop @mode_stack; };
+	local *Slim::Buttons::Common::pushModeLeft = sub { my ($c, $m) = @_; push @mode_stack, $m; };
+
+	Plugins::Zvuk::AtlasUI::handleStartIslandWave($client, sub {}, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+
+	is(scalar(@executed_cmds), 1, 'T2.7: handleStartIslandWave executed 1 command');
+	is($executed_cmds[0][1], 'play', 'T2.7: Command is play');
+	is($executed_cmds[0][2], 'zvuk://atlas:1511fc72-2331-59d2-913f-9ce8ed2b04ad', 'T2.7: Target is zvuk://atlas:<id>');
+	is($mode_stack[-1], 'playlist', 'T2.7: Cleanly transitioned to playlist mode');
+
+	# 4. Test handleStartRandomIslandWave on button player
+	@executed_cmds = ();
+	@mode_stack = ('xmlbrowser');
+	Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave($client, sub {}, { isButton => 1 });
+	is(scalar(@executed_cmds), 1, 'T2.7: handleStartRandomIslandWave executed command');
+	like($executed_cmds[0][2], qr{^zvuk://atlas:[0-9a-fA-F-]+$}, 'T2.7: Random island played valid zvuk://atlas:<id>');
+}
+
+# ===================================================================
+# SECTION 3: Actionability & Playback (ProtocolHandler.pm)
+# ===================================================================
+
+# Test 3.1: ProtocolHandler format and URL recognition
+{
+	$Slim::Utils::Prefs::STORE{'plugin.zvuk'}{quality} = 'flac';
+	is(Plugins::Zvuk::ProtocolHandler->getFormatForURL('zvuk://atlas:621ceafb-995c-5510-b601-5d4b14f02c08'), undef,
+		'T3.1: getFormatForURL returns undef for zvuk://atlas:<id> (recognized as playlist container)');
+	is_deeply(Plugins::Zvuk::ProtocolHandler->getMetadataFor($client, 'zvuk://atlas:621ceafb-995c-5510-b601-5d4b14f02c08'), {},
+		'T3.1: getMetadataFor returns empty hash for container');
+	is(Plugins::Zvuk::ProtocolHandler->getFormatForURL('zvuk://47730977'), 'flc',
+		'T3.1: getFormatForURL returns audio format for track URL');
+}
+
+# Test 3.2: explodePlaylist for zvuk://atlas:<island_id>
+{
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+	Plugins::Zvuk::API::Async->_resetThrottlerForTesting();
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => '{"island_alive":true}' }, # PUT start wave
+		{ code => 200, content => $wave_json_content },       # GET wave tracks
+	);
+
+	my $exploded_urls;
+	my $island_id = '621ceafb-995c-5510-b601-5d4b14f02c08';
+	Plugins::Zvuk::ProtocolHandler->explodePlaylist($client, "zvuk://atlas:$island_id", sub {
+		$exploded_urls = shift;
+	});
+
+	ok(ref $exploded_urls eq 'ARRAY', 'T3.2: explodePlaylist returned array of URLs');
+	is(scalar(@$exploded_urls), 20, 'T3.2: Returned 20 track URLs for wave');
+	is($exploded_urls->[0], 'zvuk://34015579', 'T3.2: First URL is zvuk://34015579');
+
+	# Check client state flags in pluginData
+	is($client->pluginData('zvuk_atlas_active'), 1, 'T3.2: zvuk_atlas_active set to 1');
+	is($client->pluginData('zvuk_atlas_island_id'), $island_id, 'T3.2: zvuk_atlas_island_id stored');
+	ok(defined $client->pluginData('zvuk_atlas_cursor'), 'T3.2: zvuk_atlas_cursor stored');
+	is($client->pluginData('zvuk_wave_active'), 0, 'T3.2: other modes cleared (wave_active = 0)');
+	is($client->pluginData('zvuk_radio_active'), 0, 'T3.2: other modes cleared (radio_active = 0)');
+}
+
+# Test 3.3: Auto-extend Atlas Wave when queue is low
+{
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+	Plugins::Zvuk::API::Async->_resetThrottlerForTesting();
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Control::Request::EXECUTED_REQUESTS = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $wave_json_content }
+	);
+
+	my $initial_cursor = $client->pluginData('zvuk_atlas_cursor');
+	Plugins::Zvuk::ProtocolHandler::_loadMoreAtlasTracks($client);
+
+	# Check request made with cursor
+	my $last_req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url) = @{ $last_req->{args} };
+	like($url, qr{/api/v1/map/islands/621ceafb-995c-5510-b601-5d4b14f02c08/wave\?}, 'T3.3: Sent wave auto-load request');
+	like($url, qr{cursor=}, 'T3.3: Included cursor in request');
+
+	# Check that tracks were appended to LMS playlist
+	is(scalar(@Slim::Control::Request::EXECUTED_REQUESTS), 20, 'T3.3: Appended 20 tracks via playlist add');
+	is($Slim::Control::Request::EXECUTED_REQUESTS[0]{cmd}[1], 'add', 'T3.3: Request command was playlist add');
+	is($Slim::Control::Request::EXECUTED_REQUESTS[0]{cmd}[2], 'zvuk://34015579', 'T3.3: Added track URL is zvuk://34015579');
+}
+
+# Test 3.4: _onStop clears Atlas flags
+{
+	ok($client->pluginData('zvuk_atlas_active') == 1, 'T3.4: Pre-condition: atlas_active is 1');
+
+	my $req = Test::FakeRequest->new(
+		client => $client,
+		cmd    => ['stop'],
+	);
+	Plugins::Zvuk::Plugin::_onStop($req);
+
+	is($client->pluginData('zvuk_atlas_active'), 0, 'T3.4: zvuk_atlas_active cleared to 0 on stop');
+	is($client->pluginData('zvuk_atlas_island_id'), undef, 'T3.4: zvuk_atlas_island_id reset to undef');
+	is($client->pluginData('zvuk_atlas_cursor'), undef, 'T3.4: zvuk_atlas_cursor reset to undef');
+}
+
+done_testing();

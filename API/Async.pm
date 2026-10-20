@@ -1766,4 +1766,38 @@ sub unhideTrack {
 	}, 'removeItemFromHidden', $gql, { id => "$trackId", type => 'track' }, { ttl => 0 });
 }
 
+# --- Atlas of Taste API Delegations ---
+
+sub getAtlasMap {
+	my ($self, $cb, $opts) = @_;
+	require Plugins::Zvuk::API::Atlas;
+	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $userId });
+	$atlas->getMap($cb, $opts);
+}
+
+sub getAtlasIslandTracks {
+	my ($self, $cb, $islandId, $opts) = @_;
+	require Plugins::Zvuk::API::Atlas;
+	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $userId });
+	$atlas->getIslandTracks($cb, $islandId, $opts);
+}
+
+sub startAtlasIslandWave {
+	my ($self, $cb, $islandId, $opts) = @_;
+	require Plugins::Zvuk::API::Atlas;
+	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $userId });
+	$atlas->startIslandWave($cb, $islandId, $opts);
+}
+
+sub getAtlasIslandWave {
+	my ($self, $cb, $islandId, $limit, $cursor, $opts) = @_;
+	require Plugins::Zvuk::API::Atlas;
+	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $userId });
+	$atlas->getIslandWave($cb, $islandId, $limit, $cursor, $opts);
+}
+
 1;

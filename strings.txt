@@ -655,3 +655,55 @@ PLUGIN_ZVUK_ALBUM_RADIO
 	EN	Album Radio
 	RU	Радио по альбому
 
+PLUGIN_ZVUK_ATLAS
+	EN	Taste Atlas
+	RU	Атлас вкуса
+
+PLUGIN_ZVUK_ATLAS_DESC
+	EN	Explore your music taste map and islands on atlas.zvuk.com
+	RU	Исследуйте персональную карту вкуса и острова на atlas.zvuk.com
+
+PLUGIN_ZVUK_ATLAS_ALL_ISLANDS
+	EN	All Islands (Top Taste)
+	RU	Все острова (Топ вашего вкуса)
+
+PLUGIN_ZVUK_ATLAS_GENRES
+	EN	By Genre Families
+	RU	По семействам жанров
+
+PLUGIN_ZVUK_ATLAS_MOODS
+	EN	By Moods
+	RU	По настроениям
+
+PLUGIN_ZVUK_ATLAS_RANDOM
+	EN	Random Island (I'm Feeling Lucky)
+	RU	Случайный остров (Мне повезёт)
+
+PLUGIN_ZVUK_ATLAS_WEB_MAP
+	EN	Open Taste Map (Web)
+	RU	Открыть карту вкуса (Web)
+
+PLUGIN_ZVUK_ATLAS_PLAY_STREAM
+	EN	Play Island Wave
+	RU	Слушать поток острова
+
+PLUGIN_ZVUK_ATLAS_TRACKS
+	EN	Island Tracks
+	RU	Треки острова
+
+PLUGIN_ZVUK_ATLAS_EMPTY
+	EN	No taste islands found
+	RU	Острова вкуса не найдены
+
+PLUGIN_ZVUK_ATLAS_ERROR
+	EN	Failed to load Taste Atlas
+	RU	Ошибка загрузки Атласа вкуса
+
+PLUGIN_ZVUK_ATLAS_TRACKS_COUNT
+	EN	tracks
+	RU	тр.
+
+PLUGIN_ZVUK_ATLAS_ISLANDS_COUNT
+	EN	islands
+	RU	остр.
+
