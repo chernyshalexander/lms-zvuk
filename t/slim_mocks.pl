@@ -110,6 +110,7 @@ $INC{'Slim/Utils/Strings.pm'} = 1;
 package Slim::Plugin::OPMLBased;
 our $VERSION = 1;
 sub _pluginDataFor { return 'mock_icon.png'; }
+sub initPlugin     { }
 $INC{'Slim/Plugin/OPMLBased.pm'} = 1;
 
 package Slim::Web::Settings;
@@ -226,6 +227,19 @@ package Slim::Player::Playlist;
 sub count { return 10; }
 $INC{'Slim/Player/Playlist.pm'} = 1;
 
+package Slim::Player::ProtocolHandlers;
+our %HANDLERS;
+sub registerHandler {
+    my ($class, $scheme, $handler) = @_;
+    $HANDLERS{$scheme} = $handler;
+}
+sub handlerForURL {
+    my ($class, $url) = @_;
+    my ($scheme) = $url =~ m{^(\w+)://};
+    return $HANDLERS{$scheme};
+}
+$INC{'Slim/Player/ProtocolHandlers.pm'} = 1;
+
 package Slim::Player::Source;
 sub playingSongIndex { return 1; }
 $INC{'Slim/Player/Source.pm'} = 1;
@@ -241,6 +255,8 @@ sub executeRequest {
     my ($client, $cmd) = @_;
     push @EXECUTED_REQUESTS, { client => $client, cmd => $cmd };
 }
+sub addDispatch { }
+sub subscribe   { }
 $INC{'Slim/Control/Request.pm'} = 1;
 
 # ---- JSON (real JSON::PP under the hood; JSON::XS/.VersionOneAndTwo are XS-only and not installed here) ----
@@ -267,5 +283,23 @@ sub isWebBrowser { return 0; }
 sub canFollowWeblinks { return 0; }
 $INC{'Slim/Utils/Misc.pm'} = 1;
 
+package Slim::Menu::Base;
+our %PROVIDERS;
+sub registerInfoProvider {
+    my ($class, $name, %details) = @_;
+    $PROVIDERS{$class}{$name} = \%details;
+}
+
+package Slim::Menu::TrackInfo;
+our @ISA = qw(Slim::Menu::Base);
+$INC{'Slim/Menu/TrackInfo.pm'} = 1;
+
+package Slim::Menu::AlbumInfo;
+our @ISA = qw(Slim::Menu::Base);
+$INC{'Slim/Menu/AlbumInfo.pm'} = 1;
+
+package Slim::Menu::ArtistInfo;
+our @ISA = qw(Slim::Menu::Base);
+$INC{'Slim/Menu/ArtistInfo.pm'} = 1;
 
 1;

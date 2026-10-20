@@ -279,4 +279,16 @@ is($rendered_track->{itemActions}{info}{fixedParams}{id}, 101, 'T8: fixedParams 
 is($rendered_track->{itemActions}{info}{fixedParams}{artist_id}, 201, 'T8: fixedParams artist_id is 201');
 is($rendered_track->{itemActions}{info}{fixedParams}{release_id}, 301, 'T8: fixedParams release_id is 301');
 
+# -------------------------------------------------------------------
+# Test 9: initPlugin registers Slim::Menu providers
+# -------------------------------------------------------------------
+Plugins::Zvuk::Plugin->initPlugin();
+
+ok($Slim::Menu::Base::PROVIDERS{'Slim::Menu::TrackInfo'}{zvuk}, 'T9: TrackInfo provider registered');
+is($Slim::Menu::Base::PROVIDERS{'Slim::Menu::TrackInfo'}{zvuk}{before}, 'top', 'T9: TrackInfo placed before top');
+ok($Slim::Menu::Base::PROVIDERS{'Slim::Menu::AlbumInfo'}{zvuk}, 'T9: AlbumInfo provider registered');
+is($Slim::Menu::Base::PROVIDERS{'Slim::Menu::AlbumInfo'}{zvuk}{before}, 'top', 'T9: AlbumInfo placed before top');
+ok($Slim::Menu::Base::PROVIDERS{'Slim::Menu::ArtistInfo'}{zvuk}, 'T9: ArtistInfo provider registered');
+is($Slim::Menu::Base::PROVIDERS{'Slim::Menu::ArtistInfo'}{zvuk}{before}, 'top', 'T9: ArtistInfo placed before top');
+
 done_testing();

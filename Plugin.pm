@@ -50,27 +50,6 @@ sub initPlugin {
 
 	Plugins::Zvuk::ProtocolHandler->register();
 	Plugins::Zvuk::Browse::InfoMenu->init();
-
-	eval {
-		if (defined &Slim::Menu::AlbumInfo::registerInfoProvider) {
-			Slim::Menu::AlbumInfo->registerInfoProvider( zvuk => (
-				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
-			) );
-		}
-		if (defined &Slim::Menu::TrackInfo::registerInfoProvider) {
-			Slim::Menu::TrackInfo->registerInfoProvider( zvuk => (
-				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu,
-			) );
-		}
-		if (defined &Slim::Menu::ArtistInfo::registerInfoProvider) {
-			Slim::Menu::ArtistInfo->registerInfoProvider( zvuk => (
-				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu,
-			) );
-		}
-	};
 	
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
@@ -146,6 +125,31 @@ sub initPlugin {
 	my $accounts = $prefs->get('accounts') || {};
 	foreach my $userId (keys %$accounts) {
 		_init_api_client($userId);
+	}
+
+	# Register info providers for TrackInfo, AlbumInfo, and ArtistInfo menus
+	eval {
+		if (eval { Slim::Menu::TrackInfo->can('registerInfoProvider') }) {
+			Slim::Menu::TrackInfo->registerInfoProvider( zvuk => (
+				before => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu,
+			) );
+		}
+		if (eval { Slim::Menu::AlbumInfo->can('registerInfoProvider') }) {
+			Slim::Menu::AlbumInfo->registerInfoProvider( zvuk => (
+				before => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
+			) );
+		}
+		if (eval { Slim::Menu::ArtistInfo->can('registerInfoProvider') }) {
+			Slim::Menu::ArtistInfo->registerInfoProvider( zvuk => (
+				before => 'top',
+				func  => \&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu,
+			) );
+		}
+	};
+	if ($@) {
+		$log->error("Error registering info providers: $@");
 	}
 
 }
