@@ -645,11 +645,11 @@ PLUGIN_ZVUK_RADIO
 
 PLUGIN_ZVUK_TRACK_RADIO
 	EN	Track Radio
-	RU	Включить радио по треку
+	RU	Радио по треку
 
 PLUGIN_ZVUK_ARTIST_RADIO
 	EN	Artist Radio
-	RU	Радио артиста
+	RU	Радио по исполнителю
 
 PLUGIN_ZVUK_ALBUM_RADIO
 	EN	Album Radio

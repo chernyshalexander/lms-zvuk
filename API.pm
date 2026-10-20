@@ -185,22 +185,51 @@ sub cacheTrackMetadata {
         next unless $track && ref $track eq 'HASH';
         my $id = $track->{id} or next;
 
-        # Check if already cached, reuse if found
-        if (my $cached = $cache->get("zvuk_meta_$id")) {
-            push @result, $cached;
-            next;
-        }
-
         my $icon   = $class->getImageUrl($track, 'usePlaceholder');
         my $artist = $class->_getArtistName($track);
         my $album  = ($track->{release} && $track->{release}->{title}) ? $track->{release}->{title} : '';
+
+        my $artist_id = ($track->{artists} && ref $track->{artists} eq 'ARRAY' && $track->{artists}->[0])
+            ? $track->{artists}->[0]->{id}
+            : ($track->{artist_id} || '');
+        my $release_id = ($track->{release} && ref $track->{release} eq 'HASH')
+            ? $track->{release}->{id}
+            : ($track->{release_id} || '');
+
+        # Check if already cached, reuse if found
+        if (my $cached = $cache->get("zvuk_meta_$id")) {
+            my $updated = 0;
+            if (!$cached->{artist_id} && $artist_id) {
+                $cached->{artist_id} = $artist_id;
+                $updated = 1;
+            }
+            if (!$cached->{release_id} && $release_id) {
+                $cached->{release_id} = $release_id;
+                $updated = 1;
+            }
+            if (!$cached->{artists} && $track->{artists}) {
+                $cached->{artists} = $track->{artists};
+                $updated = 1;
+            }
+            if (!$cached->{release} && $track->{release}) {
+                $cached->{release} = $track->{release};
+                $updated = 1;
+            }
+            $cache->set( "zvuk_meta_$id", $cached, DEFAULT_TTL ) if $updated;
+            push @result, $cached;
+            next;
+        }
 
         my $dur = int($track->{duration} || 0);
         my $meta = {
             id          => $id,
             title       => $track->{title}          || '',
             artist      => $artist,
+            artist_id   => $artist_id,
             album       => $album,
+            release_id  => $release_id,
+            artists     => $track->{artists},
+            release     => $track->{release},
             duration    => $dur,
             secs        => $dur,
             icon        => $icon,

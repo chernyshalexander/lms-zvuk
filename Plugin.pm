@@ -54,19 +54,19 @@ sub initPlugin {
 	eval {
 		if (defined &Slim::Menu::AlbumInfo::registerInfoProvider) {
 			Slim::Menu::AlbumInfo->registerInfoProvider( zvuk => (
-				after => 'top',
+				before => 'top',
 				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
 			) );
 		}
 		if (defined &Slim::Menu::TrackInfo::registerInfoProvider) {
 			Slim::Menu::TrackInfo->registerInfoProvider( zvuk => (
-				after => 'top',
+				before => 'top',
 				func  => \&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu,
 			) );
 		}
 		if (defined &Slim::Menu::ArtistInfo::registerInfoProvider) {
 			Slim::Menu::ArtistInfo->registerInfoProvider( zvuk => (
-				after => 'top',
+				before => 'top',
 				func  => \&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu,
 			) );
 		}

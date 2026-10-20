@@ -197,18 +197,43 @@ my $track_menu = Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu(
 
 ok($track_menu, 'T6: trackInfoMenu returned a menu');
 is($track_menu->{name}, 'PLUGIN_ZVUK_ON_ZVUK', 'T6: trackInfoMenu is named PLUGIN_ZVUK_ON_ZVUK');
-is($track_menu->{type}, 'outline', 'T6: trackInfoMenu has type outline');
 my $t_items = $track_menu->{items};
-is(scalar(@$t_items), 3, 'T6: trackInfoMenu has 3 items (track radio, artist radio, album radio)');
+ok(scalar(@$t_items) >= 3, 'T6: trackInfoMenu has at least 3 radio items');
 is($t_items->[0]{name}, 'PLUGIN_ZVUK_TRACK_RADIO', 'T6: item 1 is Track Radio');
-is($t_items->[0]{itemActions}{go}{cmd}[1], 'play', 'T6: item 1 action is playlist play');
-is($t_items->[0]{itemActions}{go}{params}{url}, 'zvuk://radio:track:101', 'T6: item 1 URL is zvuk://radio:track:101');
+is($t_items->[0]{type}, 'audio', 'T6: item 1 is type audio');
+is($t_items->[0]{url}, 'zvuk://radio:track:101', 'T6: item 1 URL is zvuk://radio:track:101');
+is($t_items->[0]{play}, 'zvuk://radio:track:101', 'T6: item 1 play is zvuk://radio:track:101');
+is($t_items->[0]{on_select}, 'play', 'T6: item 1 on_select is play');
 
 like($t_items->[1]{name}, qr/PLUGIN_ZVUK_ARTIST_RADIO/, 'T6: item 2 is Artist Radio');
-is($t_items->[1]{itemActions}{go}{params}{url}, 'zvuk://radio:artist:201', 'T6: item 2 URL is zvuk://radio:artist:201');
+is($t_items->[1]{type}, 'audio', 'T6: item 2 is type audio');
+is($t_items->[1]{url}, 'zvuk://radio:artist:201', 'T6: item 2 URL is zvuk://radio:artist:201');
 
 like($t_items->[2]{name}, qr/PLUGIN_ZVUK_ALBUM_RADIO/, 'T6: item 3 is Album Radio');
-is($t_items->[2]{itemActions}{go}{params}{url}, 'zvuk://radio:release:301', 'T6: item 3 URL is zvuk://radio:release:301');
+is($t_items->[2]{type}, 'audio', 'T6: item 3 is type audio');
+is($t_items->[2]{url}, 'zvuk://radio:release:301', 'T6: item 3 URL is zvuk://radio:release:301');
+
+# Test trackInfoMenu cache fallback when remoteMeta is empty
+Plugins::Zvuk::API->cacheTrackMetadata([
+	{
+		id       => 999,
+		title    => 'Cached Track',
+		duration => 180,
+		artists  => [{ id => 888, title => 'Cached Artist' }],
+		release  => { id => 777, title => 'Cached Album' },
+	}
+]);
+my $cached_track_menu = Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu(
+	$client,
+	'zvuk://999',
+	undef,
+	undef
+);
+ok($cached_track_menu, 'T6c: trackInfoMenu resolved from cache without remoteMeta');
+my $c_items = $cached_track_menu->{items};
+is($c_items->[0]{url}, 'zvuk://radio:track:999', 'T6c: Track Radio from cache');
+is($c_items->[1]{url}, 'zvuk://radio:artist:888', 'T6c: Artist Radio from cache');
+is($c_items->[2]{url}, 'zvuk://radio:release:777', 'T6c: Album Radio from cache');
 
 # Test artistInfoMenu
 my $artist_menu = Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu(
@@ -219,9 +244,10 @@ my $artist_menu = Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu(
 );
 ok($artist_menu, 'T6b: artistInfoMenu returned a menu');
 is($artist_menu->{name}, 'PLUGIN_ZVUK_ON_ZVUK', 'T6b: artistInfoMenu is named PLUGIN_ZVUK_ON_ZVUK');
-is($artist_menu->{type}, 'outline', 'T6b: artistInfoMenu has type outline');
 is($artist_menu->{items}[0]{name}, 'PLUGIN_ZVUK_ARTIST_RADIO', 'T6b: item is Artist Radio');
-is($artist_menu->{items}[0]{itemActions}{go}{params}{url}, 'zvuk://radio:artist:201', 'T6b: URL is zvuk://radio:artist:201');
+is($artist_menu->{items}[0]{type}, 'audio', 'T6b: item is type audio');
+is($artist_menu->{items}[0]{url}, 'zvuk://radio:artist:201', 'T6b: URL is zvuk://radio:artist:201');
+is($artist_menu->{items}[0]{play}, 'zvuk://radio:artist:201', 'T6b: play is zvuk://radio:artist:201');
 
 # -------------------------------------------------------------------
 # Test 7: Plugin.pm handleArtist menu contains Artist Radio

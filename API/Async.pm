@@ -694,6 +694,7 @@ sub getTracks {
 			mediaContents(ids: $ids) {
 				... on Track {
 					id title duration availability artistTemplate
+					artists { id title image { src } }
 					release { id title image { src } }
 				}
 			}
