@@ -511,6 +511,13 @@ canvas#atlasCanvas:active {
 
 		if (!islands.length) return;
 
+		// Calculate dynamic font size based on zoom level
+		var defaultZoom = Math.min(w, h) * 0.42 || 250;
+		var zoomRatio = camera.zoom / defaultZoom;
+		var fontSize = Math.round(11 * Math.pow(zoomRatio, 0.7));
+		if (fontSize < 7) fontSize = 7;
+		if (fontSize > 28) fontSize = 28;
+
 		// Draw connections
 		ctx.lineWidth = 1;
 		ctx.strokeStyle = 'rgba(88, 166, 255, 0.15)';
@@ -569,11 +576,20 @@ canvas#atlasCanvas:active {
 			ctx.strokeStyle = (isSelected || isHovered) ? '#fff' : 'rgba(255,255,255,0.7)';
 			ctx.stroke();
 
-			// Label
-			ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#c9d1d9';
-			ctx.font = ((isSelected || isHovered) ? 'bold 12px' : '11px') + ' sans-serif';
-			ctx.textAlign = 'center';
-			ctx.fillText(isl.title, p.x, p.y + radius + 14);
+			// Label with dynamic font scaling
+			var showLabel = true;
+			if (zoomRatio < 0.65 && !isSelected && !isHovered) {
+				if ((isl.track_count && isl.track_count < 60) && (isl.share && isl.share < 0.02)) {
+					showLabel = false;
+				}
+			}
+
+			if (showLabel) {
+				ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#c9d1d9';
+				ctx.font = ((isSelected || isHovered) ? 'bold ' : '') + fontSize + 'px sans-serif';
+				ctx.textAlign = 'center';
+				ctx.fillText(isl.title, p.x, p.y + radius + fontSize + 3);
+			}
 		});
 	}
 
