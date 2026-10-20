@@ -71,6 +71,75 @@ select.player-select {
 .view-mode-btn:hover {
 	background: #2ea043;
 }
+.zoom-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.zoom-btn {
+	background: #21262d;
+	color: #c9d1d9;
+	border: 1px solid #30363d;
+	width: 32px;
+	height: 32px;
+	border-radius: 6px;
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	user-select: none;
+	transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.zoom-btn:hover {
+	background: #30363d;
+	color: #fff;
+	border-color: #58a6ff;
+}
+.zoom-btn:active {
+	background: #1f6feb;
+	color: #fff;
+}
+.canvas-zoom-overlay {
+	position: absolute;
+	right: 20px;
+	bottom: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	z-index: 15;
+}
+.canvas-zoom-btn {
+	background: rgba(33, 38, 45, 0.9);
+	backdrop-filter: blur(8px);
+	color: #c9d1d9;
+	border: 1px solid #30363d;
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	user-select: none;
+	box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+	transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+}
+.canvas-zoom-btn:hover {
+	background: #30363d;
+	color: #fff;
+	border-color: #58a6ff;
+}
+.canvas-zoom-btn:active {
+	background: #1f6feb;
+	color: #fff;
+	transform: scale(0.95);
+}
 #canvasContainer {
 	flex: 1;
 	position: relative;
@@ -95,16 +164,36 @@ canvas#atlasCanvas:active {
 	border-radius: 8px;
 	padding: 14px;
 	pointer-events: auto;
-	box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-	min-width: 240px;
-	max-width: 300px;
+	box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+	min-width: 250px;
+	max-width: 320px;
 	z-index: 20;
 	backdrop-filter: blur(10px);
 }
-#tooltip h3 {
+.tooltip-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+.tooltip-header h3 {
 	font-size: 15px;
 	color: #fff;
-	margin-bottom: 6px;
+	line-height: 1.3;
+}
+.tooltip-close {
+	background: transparent;
+	border: none;
+	color: #8b949e;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 4px;
+	transition: color 0.2s;
+}
+.tooltip-close:hover {
+	color: #fff;
 }
 #tooltip .meta-line {
 	font-size: 12px;
@@ -189,12 +278,20 @@ canvas#atlasCanvas:active {
 		<select class="player-select" id="playerSelect">
 			<option value="[% playerid %]">[% "PLUGIN_ZVUK_DEFAULT_PLAYER" | string %]</option>
 		</select>
-		<button class="view-mode-btn" id="resetZoomBtn">[% "PLUGIN_ZVUK_ATLAS_RESET_ZOOM" | string %]</button>
+		<div class="zoom-controls">
+			<button class="zoom-btn" id="zoomInBtn" title="Zoom In">+</button>
+			<button class="zoom-btn" id="zoomOutBtn" title="Zoom Out">&minus;</button>
+			<button class="view-mode-btn" id="resetZoomBtn">[% "PLUGIN_ZVUK_ATLAS_RESET_ZOOM" | string %]</button>
+		</div>
 	</div>
 </header>
 
 <div id="canvasContainer">
 	<canvas id="atlasCanvas"></canvas>
+	<div class="canvas-zoom-overlay">
+		<button class="canvas-zoom-btn" id="canvasZoomInBtn" title="Zoom In">+</button>
+		<button class="canvas-zoom-btn" id="canvasZoomOutBtn" title="Zoom Out">&minus;</button>
+	</div>
 	<div id="tooltip"></div>
 	<div id="loadingOverlay">
 		<div class="spinner"></div>
@@ -232,11 +329,16 @@ canvas#atlasCanvas:active {
 	var headerMeta = document.getElementById('headerMeta');
 	var playerSelect = document.getElementById('playerSelect');
 	var resetZoomBtn = document.getElementById('resetZoomBtn');
+	var zoomInBtn = document.getElementById('zoomInBtn');
+	var zoomOutBtn = document.getElementById('zoomOutBtn');
+	var canvasZoomInBtn = document.getElementById('canvasZoomInBtn');
+	var canvasZoomOutBtn = document.getElementById('canvasZoomOutBtn');
 	var toast = document.getElementById('toast');
 
 	var mapData = null;
 	var islands = [];
 	var hoveredIsland = null;
+	var selectedIsland = null;
 
 	var camera = {
 		x: 0,
@@ -245,12 +347,15 @@ canvas#atlasCanvas:active {
 	};
 	var isDragging = false;
 	var dragStart = { x: 0, y: 0 };
+	var mouseDownPos = { x: 0, y: 0 };
+	var mouseDownTime = 0;
 
 	function resize() {
 		canvas.width = container.clientWidth * window.devicePixelRatio;
 		canvas.height = container.clientHeight * window.devicePixelRatio;
 		ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 		render();
+		updateTooltipPosition();
 	}
 	window.addEventListener('resize', resize);
 
@@ -296,6 +401,7 @@ canvas#atlasCanvas:active {
 				mapData = res.map;
 				islands = mapData.islands || [];
 				headerMeta.textContent = (mapData.user_name || I18N.profile) + ' \u2022 ' + (mapData.total_tracks || 0) + ' ' + I18N.tracks + ' \u2022 ' + islands.length + ' ' + I18N.islands;
+				hideTooltip();
 				resetCamera();
 				render();
 			} else {
@@ -314,10 +420,42 @@ canvas#atlasCanvas:active {
 		camera.zoom = Math.min(container.clientWidth, container.clientHeight) * 0.42;
 	}
 
-	resetZoomBtn.addEventListener('click', function() {
-		resetCamera();
+	function zoomByFactor(factor, cx, cy) {
+		if (cx === undefined || cy === undefined) {
+			cx = container.clientWidth / 2;
+			cy = container.clientHeight / 2;
+		}
+		var newZoom = camera.zoom * factor;
+		if (newZoom < 40) newZoom = 40;
+		if (newZoom > 6000) newZoom = 6000;
+		var actualFactor = newZoom / camera.zoom;
+		camera.x = cx - (cx - camera.x) * actualFactor;
+		camera.y = cy - (cy - camera.y) * actualFactor;
+		camera.zoom = newZoom;
 		render();
-	});
+		updateTooltipPosition();
+	}
+
+	if (resetZoomBtn) {
+		resetZoomBtn.addEventListener('click', function() {
+			resetCamera();
+			render();
+			updateTooltipPosition();
+		});
+	}
+
+	if (zoomInBtn) {
+		zoomInBtn.addEventListener('click', function() { zoomByFactor(1.3); });
+	}
+	if (zoomOutBtn) {
+		zoomOutBtn.addEventListener('click', function() { zoomByFactor(1 / 1.3); });
+	}
+	if (canvasZoomInBtn) {
+		canvasZoomInBtn.addEventListener('click', function() { zoomByFactor(1.3); });
+	}
+	if (canvasZoomOutBtn) {
+		canvasZoomOutBtn.addEventListener('click', function() { zoomByFactor(1 / 1.3); });
+	}
 
 	playerSelect.addEventListener('change', function() {
 		loadingOverlay.style.display = 'flex';
@@ -343,6 +481,24 @@ canvas#atlasCanvas:active {
 		if (valence < 0 && energy >= 0)  return '#ef4444'; // Red / Drive
 		if (valence < 0 && energy < 0)   return '#3b82f6'; // Blue / Melancholy
 		return '#10b981';                                  // Emerald / Calm
+	}
+
+	function getIslandRadius(isl) {
+		return Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
+	}
+
+	function findIslandAt(sx, sy) {
+		for (var i = islands.length - 1; i >= 0; i--) {
+			var isl = islands[i];
+			var p = worldToScreen(isl.valence, isl.energy);
+			var radius = getIslandRadius(isl);
+			var hitRadius = Math.max(radius + 8, 14);
+			var dist = Math.hypot(p.x - sx, p.y - sy);
+			if (dist <= hitRadius) {
+				return isl;
+			}
+		}
+		return null;
 	}
 
 	function render() {
@@ -380,15 +536,27 @@ canvas#atlasCanvas:active {
 		// Draw islands
 		islands.forEach(function(isl) {
 			var p = worldToScreen(isl.valence, isl.energy);
-			var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
+			var radius = getIslandRadius(isl);
 			var isHovered = (hoveredIsland === isl);
+			var isSelected = (selectedIsland === isl);
 			var color = getIslandColor(isl.valence, isl.energy);
 
-			// Glow
-			if (isHovered) {
+			// Selection or Hover aura
+			if (isSelected) {
 				ctx.beginPath();
-				ctx.arc(p.x, p.y, radius + 8, 0, Math.PI * 2);
-				ctx.fillStyle = 'rgba(88, 166, 255, 0.3)';
+				ctx.arc(p.x, p.y, radius + 10, 0, Math.PI * 2);
+				ctx.fillStyle = 'rgba(88, 166, 255, 0.4)';
+				ctx.fill();
+
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, radius + 5, 0, Math.PI * 2);
+				ctx.strokeStyle = '#58a6ff';
+				ctx.lineWidth = 2;
+				ctx.stroke();
+			} else if (isHovered) {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, radius + 6, 0, Math.PI * 2);
+				ctx.fillStyle = 'rgba(88, 166, 255, 0.25)';
 				ctx.fill();
 			}
 
@@ -397,13 +565,13 @@ canvas#atlasCanvas:active {
 			ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
 			ctx.fillStyle = color;
 			ctx.fill();
-			ctx.lineWidth = isHovered ? 2.5 : 1.5;
-			ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.7)';
+			ctx.lineWidth = (isSelected || isHovered) ? 2.5 : 1.5;
+			ctx.strokeStyle = (isSelected || isHovered) ? '#fff' : 'rgba(255,255,255,0.7)';
 			ctx.stroke();
 
 			// Label
-			ctx.fillStyle = isHovered ? '#ffffff' : '#c9d1d9';
-			ctx.font = (isHovered ? 'bold 12px' : '11px') + ' sans-serif';
+			ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#c9d1d9';
+			ctx.font = ((isSelected || isHovered) ? 'bold 12px' : '11px') + ' sans-serif';
 			ctx.textAlign = 'center';
 			ctx.fillText(isl.title, p.x, p.y + radius + 14);
 		});
@@ -442,12 +610,99 @@ canvas#atlasCanvas:active {
 		ctx.fillText(I18N.calm, center.x + 30, h - 16);
 	}
 
+	function hideTooltip() {
+		selectedIsland = null;
+		tooltip.style.display = 'none';
+		render();
+	}
+
+	function showTooltip(isl) {
+		selectedIsland = isl;
+		var coversHtml = '';
+		if (isl.covers && isl.covers.length) {
+			coversHtml = '<div class="covers-row">';
+			isl.covers.slice(0, 4).forEach(function(c) {
+				var escTitle = (c.title || '').replace(/"/g, '&quot;');
+				var escArtist = (c.artist || '').replace(/"/g, '&quot;');
+				coversHtml += '<img src="' + c.cover_url + '" title="' + escTitle + ' - ' + escArtist + '"/>';
+			});
+			coversHtml += '</div>';
+		}
+
+		var sharePct = (isl.share ? (isl.share * 100).toFixed(1) : '0') + '%';
+
+		var escTitle = (isl.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		var escGenre = (isl.genre || '\u2014').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		var escMood = (isl.mood || '\u2014').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+		tooltip.innerHTML =
+			'<div class="tooltip-header">' +
+				'<h3>' + escTitle + '</h3>' +
+				'<button class="tooltip-close" id="tooltipCloseBtn" title="Close">&times;</button>' +
+			'</div>' +
+			'<div class="meta-line">' + I18N.genre + ': ' + escGenre + ' \u2022 ' + I18N.mood + ': ' + escMood + '</div>' +
+			'<div class="meta-line">' + (isl.track_count || 0) + ' ' + I18N.tracks + ' \u2022 ' + I18N.share + ': ' + sharePct + '</div>' +
+			coversHtml +
+			'<button class="play-btn" id="playIslandBtn">' + I18N.playWave + '</button>';
+
+		tooltip.style.display = 'block';
+		updateTooltipPosition();
+
+		var closeBtn = document.getElementById('tooltipCloseBtn');
+		if (closeBtn) {
+			closeBtn.onclick = function(e) {
+				e.stopPropagation();
+				hideTooltip();
+			};
+		}
+
+		var playBtn = document.getElementById('playIslandBtn');
+		if (playBtn) {
+			playBtn.onclick = function(e) {
+				e.stopPropagation();
+				playIsland(isl.id, isl.title);
+			};
+		}
+
+		render();
+	}
+
+	function updateTooltipPosition() {
+		if (!selectedIsland || tooltip.style.display === 'none') return;
+		var p = worldToScreen(selectedIsland.valence, selectedIsland.energy);
+		var radius = getIslandRadius(selectedIsland);
+
+		var tw = tooltip.offsetWidth || 280;
+		var th = tooltip.offsetHeight || 160;
+		var cw = container.clientWidth;
+		var ch = container.clientHeight;
+
+		var x = p.x + radius + 14;
+		var y = p.y - 20;
+
+		if (x + tw > cw - 12) {
+			x = p.x - radius - tw - 14;
+		}
+		if (x < 12) x = 12;
+		if (x + tw > cw - 12) x = cw - tw - 12;
+
+		if (y < 12) y = 12;
+		if (y + th > ch - 12) y = ch - th - 12;
+
+		tooltip.style.left = Math.round(x) + 'px';
+		tooltip.style.top = Math.round(y) + 'px';
+	}
+
 	// Mouse interaction
 	container.addEventListener('mousedown', function(e) {
 		if (e.target === canvas) {
 			isDragging = true;
 			dragStart.x = e.clientX - camera.x;
 			dragStart.y = e.clientY - camera.y;
+			mouseDownPos.x = e.clientX;
+			mouseDownPos.y = e.clientY;
+			mouseDownTime = Date.now();
+			canvas.style.cursor = 'grabbing';
 		}
 	});
 
@@ -456,7 +711,7 @@ canvas#atlasCanvas:active {
 			camera.x = e.clientX - dragStart.x;
 			camera.y = e.clientY - dragStart.y;
 			render();
-			tooltip.style.display = 'none';
+			updateTooltipPosition();
 			return;
 		}
 
@@ -464,32 +719,37 @@ canvas#atlasCanvas:active {
 		var mx = e.clientX - rect.left;
 		var my = e.clientY - rect.top;
 
-		var found = null;
-		for (var i = islands.length - 1; i >= 0; i--) {
-			var isl = islands[i];
-			var p = worldToScreen(isl.valence, isl.energy);
-			var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
-			var dist = Math.hypot(p.x - mx, p.y - my);
-			if (dist <= radius + 4) {
-				found = isl;
-				break;
-			}
-		}
+		var found = findIslandAt(mx, my);
 
 		if (found !== hoveredIsland) {
 			hoveredIsland = found;
+			canvas.style.cursor = found ? 'pointer' : 'grab';
 			render();
-
-			if (found) {
-				showTooltip(found, e.clientX, e.clientY);
-			} else {
-				tooltip.style.display = 'none';
-			}
 		}
 	});
 
-	window.addEventListener('mouseup', function() {
+	window.addEventListener('mouseup', function(e) {
+		if (!isDragging) return;
 		isDragging = false;
+		canvas.style.cursor = hoveredIsland ? 'pointer' : 'grab';
+
+		var dt = Date.now() - mouseDownTime;
+		var dx = e.clientX - mouseDownPos.x;
+		var dy = e.clientY - mouseDownPos.y;
+		var dist = Math.hypot(dx, dy);
+
+		if (dist < 6 && dt < 400 && e.target === canvas) {
+			var rect = canvas.getBoundingClientRect();
+			var mx = e.clientX - rect.left;
+			var my = e.clientY - rect.top;
+			var clicked = findIslandAt(mx, my);
+
+			if (clicked) {
+				showTooltip(clicked);
+			} else if (selectedIsland) {
+				hideTooltip();
+			}
+		}
 	});
 
 	container.addEventListener('wheel', function(e) {
@@ -498,11 +758,7 @@ canvas#atlasCanvas:active {
 		var rect = canvas.getBoundingClientRect();
 		var mx = e.clientX - rect.left;
 		var my = e.clientY - rect.top;
-
-		camera.x = mx - (mx - camera.x) * factor;
-		camera.y = my - (my - camera.y) * factor;
-		camera.zoom *= factor;
-		render();
+		zoomByFactor(factor, mx, my);
 	}, { passive: false });
 
 	// Touch interaction
@@ -512,6 +768,7 @@ canvas#atlasCanvas:active {
 	var touchStartPos = { x: 0, y: 0 };
 
 	container.addEventListener('touchstart', function(e) {
+		if (e.target !== canvas) return;
 		if (e.touches.length === 1) {
 			isDragging = true;
 			dragStart.x = e.touches[0].clientX - camera.x;
@@ -534,15 +791,26 @@ canvas#atlasCanvas:active {
 			camera.x = e.touches[0].clientX - dragStart.x;
 			camera.y = e.touches[0].clientY - dragStart.y;
 			render();
-			tooltip.style.display = 'none';
+			updateTooltipPosition();
 		} else if (e.touches.length === 2 && initialPinchDist > 0) {
 			var dist = Math.hypot(
 				e.touches[0].clientX - e.touches[1].clientX,
 				e.touches[0].clientY - e.touches[1].clientY
 			);
 			var factor = dist / initialPinchDist;
-			camera.zoom = initialPinchZoom * factor;
-			render();
+			var newZoom = initialPinchZoom * factor;
+			if (newZoom >= 40 && newZoom <= 6000) {
+				var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+				var cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+				var rect = canvas.getBoundingClientRect();
+				var sx = cx - rect.left;
+				var sy = cy - rect.top;
+				camera.x = sx - (sx - camera.x) * (newZoom / camera.zoom);
+				camera.y = sy - (sy - camera.y) * (newZoom / camera.zoom);
+				camera.zoom = newZoom;
+				render();
+				updateTooltipPosition();
+			}
 		}
 	}, { passive: true });
 
@@ -552,64 +820,20 @@ canvas#atlasCanvas:active {
 			var dt = Date.now() - touchStartTime;
 			var dx = e.changedTouches[0].clientX - touchStartPos.x;
 			var dy = e.changedTouches[0].clientY - touchStartPos.y;
-			if (dt < 300 && Math.hypot(dx, dy) < 10) {
+			if (dt < 400 && Math.hypot(dx, dy) < 10) {
 				var rect = canvas.getBoundingClientRect();
 				var mx = e.changedTouches[0].clientX - rect.left;
 				var my = e.changedTouches[0].clientY - rect.top;
-				for (var i = islands.length - 1; i >= 0; i--) {
-					var isl = islands[i];
-					var p = worldToScreen(isl.valence, isl.energy);
-					var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
-					if (Math.hypot(p.x - mx, p.y - my) <= radius + 10) {
-						hoveredIsland = isl;
-						showTooltip(isl, e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-						render();
-						break;
-					}
+				var clicked = findIslandAt(mx, my);
+				if (clicked) {
+					showTooltip(clicked);
+				} else if (selectedIsland) {
+					hideTooltip();
 				}
 			}
 		}
 		if (e.touches.length < 2) {
 			initialPinchDist = 0;
-		}
-	});
-
-	function showTooltip(isl, clientX, clientY) {
-		var coversHtml = '';
-		if (isl.covers && isl.covers.length) {
-			coversHtml = '<div class="covers-row">';
-			isl.covers.slice(0, 4).forEach(function(c) {
-				coversHtml += '<img src="' + c.cover_url + '" title="' + (c.title || '') + ' - ' + (c.artist || '') + '"/>';
-			});
-			coversHtml += '</div>';
-		}
-
-		var sharePct = (isl.share ? (isl.share * 100).toFixed(1) : '0') + '%';
-
-		tooltip.innerHTML =
-			'<h3>' + isl.title + '</h3>' +
-			'<div class="meta-line">' + I18N.genre + ': ' + (isl.genre || '&mdash;') + ' \u2022 ' + I18N.mood + ': ' + (isl.mood || '&mdash;') + '</div>' +
-			'<div class="meta-line">' + (isl.track_count || 0) + ' ' + I18N.tracks + ' \u2022 ' + I18N.share + ': ' + sharePct + '</div>' +
-			coversHtml +
-			'<button class="play-btn" id="playIslandBtn">' + I18N.playWave + '</button>';
-
-		var x = clientX + 15;
-		var y = clientY + 15;
-		if (x + 300 > window.innerWidth) x = clientX - 310;
-		if (y + 200 > window.innerHeight) y = clientY - 210;
-
-		tooltip.style.left = x + 'px';
-		tooltip.style.top = y + 'px';
-		tooltip.style.display = 'block';
-
-		document.getElementById('playIslandBtn').onclick = function() {
-			playIsland(isl.id, isl.title);
-		};
-	}
-
-	canvas.addEventListener('click', function(e) {
-		if (hoveredIsland) {
-			playIsland(hoveredIsland.id, hoveredIsland.title);
 		}
 	});
 
