@@ -98,6 +98,9 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	is($headers{'cookie'}, 'auth=0123456789abcdef0123456789abcdef; in_webkit=true', 'T1.1: Cookie header contains auth=<token>; in_webkit=true');
 	ok(!exists $headers{'x-auth-token'}, 'T1.1: CRITICAL: x-auth-token header is NOT present (rejected by atlas)');
 	like($headers{'referer'}, qr{atlas\.zvuk\.com}, 'T1.1: Referer header contains atlas.zvuk.com');
+	is($headers{'connection'}, 'close', 'T1.1: Connection header is close');
+	ok($last_req->{opts}->{request}, 'T1.1: HTTP::Request object passed in SimpleAsyncHTTP opts');
+	is($last_req->{opts}->{request}->protocol, 'HTTP/1.1', 'T1.1: Request protocol is explicitly HTTP/1.1 (avoids HTTP 426 Upgrade Required)');
 
 	# Test 1.2: Cache Hit on second getMap
 	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
@@ -158,6 +161,8 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	my %headers = @rest;
 	is($url, "https://atlas.zvuk.com/api/v1/map/islands/$island_id/wave", 'T1.4: Target is PUT wave URL');
 	is($headers{'content-type'}, 'application/json', 'T1.4: Content-Type is application/json');
+	ok($req->{opts}->{request}, 'T1.4: HTTP::Request object passed in SimpleAsyncHTTP opts for PUT');
+	is($req->{opts}->{request}->protocol, 'HTTP/1.1', 'T1.4: PUT Request protocol is explicitly HTTP/1.1');
 }
 
 # Test 1.5: getIslandWave (GET with limit and cursor)

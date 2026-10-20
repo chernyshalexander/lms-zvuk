@@ -6,6 +6,7 @@ use utf8;
 
 use Digest::MD5 qw(md5_hex);
 use Encode qw(encode_utf8 is_utf8);
+use HTTP::Request;
 use JSON::XS;
 use URI::Escape qw(uri_escape);
 use Slim::Networking::SimpleAsyncHTTP;
@@ -156,6 +157,11 @@ sub _request {
 			sub {
 				my $op_cb = shift;
 
+				# CRITICAL: atlas.zvuk.com strictly requires HTTP/1.1 (rejects HTTP/1.0 with 426 Upgrade Required).
+				# Slim::Networking::Async::HTTP defaults to HTTP/1.0 unless request->protocol is explicitly set.
+				my $request = HTTP::Request->new($method => $url);
+				$request->protocol('HTTP/1.1');
+
 				my $http = Slim::Networking::SimpleAsyncHTTP->new(
 					sub {
 						my $response = shift;
@@ -201,7 +207,10 @@ sub _request {
 						}
 						$op_cb->({ error => $error, code => $code });
 					},
-					{ timeout => $opts->{timeout} || 15 }
+					{
+						timeout => $opts->{timeout} || 15,
+						request => $request,
+					}
 				);
 
 				# CRITICAL: Atlas API requires Cookie: auth=<token>; in_webkit=true
@@ -216,6 +225,7 @@ sub _request {
 					'user-agent' => Plugins::Zvuk::API::USER_AGENT,
 					'referer'    => $referer,
 					'cookie'     => "auth=$token; in_webkit=true",
+					'connection' => 'close',
 					%{ $opts->{headers} || {} },
 				);
 

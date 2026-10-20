@@ -149,7 +149,7 @@ sub new {
 }
 sub post {
     my ($self, @args) = @_;
-    push @POST_LOG, { args => \@args };
+    push @POST_LOG, { method => 'POST', args => \@args, opts => $self->{opts} };
     my $resp = shift(@RESPONSES) || { code => 200, content => '{"data":{}}' };
 
     my $fire = sub {
@@ -171,7 +171,7 @@ sub post {
 }
 sub get {
     my ($self, @args) = @_;
-    push @POST_LOG, { args => \@args };
+    push @POST_LOG, { method => 'GET', args => \@args, opts => $self->{opts} };
     my $resp = shift(@RESPONSES) || { code => 200, content => '{"data":{}}' };
 
     my $fire = sub {
@@ -193,7 +193,7 @@ sub get {
 }
 sub put {
     my ($self, @args) = @_;
-    push @POST_LOG, { method => 'PUT', args => \@args };
+    push @POST_LOG, { method => 'PUT', args => \@args, opts => $self->{opts} };
     my $resp = shift(@RESPONSES) || { code => 200, content => '{"island_alive":true}' };
 
     my $fire = sub {
