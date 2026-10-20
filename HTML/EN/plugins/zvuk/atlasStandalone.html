@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>[% "PLUGIN_ZVUK_ATLAS" | string %] — Zvuk</title>
+<title>[% "PLUGIN_ZVUK_ATLAS" | string %] &mdash; Zvuk</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -183,13 +183,13 @@ canvas#atlasCanvas:active {
 <header>
 	<div class="header-left">
 		<h1>[% "PLUGIN_ZVUK_ATLAS" | string %]</h1>
-		<div class="header-meta" id="headerMeta">Загрузка данных карты...</div>
+		<div class="header-meta" id="headerMeta">[% "PLUGIN_ZVUK_ATLAS_LOADING" | string %]</div>
 	</div>
 	<div class="header-right">
 		<select class="player-select" id="playerSelect">
-			<option value="[% playerid %]">Плеер по умолчанию</option>
+			<option value="[% playerid %]">[% "PLUGIN_ZVUK_DEFAULT_PLAYER" | string %]</option>
 		</select>
-		<button class="view-mode-btn" id="resetZoomBtn">Сброс зума</button>
+		<button class="view-mode-btn" id="resetZoomBtn">[% "PLUGIN_ZVUK_ATLAS_RESET_ZOOM" | string %]</button>
 	</div>
 </header>
 
@@ -198,7 +198,7 @@ canvas#atlasCanvas:active {
 	<div id="tooltip"></div>
 	<div id="loadingOverlay">
 		<div class="spinner"></div>
-		<div>Загрузка Атласа вкуса...</div>
+		<div>[% "PLUGIN_ZVUK_ATLAS_LOADING" | string %]</div>
 	</div>
 </div>
 
@@ -206,6 +206,24 @@ canvas#atlasCanvas:active {
 
 <script>
 (function() {
+	var I18N = {
+		tracks: "\u0442\u0440\u0435\u043a\u043e\u0432",
+		islands: "\u043e\u0441\u0442\u0440\u043e\u0432\u043e\u0432",
+		profile: "\u041f\u0440\u043e\u0444\u0438\u043b\u044c",
+		error: "\u041e\u0448\u0438\u0431\u043a\u0430",
+		loadError: "\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043a\u0430\u0440\u0442\u044b",
+		positive: "\u041f\u043e\u0437\u0438\u0442\u0438\u0432 \u2192",
+		negative: "\u2190 \u041d\u0435\u0433\u0430\u0442\u0438\u0432",
+		energy: "\u2191 \u042d\u043d\u0435\u0440\u0433\u0438\u044f",
+		calm: "\u2193 \u041f\u043e\u043a\u043e\u0439",
+		genre: "\u0416\u0430\u043d\u0440",
+		mood: "\u041d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u0438\u0435",
+		share: "\u0414\u043e\u043b\u044f",
+		playWave: "\u25b6 \u0421\u043b\u0443\u0448\u0430\u0442\u044c \u043f\u043e\u0442\u043e\u043a \u043e\u0441\u0442\u0440\u043e\u0432\u0430",
+		playback: "\u0412\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u0435",
+		playbackError: "\u041e\u0448\u0438\u0431\u043a\u0430 \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u0438\u044f"
+	};
+
 	var canvas = document.getElementById('atlasCanvas');
 	var ctx = canvas.getContext('2d');
 	var container = document.getElementById('canvasContainer');
@@ -277,16 +295,16 @@ canvas#atlasCanvas:active {
 			if (res && res.success && res.map) {
 				mapData = res.map;
 				islands = mapData.islands || [];
-				headerMeta.textContent = (mapData.user_name || 'Профиль') + ' • ' + (mapData.total_tracks || 0) + ' треков • ' + islands.length + ' островов';
+				headerMeta.textContent = (mapData.user_name || I18N.profile) + ' \u2022 ' + (mapData.total_tracks || 0) + ' ' + I18N.tracks + ' \u2022 ' + islands.length + ' ' + I18N.islands;
 				resetCamera();
 				render();
 			} else {
-				headerMeta.textContent = 'Ошибка: ' + (res.error || 'Не удалось загрузить карту');
+				headerMeta.textContent = I18N.error + ': ' + (res.error || I18N.loadError);
 			}
 		})
 		.catch(function(err) {
 			loadingOverlay.style.display = 'none';
-			headerMeta.textContent = 'Ошибка загрузки карты: ' + err;
+			headerMeta.textContent = I18N.loadError + ': ' + err;
 		});
 	}
 
@@ -416,12 +434,12 @@ canvas#atlasCanvas:active {
 		ctx.fillStyle = 'rgba(139, 148, 158, 0.6)';
 		ctx.font = '10px sans-serif';
 		ctx.textAlign = 'right';
-		ctx.fillText('Позитив →', w - 16, center.y - 8);
+		ctx.fillText(I18N.positive, w - 16, center.y - 8);
 		ctx.textAlign = 'left';
-		ctx.fillText('← Негатив', 16, center.y - 8);
+		ctx.fillText(I18N.negative, 16, center.y - 8);
 		ctx.textAlign = 'center';
-		ctx.fillText('↑ Энергия', center.x + 36, 20);
-		ctx.fillText('↓ Покой', center.x + 30, h - 16);
+		ctx.fillText(I18N.energy, center.x + 36, 20);
+		ctx.fillText(I18N.calm, center.x + 30, h - 16);
 	}
 
 	// Mouse interaction
@@ -570,10 +588,10 @@ canvas#atlasCanvas:active {
 
 		tooltip.innerHTML =
 			'<h3>' + isl.title + '</h3>' +
-			'<div class="meta-line">Жанр: ' + (isl.genre || '—') + ' • Настроение: ' + (isl.mood || '—') + '</div>' +
-			'<div class="meta-line">' + (isl.track_count || 0) + ' треков • Доля: ' + sharePct + '</div>' +
+			'<div class="meta-line">' + I18N.genre + ': ' + (isl.genre || '&mdash;') + ' \u2022 ' + I18N.mood + ': ' + (isl.mood || '&mdash;') + '</div>' +
+			'<div class="meta-line">' + (isl.track_count || 0) + ' ' + I18N.tracks + ' \u2022 ' + I18N.share + ': ' + sharePct + '</div>' +
 			coversHtml +
-			'<button class="play-btn" id="playIslandBtn">▶ Слушать поток острова</button>';
+			'<button class="play-btn" id="playIslandBtn">' + I18N.playWave + '</button>';
 
 		var x = clientX + 15;
 		var y = clientY + 15;
@@ -610,10 +628,10 @@ canvas#atlasCanvas:active {
 		})
 		.then(function(r) { return r.json(); })
 		.then(function(res) {
-			showToast('Воспроизведение: ' + title);
+			showToast(I18N.playback + ': ' + title);
 		})
 		.catch(function(e) {
-			showToast('Ошибка воспроизведения: ' + e);
+			showToast(I18N.playbackError + ': ' + e);
 		});
 	}
 

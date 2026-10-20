@@ -707,3 +707,15 @@ PLUGIN_ZVUK_ATLAS_ISLANDS_COUNT
 	EN	islands
 	RU	остр.
 
+PLUGIN_ZVUK_DEFAULT_PLAYER
+	EN	Default player
+	RU	Плеер по умолчанию
+
+PLUGIN_ZVUK_ATLAS_RESET_ZOOM
+	EN	Reset Zoom
+	RU	Сброс зума
+
+PLUGIN_ZVUK_ATLAS_LOADING
+	EN	Loading Taste Atlas...
+	RU	Загрузка данных карты...
+
