@@ -199,6 +199,8 @@ sub cacheTrackMetadata {
             ? $track->{release}->{id}
             : ($track->{release_id} || '');
 
+        my $dur = int($track->{duration} || 0);
+
         # Check if already cached, reuse if found
         if (my $cached = $cache->get("zvuk_meta_$id")) {
             my $updated = 0;
@@ -218,12 +220,19 @@ sub cacheTrackMetadata {
                 $cached->{release} = $track->{release};
                 $updated = 1;
             }
+            if (!$cached->{album} && $album) {
+                $cached->{album} = $album;
+                $updated = 1;
+            }
+            if ((!$cached->{duration} || $cached->{duration} == 0) && $dur) {
+                $cached->{duration} = $dur;
+                $cached->{secs}     = $dur;
+                $updated = 1;
+            }
             $cache->set( "zvuk_meta_$id", $cached, DEFAULT_TTL ) if $updated;
             push @result, $cached;
             next;
         }
-
-        my $dur = int($track->{duration} || 0);
         my $meta = {
             id          => $id,
             title       => $track->{title}          || '',

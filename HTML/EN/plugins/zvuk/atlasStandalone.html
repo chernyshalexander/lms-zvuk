@@ -301,6 +301,11 @@ canvas#atlasCanvas:active {
 		render();
 	});
 
+	playerSelect.addEventListener('change', function() {
+		loadingOverlay.style.display = 'flex';
+		loadMap();
+	});
+
 	function worldToScreen(wx, wy) {
 		return {
 			x: camera.x + wx * camera.zoom,
@@ -481,6 +486,75 @@ canvas#atlasCanvas:active {
 		camera.zoom *= factor;
 		render();
 	}, { passive: false });
+
+	// Touch interaction
+	var initialPinchDist = 0;
+	var initialPinchZoom = 1;
+	var touchStartTime = 0;
+	var touchStartPos = { x: 0, y: 0 };
+
+	container.addEventListener('touchstart', function(e) {
+		if (e.touches.length === 1) {
+			isDragging = true;
+			dragStart.x = e.touches[0].clientX - camera.x;
+			dragStart.y = e.touches[0].clientY - camera.y;
+			touchStartTime = Date.now();
+			touchStartPos.x = e.touches[0].clientX;
+			touchStartPos.y = e.touches[0].clientY;
+		} else if (e.touches.length === 2) {
+			isDragging = false;
+			initialPinchDist = Math.hypot(
+				e.touches[0].clientX - e.touches[1].clientX,
+				e.touches[0].clientY - e.touches[1].clientY
+			);
+			initialPinchZoom = camera.zoom;
+		}
+	}, { passive: true });
+
+	window.addEventListener('touchmove', function(e) {
+		if (isDragging && e.touches.length === 1) {
+			camera.x = e.touches[0].clientX - dragStart.x;
+			camera.y = e.touches[0].clientY - dragStart.y;
+			render();
+			tooltip.style.display = 'none';
+		} else if (e.touches.length === 2 && initialPinchDist > 0) {
+			var dist = Math.hypot(
+				e.touches[0].clientX - e.touches[1].clientX,
+				e.touches[0].clientY - e.touches[1].clientY
+			);
+			var factor = dist / initialPinchDist;
+			camera.zoom = initialPinchZoom * factor;
+			render();
+		}
+	}, { passive: true });
+
+	window.addEventListener('touchend', function(e) {
+		if (isDragging && e.changedTouches.length === 1) {
+			isDragging = false;
+			var dt = Date.now() - touchStartTime;
+			var dx = e.changedTouches[0].clientX - touchStartPos.x;
+			var dy = e.changedTouches[0].clientY - touchStartPos.y;
+			if (dt < 300 && Math.hypot(dx, dy) < 10) {
+				var rect = canvas.getBoundingClientRect();
+				var mx = e.changedTouches[0].clientX - rect.left;
+				var my = e.changedTouches[0].clientY - rect.top;
+				for (var i = islands.length - 1; i >= 0; i--) {
+					var isl = islands[i];
+					var p = worldToScreen(isl.valence, isl.energy);
+					var radius = Math.max(6, Math.min(32, (isl.track_count || 10) * 0.08 * (camera.zoom / 250)));
+					if (Math.hypot(p.x - mx, p.y - my) <= radius + 10) {
+						hoveredIsland = isl;
+						showTooltip(isl, e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+						render();
+						break;
+					}
+				}
+			}
+		}
+		if (e.touches.length < 2) {
+			initialPinchDist = 0;
+		}
+	});
 
 	function showTooltip(isl, clientX, clientY) {
 		var coversHtml = '';

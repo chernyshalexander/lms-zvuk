@@ -296,9 +296,25 @@ sub scanUrl {
 sub explodePlaylist {
 	my ($class, $client, $url, $cb) = @_;
 
-	# Handle Atlas Island Wave
-	if ($url =~ m{^zvuk://atlas:([0-9a-fA-F-]+)}) {
+	# Handle Atlas Island Wave (specific island UUID or random)
+	if ($url =~ m{^zvuk://atlas:(random|[0-9a-fA-F-]+)}) {
 		my $island_id = $1;
+		if ($island_id eq 'random') {
+			my $api = _getAPIHandler($client);
+			if ($api) {
+				return $api->getAtlasMap(sub {
+					my ($map, $err) = @_;
+					my $islands = ($map && ref $map eq 'HASH' && $map->{islands}) ? $map->{islands} : [];
+					if (@$islands) {
+						my $chosen = $islands->[int(rand(scalar(@$islands)))];
+						return _explodeAtlas($client, $chosen->{id}, $cb);
+					}
+					$log->error("No islands available for random atlas wave: " . ($err || 'empty'));
+					$cb->([]);
+				});
+			}
+			return $cb->([]);
+		}
 		return _explodeAtlas($client, $island_id, $cb);
 	}
 
@@ -446,7 +462,7 @@ sub _explodeAtlas {
 
 			Plugins::Zvuk::API->cacheTrackMetadata($tracks);
 
-			my @urls = map { 'zvuk://' . ($_->{id} || $_->{track_id}) } @$tracks;
+			my @urls = map { 'zvuk://' . ($_->{id} || $_->{track_id}) } grep { $_ && ref $_ eq 'HASH' && ($_->{id} || $_->{track_id}) } @$tracks;
 			$cb->(\@urls);
 		}, $island_id, 20);
 	};
@@ -659,13 +675,15 @@ sub _loadMoreAtlasTracks {
 		}
 
 		my $new_cursor = $res->{next_cursor};
-		$client->pluginData(zvuk_atlas_cursor => $new_cursor) if $client && defined $new_cursor;
+		$client->pluginData(zvuk_atlas_cursor => $new_cursor) if $client;
 
 		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
 		$log->info("Atlas: auto-extended playlist with " . scalar(@$tracks) . " tracks, next cursor: " . ($new_cursor // 'none'));
 
 		for my $track (@$tracks) {
+			next unless $track && ref $track eq 'HASH';
 			my $tid = $track->{id} || $track->{track_id};
+			next unless $tid;
 			Slim::Control::Request::executeRequest(
 				$client, ['playlist', 'add', 'zvuk://' . $tid]
 			);

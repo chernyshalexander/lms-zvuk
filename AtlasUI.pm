@@ -113,7 +113,7 @@ sub handleAtlasMenu {
 			{
 				name      => cstring($client, 'PLUGIN_ZVUK_ATLAS_RANDOM'),
 				type      => 'audio',
-				url       => \&handleStartRandomIslandWave,
+				url       => $is_buttons ? \&handleStartRandomIslandWave : 'zvuk://atlas:random',
 				play      => 'zvuk://atlas:random',
 				on_select => 'play',
 				image     => 'plugins/zvuk/html/images/radio.png',
@@ -239,7 +239,7 @@ sub handleGenresMenu {
 
 sub handleGenreIslands {
 	my ($client, $cb, $args, $params) = @_;
-	my $genre = $params ? $params->{genre} : undef;
+	my $genre = ($params && $params->{genre}) || ($args && $args->{genre});
 
 	my $userId = Plugins::Zvuk::Plugin::_getUserIdForClient($client);
 	require Plugins::Zvuk::API::Atlas;
@@ -340,7 +340,7 @@ sub handleMoodsMenu {
 
 sub handleMoodIslands {
 	my ($client, $cb, $args, $params) = @_;
-	my $mood = $params ? $params->{mood} : undef;
+	my $mood = ($params && $params->{mood}) || ($args && $args->{mood});
 
 	my $userId = Plugins::Zvuk::Plugin::_getUserIdForClient($client);
 	require Plugins::Zvuk::API::Atlas;
@@ -378,7 +378,7 @@ sub handleMoodIslands {
 
 sub handleIslandDetail {
 	my ($client, $cb, $args, $params) = @_;
-	my $island_id = $params ? $params->{island_id} : undef;
+	my $island_id = ($params && $params->{island_id}) || ($args && $args->{island_id});
 
 	unless ($island_id) {
 		$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_ATLAS_ERROR'), type => 'text' }] });
@@ -433,7 +433,7 @@ sub handleIslandDetail {
 
 sub handleIslandTrackList {
 	my ($client, $cb, $args, $params) = @_;
-	my $island_id = $params ? $params->{island_id} : undef;
+	my $island_id = ($params && $params->{island_id}) || ($args && $args->{island_id});
 
 	unless ($island_id) {
 		$cb->({ items => [{ name => cstring($client, 'PLUGIN_ZVUK_ATLAS_ERROR'), type => 'text' }] });
@@ -491,10 +491,16 @@ sub handleIslandTrackList {
 
 sub handleStartIslandWave {
 	my ($client, $cb, $args, $params) = @_;
-	return unless $client;
+	unless ($client) {
+		$cb->() if $cb && ref($cb) eq 'CODE';
+		return;
+	}
 
-	my $island_id = $params && $params->{island_id} ? $params->{island_id} : undef;
-	return unless $island_id;
+	my $island_id = ($params && $params->{island_id}) || ($args && $args->{island_id});
+	unless ($island_id) {
+		$cb->() if $cb && ref($cb) eq 'CODE';
+		return;
+	}
 
 	$log->info("Starting Atlas Island Wave playback for client " . ($client->name || ref($client) || ''));
 
@@ -511,11 +517,16 @@ sub handleStartIslandWave {
 			Slim::Buttons::Common::pushModeLeft($client, 'playlist');
 		}
 	}
+
+	$cb->() if $cb && ref($cb) eq 'CODE';
 }
 
 sub handleStartRandomIslandWave {
 	my ($client, $cb, $args) = @_;
-	return unless $client;
+	unless ($client) {
+		$cb->() if $cb && ref($cb) eq 'CODE';
+		return;
+	}
 
 	my $userId = Plugins::Zvuk::Plugin::_getUserIdForClient($client);
 	require Plugins::Zvuk::API::Atlas;
@@ -524,7 +535,10 @@ sub handleStartRandomIslandWave {
 	$atlas->getMap(sub {
 		my ($map, $err) = @_;
 		my $islands = ($map && $map->{islands}) ? $map->{islands} : [];
-		return unless @$islands;
+		unless (@$islands) {
+			$cb->() if $cb && ref($cb) eq 'CODE';
+			return;
+		}
 
 		my $random_idx = int(rand(scalar(@$islands)));
 		my $chosen = $islands->[$random_idx];
@@ -545,6 +559,8 @@ sub handleStartRandomIslandWave {
 				Slim::Buttons::Common::pushModeLeft($client, 'playlist');
 			}
 		}
+
+		$cb->() if $cb && ref($cb) eq 'CODE';
 	});
 }
 

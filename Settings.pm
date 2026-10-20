@@ -53,6 +53,8 @@ sub handler {
 				Plugins::Zvuk::Plugin::_clear_api_client($userId);
 				require Plugins::Zvuk::API::Async;
 				Plugins::Zvuk::API::Async->clearClient($userId);
+				require Plugins::Zvuk::API::Atlas;
+				Plugins::Zvuk::API::Atlas->clearClient($userId);
 			}
 		}
 	}

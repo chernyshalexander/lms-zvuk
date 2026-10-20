@@ -1007,7 +1007,7 @@ sub handleAtlasStandalone {
 
 	my $template = 'plugins/zvuk/atlasStandalone.html';
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
-	my $output_bytes = encode_utf8($$output_ref);
+	my $output_bytes = ($output_ref && ref $output_ref eq 'SCALAR') ? encode_utf8($$output_ref) : '';
 
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');

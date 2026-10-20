@@ -200,6 +200,8 @@ sub _clear_api_client {
 	} else {
 		%api_clients = ();
 	}
+	require Plugins::Zvuk::API::Atlas;
+	Plugins::Zvuk::API::Atlas->clearClient($userId);
 }
 
 sub _init_api_client {

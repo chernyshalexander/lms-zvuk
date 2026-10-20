@@ -7,6 +7,7 @@ use utf8;
 use Digest::MD5 qw(md5_hex);
 use Encode qw(encode_utf8 is_utf8);
 use JSON::XS;
+use URI::Escape qw(uri_escape);
 use Slim::Networking::SimpleAsyncHTTP;
 use Slim::Utils::Cache;
 use Slim::Utils::Log;
@@ -80,7 +81,7 @@ sub _request {
 		my @param_pairs;
 		foreach my $key (sort keys %$params) {
 			my $value = $params->{$key};
-			push @param_pairs, "$key=" . ($value // '');
+			push @param_pairs, uri_escape($key) . '=' . uri_escape($value // '');
 		}
 		$url .= ($url =~ /\?/ ? '&' : '?') . join('&', @param_pairs);
 	}
@@ -176,14 +177,15 @@ sub _request {
 						my $data = eval { decode_json($bytes) };
 						if ($@ || !$data) {
 							my $err = $@ ? "JSON parse error: $@" : "No data decoded";
-							$log->error("Atlas $method $url: $err");
-							$op_cb->({ error => $err, code => 400 });
+							$log->error("Atlas $method $url: $err (HTTP $code)");
+							$op_cb->({ error => $err, code => $code || 400 });
 							return;
 						}
 
-						if (ref $data eq 'HASH' && $data->{error}) {
-							my $err_code = ($data->{error} =~ /unauthori[zs]ed/i) ? 401 : $code;
-							$op_cb->({ error => $data->{error}, code => $err_code });
+						if ($code >= 400 || (ref $data eq 'HASH' && $data->{error})) {
+							my $err_msg = ref $data eq 'HASH' ? ($data->{error} || $data->{message} || $data->{detail} || "HTTP $code") : "HTTP $code";
+							my $err_code = ($err_msg =~ /unauthori[zs]ed|unauthenticated/i) ? 401 : $code;
+							$op_cb->({ error => $err_msg, code => $err_code });
 							return;
 						}
 
@@ -293,6 +295,14 @@ sub startIslandWave {
 # GET /api/v1/map/islands/{island_id}/wave?limit=20[&cursor=...] — Island wave stream tracks
 sub getIslandWave {
 	my ($self, $cb, $islandId, $limit, $cursor, $opts) = @_;
+	if (ref $limit eq 'HASH') {
+		$opts = $limit;
+		$limit = $opts->{limit};
+		$cursor = $opts->{cursor};
+	} elsif (ref $cursor eq 'HASH') {
+		$opts = $cursor;
+		$cursor = $opts->{cursor};
+	}
 	$opts ||= {};
 
 	return $cb->(undef, 'Missing islandId') unless defined $islandId && length($islandId);

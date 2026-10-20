@@ -7,6 +7,12 @@ use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use Test::More;
 
+binmode STDOUT, ':utf8';
+binmode STDERR, ':utf8';
+binmode Test::More->builder->output, ':utf8';
+binmode Test::More->builder->failure_output, ':utf8';
+binmode Test::More->builder->todo_output, ':utf8';
+
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
 
@@ -210,6 +216,85 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	is($retry_headers{'cookie'}, 'auth=refreshed_token_xyz987; in_webkit=true', 'T1.6: Retried request sent updated Cookie');
 }
 
+# Test 1.7: Cursor with base64 special characters (+, /, =) is properly URL-escaped
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $wave_json_content }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my $island_id = '621ceafb-995c-5510-b601-5d4b14f02c08';
+	my $base64_cursor = 'eyJ+v2/test==';
+
+	my ($wave_res, $wave_err);
+	$atlas->getIslandWave(sub {
+		($wave_res, $wave_err) = @_;
+	}, $island_id, 20, $base64_cursor);
+
+	is($wave_err, undef, 'T1.7: getIslandWave with base64 cursor succeeded');
+	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url) = @{ $req->{args} };
+	like($url, qr{cursor=eyJ%2Bv2%2Ftest%3D%3D}, 'T1.7: Base64 cursor characters (+, /, =) properly URL-escaped with uri_escape');
+}
+
+# Test 1.8: HTTP 403 status without 'error' key handled as error
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	Plugins::Zvuk::API->cache->clear();
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 403, content => '{"message":"Access denied"}' }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($err_res, $err_msg, $err_code);
+	$atlas->getMap(sub {
+		($err_res, $err_msg, $err_code) = @_;
+	});
+
+	is($err_res, undef, 'T1.8: HTTP 403 without error key returns undef data');
+	like($err_msg, qr{Access denied|403}, 'T1.8: HTTP 403 correctly recognized as error');
+	is($err_code, 403, 'T1.8: HTTP 403 status code returned');
+}
+
+# Test 1.9: JSON parse error retains real HTTP status code (e.g. 502 HTML) and triggers retries
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Utils::Timers::SCHEDULED = ();
+	Plugins::Zvuk::API->cache->clear();
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+
+	my $html_502 = '<html><head><title>502 Bad Gateway</title></head><body>Bad Gateway</body></html>';
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = map { { code => 502, content => $html_502 } } (1 .. 6);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($err_res, $err_msg, $err_code);
+	$atlas->getMap(sub {
+		($err_res, $err_msg, $err_code) = @_;
+	});
+
+	ok(scalar(@Slim::Utils::Timers::SCHEDULED) == 1, 'T1.9: 502 HTML error is recognized as retryable (not hardcoded 400) and schedules timer');
+
+	# Fire retry timers until max attempts exhausted
+	while (@Slim::Utils::Timers::SCHEDULED) {
+		Slim::Utils::Timers::fireAll();
+	}
+
+	is($err_res, undef, 'T1.9: 502 HTML error returns undef data after retries');
+	is($err_code, 502, 'T1.9: Real HTTP 502 code retained instead of hardcoded 400');
+}
+
+# Test 1.10: Client eviction in clearClient
+{
+	my $c1 = Plugins::Zvuk::API::Atlas->new({ userId => 'user_evict_test' });
+	ok(defined $c1, 'T1.10: Atlas client instantiated');
+	Plugins::Zvuk::Plugin::_clear_api_client('user_evict_test');
+	my $c2 = Plugins::Zvuk::API::Atlas->new({ userId => 'user_evict_test' });
+	# Since client was evicted, a new instance is constructed
+	isnt("$c1", "$c2", 'T1.10: _clear_api_client successfully evicted cached Atlas client instance');
+}
+
 # ===================================================================
 # SECTION 2: Multi-client LMS Navigation UI (Plugins::Zvuk::AtlasUI)
 # ===================================================================
@@ -253,8 +338,16 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	my ($moods_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleMoodsMenu } @items;
 	ok(defined $moods_item, 'T2.2: Menu contains "By Moods" item');
 
-	my ($random_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave } @items;
+	my ($random_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:random' } @items;
 	ok(defined $random_item, 'T2.2: Menu contains "Random Island (I am feeling lucky)" item');
+	is($random_item->{url}, 'zvuk://atlas:random', 'T2.2: Random Island has zvuk://atlas:random URL for weblink/jive client');
+
+	# And for button player, it uses CODE ref
+	my $btn_atlas_menu;
+	Plugins::Zvuk::AtlasUI::handleAtlasMenu($client, sub { $btn_atlas_menu = shift; }, { isButton => 1 });
+	my ($btn_random_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:random' } @{ $btn_atlas_menu->{items} };
+	ok(ref($btn_random_item->{url}) eq 'CODE' && $btn_random_item->{url} == \&Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave,
+		'T2.2: Random Island uses CODE ref for button player');
 
 	# Test 2.3: All Islands sorting by share / track_count
 	my $all_islands_menu;
@@ -337,6 +430,18 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	ok(defined $cached_meta, 'T2.6: Track metadata cached in Slim::Utils::Cache');
 	is($cached_meta->{title}, 'Satisfied', 'T2.6: Track title cached correctly');
 	is($cached_meta->{artist}, 'Skunk Anansie', 'T2.6: Track artist cached correctly');
+
+	# Verify metadata enrichment: when full GraphQL track info arrives with duration and album, cache is updated
+	is($cached_meta->{duration}, 0, 'T2.6b: Initial Atlas track duration was 0');
+	is($cached_meta->{album}, '', 'T2.6b: Initial Atlas track album was empty');
+
+	Plugins::Zvuk::API->cacheTrackMetadata([
+		{ id => 47730977, title => 'Satisfied', artist => 'Skunk Anansie', duration => 215, release => { title => 'Stoosh', id => 9999 } }
+	]);
+	my $enriched_meta = Plugins::Zvuk::API->cache->get('zvuk_meta_47730977');
+	is($enriched_meta->{duration}, 215, 'T2.6b: Duration enriched in cache');
+	is($enriched_meta->{secs}, 215, 'T2.6b: Secs enriched in cache');
+	is($enriched_meta->{album}, 'Stoosh', 'T2.6b: Album enriched in cache');
 }
 
 # Test 2.7: Vintage Button / Rotary Knob Players (Squeezebox Boom / Classic)
@@ -463,6 +568,30 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	is($client->pluginData('zvuk_atlas_active'), 0, 'T3.4: zvuk_atlas_active cleared to 0 on stop');
 	is($client->pluginData('zvuk_atlas_island_id'), undef, 'T3.4: zvuk_atlas_island_id reset to undef');
 	is($client->pluginData('zvuk_atlas_cursor'), undef, 'T3.4: zvuk_atlas_cursor reset to undef');
+}
+
+# Test 3.5: explodePlaylist for zvuk://atlas:random resolves map and launches random island wave
+{
+	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
+	Plugins::Zvuk::API::Async->_resetThrottlerForTesting();
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	Plugins::Zvuk::API->cache->clear();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $map_json_content },       # GET map to pick random island
+		{ code => 200, content => '{"island_alive":true}' }, # PUT start wave
+		{ code => 200, content => $wave_json_content },       # GET wave tracks
+	);
+
+	my $exploded_random_urls;
+	Plugins::Zvuk::ProtocolHandler->explodePlaylist($client, 'zvuk://atlas:random', sub {
+		$exploded_random_urls = shift;
+	});
+
+	ok(ref $exploded_random_urls eq 'ARRAY', 'T3.5: explodePlaylist for zvuk://atlas:random returned array of URLs');
+	is(scalar(@$exploded_random_urls), 20, 'T3.5: Returned 20 tracks for random island wave');
+	is($client->pluginData('zvuk_atlas_active'), 1, 'T3.5: zvuk_atlas_active set to 1');
+	like($client->pluginData('zvuk_atlas_island_id'), qr/^[0-9a-fA-F-]+$/, 'T3.5: Random island ID selected and stored');
+	ok(defined $client->pluginData('zvuk_atlas_cursor'), 'T3.5: Cursor stored for auto-extension');
 }
 
 done_testing();
