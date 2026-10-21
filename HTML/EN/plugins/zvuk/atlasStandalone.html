@@ -165,10 +165,13 @@ canvas#atlasCanvas:active {
 	padding: 14px;
 	pointer-events: auto;
 	box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-	min-width: 250px;
-	max-width: 320px;
+	min-width: 220px;
+	max-width: min(320px, calc(100vw - 20px));
+	max-height: calc(100vh - 80px);
+	overflow-y: auto;
 	z-index: 20;
 	backdrop-filter: blur(10px);
+	word-break: break-word;
 }
 .tooltip-header {
 	display: flex;
@@ -264,6 +267,31 @@ canvas#atlasCanvas:active {
 	display: none;
 	z-index: 100;
 	box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+@media (max-width: 600px) {
+	header {
+		padding: 0 10px;
+		height: 50px;
+	}
+	#canvasContainer {
+		height: calc(100vh - 50px);
+	}
+	.header-left h1 {
+		font-size: 14px;
+	}
+	.header-meta {
+		display: none;
+	}
+	.zoom-controls {
+		display: none;
+	}
+	#tooltip {
+		padding: 10px 12px;
+	}
+	#tooltip .covers-row img {
+		width: 38px;
+		height: 38px;
+	}
 }
 </style>
 </head>
@@ -388,6 +416,107 @@ canvas#atlasCanvas:active {
 		});
 	}
 
+	function resolveIslandCollisions(islandsList) {
+		if (!islandsList || !islandsList.length) return;
+
+		var baseScale = 250;
+		var gap = 12; // Calibrated to guarantee 7px minimum visual gap against spring force
+
+		for (var k = 0; k < islandsList.length; k++) {
+			var isl = islandsList[k];
+			isl.origValence = isl.valence;
+			isl.origEnergy = isl.energy;
+			isl.dispValence = isl.valence;
+			isl.dispEnergy = isl.energy;
+			isl.labelPos = 'bottom';
+		}
+
+		if (islandsList.length < 2) return;
+
+		var iterations = 40;
+		for (var iter = 0; iter < iterations; iter++) {
+			for (var i = 0; i < islandsList.length; i++) {
+				var a = islandsList[i];
+				var rA = Math.max(6, Math.min(32, (a.track_count || 10) * 0.08));
+
+				for (var j = i + 1; j < islandsList.length; j++) {
+					var b = islandsList[j];
+					var rB = Math.max(6, Math.min(32, (b.track_count || 10) * 0.08));
+
+					var dx = (b.dispValence - a.dispValence) * baseScale;
+					var dy = (b.dispEnergy - a.dispEnergy) * baseScale;
+					var dist = Math.hypot(dx, dy);
+					var minDist = rA + rB + gap;
+
+					if (dist < minDist) {
+						if (dist < 0.001) {
+							dx = (Math.random() - 0.5) * 2 || 1;
+							dy = (Math.random() - 0.5) * 2 || 1;
+							dist = Math.hypot(dx, dy) || 0.001;
+						}
+						var overlap = (minDist - dist) / dist;
+						var shiftX = (dx * overlap * 0.5) / baseScale;
+						var shiftY = (dy * overlap * 0.5) / baseScale;
+
+						a.dispValence -= shiftX * 0.5;
+						a.dispEnergy -= shiftY * 0.5;
+						b.dispValence += shiftX * 0.5;
+						b.dispEnergy += shiftY * 0.5;
+					}
+				}
+
+				// Elastic spring return to true Russell coordinates
+				a.dispValence += (a.origValence - a.dispValence) * 0.05;
+				a.dispEnergy += (a.origEnergy - a.dispEnergy) * 0.05;
+
+				// Prevent crossing Russell quadrant axes
+				if (a.origValence >= 0 && a.dispValence < 0.01) a.dispValence = 0.01;
+				if (a.origValence < 0 && a.dispValence > -0.01) a.dispValence = -0.01;
+				if (a.origEnergy >= 0 && a.dispEnergy < 0.01) a.dispEnergy = 0.01;
+				if (a.origEnergy < 0 && a.dispEnergy > -0.01) a.dispEnergy = -0.01;
+			}
+		}
+
+		// Vertical staggering for labels of close islands (distance-sorted priority)
+		var closePairs = [];
+		for (var i = 0; i < islandsList.length; i++) {
+			var a = islandsList[i];
+			var rA = Math.max(6, Math.min(32, (a.track_count || 10) * 0.08));
+			for (var j = i + 1; j < islandsList.length; j++) {
+				var b = islandsList[j];
+				var rB = Math.max(6, Math.min(32, (b.track_count || 10) * 0.08));
+				var dx = (b.dispValence - a.dispValence) * baseScale;
+				var dy = (b.dispEnergy - a.dispEnergy) * baseScale;
+				var dist = Math.hypot(dx, dy);
+				if (dist < rA + rB + gap + 16) {
+					closePairs.push({ a: a, b: b, dist: dist });
+				}
+			}
+		}
+
+		closePairs.sort(function(p1, p2) { return p1.dist - p2.dist; });
+
+		var assigned = {};
+		for (var p = 0; p < closePairs.length; p++) {
+			var pair = closePairs[p];
+			var upper = pair.a.dispEnergy >= pair.b.dispEnergy ? pair.a : pair.b;
+			var lower = pair.a.dispEnergy >= pair.b.dispEnergy ? pair.b : pair.a;
+
+			if (!assigned[upper.id] && !assigned[lower.id]) {
+				upper.labelPos = 'top';
+				lower.labelPos = 'bottom';
+				assigned[upper.id] = true;
+				assigned[lower.id] = true;
+			} else if (!assigned[upper.id]) {
+				upper.labelPos = (lower.labelPos === 'bottom') ? 'top' : 'bottom';
+				assigned[upper.id] = true;
+			} else if (!assigned[lower.id]) {
+				lower.labelPos = (upper.labelPos === 'top') ? 'bottom' : 'top';
+				assigned[lower.id] = true;
+			}
+		}
+	}
+
 	function loadMap() {
 		var url = '/plugins/zvuk/getAtlasMap';
 		var currentPid = playerSelect.value;
@@ -400,6 +529,7 @@ canvas#atlasCanvas:active {
 			if (res && res.success && res.map) {
 				mapData = res.map;
 				islands = mapData.islands || [];
+				resolveIslandCollisions(islands);
 				headerMeta.textContent = (mapData.user_name || I18N.profile) + ' \u2022 ' + (mapData.total_tracks || 0) + ' ' + I18N.tracks + ' \u2022 ' + islands.length + ' ' + I18N.islands;
 				hideTooltip();
 				resetCamera();
@@ -488,17 +618,24 @@ canvas#atlasCanvas:active {
 	}
 
 	function findIslandAt(sx, sy) {
-		for (var i = islands.length - 1; i >= 0; i--) {
+		var bestIsland = null;
+		var bestDist = Infinity;
+
+		for (var i = 0; i < islands.length; i++) {
 			var isl = islands[i];
-			var p = worldToScreen(isl.valence, isl.energy);
+			var p = worldToScreen(
+				isl.dispValence !== undefined ? isl.dispValence : isl.valence,
+				isl.dispEnergy !== undefined ? isl.dispEnergy : isl.energy
+			);
 			var radius = getIslandRadius(isl);
-			var hitRadius = Math.max(radius + 8, 14);
+			var hitRadius = Math.max(radius + 12, 22);
 			var dist = Math.hypot(p.x - sx, p.y - sy);
-			if (dist <= hitRadius) {
-				return isl;
+			if (dist <= hitRadius && dist < bestDist) {
+				bestDist = dist;
+				bestIsland = isl;
 			}
 		}
-		return null;
+		return bestIsland;
 	}
 
 	function render() {
@@ -525,12 +662,18 @@ canvas#atlasCanvas:active {
 		islands.forEach(function(isl) { islandMap[isl.id] = isl; });
 
 		islands.forEach(function(isl) {
-			var p1 = worldToScreen(isl.valence, isl.energy);
+			var p1 = worldToScreen(
+				isl.dispValence !== undefined ? isl.dispValence : isl.valence,
+				isl.dispEnergy !== undefined ? isl.dispEnergy : isl.energy
+			);
 			if (isl.connections && isl.connections.right) {
 				isl.connections.right.forEach(function(targetId) {
 					var target = islandMap[targetId];
 					if (target) {
-						var p2 = worldToScreen(target.valence, target.energy);
+						var p2 = worldToScreen(
+							target.dispValence !== undefined ? target.dispValence : target.valence,
+							target.dispEnergy !== undefined ? target.dispEnergy : target.energy
+						);
 						ctx.beginPath();
 						ctx.moveTo(p1.x, p1.y);
 						ctx.lineTo(p2.x, p2.y);
@@ -540,13 +683,19 @@ canvas#atlasCanvas:active {
 			}
 		});
 
-		// Draw islands
-		islands.forEach(function(isl) {
-			var p = worldToScreen(isl.valence, isl.energy);
+		// Helper to draw single island and its label
+		function drawIslandCircleAndLabel(isl) {
+			var p = worldToScreen(
+				isl.dispValence !== undefined ? isl.dispValence : isl.valence,
+				isl.dispEnergy !== undefined ? isl.dispEnergy : isl.energy
+			);
 			var radius = getIslandRadius(isl);
 			var isHovered = (hoveredIsland === isl);
 			var isSelected = (selectedIsland === isl);
-			var color = getIslandColor(isl.valence, isl.energy);
+			var color = getIslandColor(
+				isl.origValence !== undefined ? isl.origValence : isl.valence,
+				isl.origEnergy !== undefined ? isl.origEnergy : isl.energy
+			);
 
 			// Selection or Hover aura
 			if (isSelected) {
@@ -576,7 +725,7 @@ canvas#atlasCanvas:active {
 			ctx.strokeStyle = (isSelected || isHovered) ? '#fff' : 'rgba(255,255,255,0.7)';
 			ctx.stroke();
 
-			// Label with dynamic font scaling
+			// Label with dynamic font scaling and smart staggering
 			var showLabel = true;
 			if (zoomRatio < 0.65 && !isSelected && !isHovered) {
 				if ((isl.track_count && isl.track_count < 60) && (isl.share && isl.share < 0.02)) {
@@ -588,9 +737,30 @@ canvas#atlasCanvas:active {
 				ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#c9d1d9';
 				ctx.font = ((isSelected || isHovered) ? 'bold ' : '') + fontSize + 'px sans-serif';
 				ctx.textAlign = 'center';
-				ctx.fillText(isl.title, p.x, p.y + radius + fontSize + 3);
+				if (isl.labelPos === 'top') {
+					ctx.textBaseline = 'bottom';
+					ctx.fillText(isl.title, p.x, p.y - radius - 4);
+				} else {
+					ctx.textBaseline = 'top';
+					ctx.fillText(isl.title, p.x, p.y + radius + 4);
+				}
+				ctx.textBaseline = 'alphabetic';
 			}
-		});
+		}
+
+		// Z-order: background islands -> hovered -> selected
+		for (var i = 0; i < islands.length; i++) {
+			var isl = islands[i];
+			if (isl !== hoveredIsland && isl !== selectedIsland) {
+				drawIslandCircleAndLabel(isl);
+			}
+		}
+		if (hoveredIsland && hoveredIsland !== selectedIsland) {
+			drawIslandCircleAndLabel(hoveredIsland);
+		}
+		if (selectedIsland) {
+			drawIslandCircleAndLabel(selectedIsland);
+		}
 	}
 
 	function drawQuadrants(w, h) {
@@ -685,7 +855,10 @@ canvas#atlasCanvas:active {
 
 	function updateTooltipPosition() {
 		if (!selectedIsland || tooltip.style.display === 'none') return;
-		var p = worldToScreen(selectedIsland.valence, selectedIsland.energy);
+		var p = worldToScreen(
+			selectedIsland.dispValence !== undefined ? selectedIsland.dispValence : selectedIsland.valence,
+			selectedIsland.dispEnergy !== undefined ? selectedIsland.dispEnergy : selectedIsland.energy
+		);
 		var radius = getIslandRadius(selectedIsland);
 
 		var tw = tooltip.offsetWidth || 280;
@@ -693,17 +866,28 @@ canvas#atlasCanvas:active {
 		var cw = container.clientWidth;
 		var ch = container.clientHeight;
 
-		var x = p.x + radius + 14;
-		var y = p.y - 20;
+		var x, y;
+		if (cw <= 600) {
+			x = Math.max(10, Math.min(cw - tw - 10, (cw - tw) / 2));
+			if (p.y < ch * 0.5) {
+				y = Math.min(ch - th - 10, p.y + radius + 16);
+			} else {
+				y = Math.max(10, p.y - radius - th - 16);
+			}
+		} else {
+			x = p.x + radius + 14;
+			y = p.y - 20;
 
-		if (x + tw > cw - 12) {
-			x = p.x - radius - tw - 14;
+			if (x + tw > cw - 10) {
+				x = p.x - radius - tw - 14;
+			}
 		}
-		if (x < 12) x = 12;
-		if (x + tw > cw - 12) x = cw - tw - 12;
 
-		if (y < 12) y = 12;
-		if (y + th > ch - 12) y = ch - th - 12;
+		if (x < 10) x = 10;
+		if (x + tw > cw - 10) x = Math.max(10, cw - tw - 10);
+
+		if (y < 10) y = 10;
+		if (y + th > ch - 10) y = Math.max(10, ch - th - 10);
 
 		tooltip.style.left = Math.round(x) + 'px';
 		tooltip.style.top = Math.round(y) + 'px';
@@ -851,6 +1035,11 @@ canvas#atlasCanvas:active {
 		if (e.touches.length < 2) {
 			initialPinchDist = 0;
 		}
+	});
+
+	window.addEventListener('touchcancel', function() {
+		isDragging = false;
+		initialPinchDist = 0;
 	});
 
 	function playIsland(islandId, title) {
