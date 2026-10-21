@@ -51,8 +51,8 @@ sub accountId {
 
 sub clearClient {
 	my ($class, $userId) = @_;
-	if (@_ == 1) {
-		$userId = $class;
+	if (@_ == 1 && ref($class)) {
+		$userId = $class->{userId};
 	}
 	if (defined $userId) {
 		delete $apiClients{$userId};
@@ -1043,8 +1043,6 @@ sub getCollection {
 		_getCollectionPodcasts($self, $cb);
 	} elsif ($type eq 'episodes') {
 		_getCollectionEpisodes($self, $cb);
-	} elsif ($type eq 'synthesis_playlists') {
-		_getCollectionSynthesis($self, $cb);
 	} else {
 		$cb->([]);
 	}
@@ -1178,13 +1176,6 @@ sub _getCollectionEpisodes {
 	}, 'userPaginatedEpisodes', $gql, {}, { ttl => Plugins::Zvuk::API::USER_CONTENT_TTL });
 }
 
-sub _getCollectionSynthesis {
-	my ($self, $cb) = @_;
-	# Synthesis playlists API endpoint not available or not supported
-	# Return empty list for now
-	$log->debug("Synthesis playlists: returning empty list (not available via API)");
-	$cb->([]);
-}
 
 # Get user playlists
 sub getUserPlaylists {
@@ -1393,17 +1384,25 @@ sub remakeGenerativePlaylist {
 # but the GraphQL field it actually selects is the same getPlaylists field
 # used for regular playlists — just without a `tracks` selection.
 sub getShortPlaylists {
-	my ($self, $cb, $ids) = @_;
+	my ($self, $cb, $ids, $options) = @_;
+
+	unless ($ids && (ref $ids eq 'ARRAY' ? @$ids : $ids)) {
+		$cb->([]);
+		return;
+	}
+
+	my $id_list = ref $ids eq 'ARRAY' ? $ids : [$ids];
 
 	my $gql = q{
 		query getShortPlaylist($ids: [ID!]!) {
 			getPlaylists(ids: $ids) {
 				id
 				title
-				isPublic
-				description
-				duration
 				image { src }
+				description
+				trackCount
+				isPublic
+				duration
 			}
 		}
 	};
@@ -1415,7 +1414,7 @@ sub getShortPlaylists {
 			return;
 		}
 		$cb->($data->{getPlaylists} || []);
-	}, 'getShortPlaylist', $gql, { ids => $ids });
+	}, 'getShortPlaylist', $gql, { ids => $id_list }, $options ? $options : ());
 }
 
 # Fetch synthesis playlists (Playlists for You personalization feature).
@@ -1448,13 +1447,13 @@ sub getEditorialPlaylistIds {
 			return;
 		}
 		
-			if (!$data || !$data->{result} || !$data->{result}{page} || !$data->{result}{page}{data}) {
-				$log->warn("Grid API returned empty data structure");
-				$cb->([]);
-				return;
-			}
-			
-			my $items = $data->{result}{page}{data} || [];
+		if (!$data || !$data->{result} || !$data->{result}{page} || !$data->{result}{page}{data}) {
+			$log->warn("Grid API returned empty data structure");
+			$cb->([]);
+			return;
+		}
+		
+		my $items = $data->{result}{page}{data} || [];
 		$log->debug("Grid API returned " . scalar(@$items) . " items");
 		
 		# Filter only playlists and extract IDs
@@ -1465,50 +1464,11 @@ sub getEditorialPlaylistIds {
 	});
 }
 
-# Get lightweight playlist metadata for editorial playlists
-	sub getEditorialPlaylistMetadata {
-		my ($self, $cb, $playlist_ids) = @_;
-		
-		unless ($playlist_ids && @$playlist_ids) {
-			$log->debug("No playlist IDs provided to getEditorialPlaylistMetadata");
-			$cb->([]);
-			return;
-		}
-		
-		my $ids = ref $playlist_ids eq 'ARRAY' ? $playlist_ids : [$playlist_ids];
-		
-			my $gql = q{
-				query getShortPlaylist($ids: [ID!]!) {
-					getPlaylists(ids: $ids) {
-						id
-						title
-						image { src }
-						description
-						trackCount
-						isPublic
-						duration
-					}
-				}
-			};
-		
-		my $vars = { ids => $ids };
-		
-		$log->info("getEditorialPlaylistMetadata: requesting metadata for " . scalar(@$ids) . " playlists");
-		
-		$self->_graphql(sub {
-			my $data = shift;
-			
-			if (!$data || $data->{error}) {
-				$cb->($data || { error => 'Unknown error' });
-				return;
-			}
-			
-			my $playlists = $data->{getPlaylists} || [];
-			$log->debug("getEditorialPlaylistMetadata: received metadata for " . scalar(@$playlists) . " playlists");
-			
-			$cb->($playlists);
-		}, 'getShortPlaylist', $gql, $vars, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
-	}
+# Get lightweight playlist metadata for editorial playlists (delegates to getShortPlaylists)
+sub getEditorialPlaylistMetadata {
+	my ($self, $cb, $playlist_ids) = @_;
+	return $self->getShortPlaylists($cb, $playlist_ids, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
+}
 
 # Get personalized music recommendations (For You, Trending, etc.).
 # $args->{page}: optional page number (defaults to 1).

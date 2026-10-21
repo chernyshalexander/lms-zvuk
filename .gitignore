@@ -4,9 +4,7 @@ cookies.txt
 *.swp
 .DS_Store
 /test/
-/t/
 /Plugins/
-/docs/
 CLAUDE.MD
 .research/
 .zcode/

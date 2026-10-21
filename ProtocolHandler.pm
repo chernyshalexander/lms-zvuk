@@ -147,12 +147,8 @@ sub getNextTrack {
 		my $format = 'mp3';
 
 		if ($prefQuality eq 'flac') {
-			# Check both flac and flacdrm
 			if ($stream->{flac}) {
 				$streamUrl = $stream->{flac};
-				$format = 'flc';
-			} elsif ($stream->{flacdrm}) {
-				$streamUrl = $stream->{flacdrm};
 				$format = 'flc';
 			} else {
 				$streamUrl = $stream->{high} || $stream->{mid};

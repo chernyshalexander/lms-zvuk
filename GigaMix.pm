@@ -199,11 +199,6 @@ sub _renderGigaMixPlaylist {
 
 	# Add "More Tracks" button if cursor exists (pagination available)
 	if ($cursor) {
-		# Save context for auto-extend feature
-		$client->pluginData('zvuk_gigamix_active', 1);
-		$client->pluginData('zvuk_gigamix_cursor', $cursor);
-		$client->pluginData('zvuk_gigamix_prompt', $prompt);
-
 		push @items, {
 			name        => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADD_MORE'),
 			type        => 'link',

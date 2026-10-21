@@ -2,7 +2,7 @@ package Plugins::Zvuk::Retry;
 
 use strict;
 use warnings;
-use Time::HiRes qw(time sleep);
+use Time::HiRes qw(time);
 
 =head1 NAME
 

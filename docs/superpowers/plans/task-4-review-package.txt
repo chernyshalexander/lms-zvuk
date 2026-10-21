@@ -1,0 +1,35 @@
+=== COMMIT LOG ===
+bd4e6bc feat: Add Personalized Playlists localization strings
+
+=== FILE STAT ===
+ strings.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+=== FULL DIFF ===
+diff --git a/strings.txt b/strings.txt
+index 46d9b90..0b314ba 100644
+--- a/strings.txt
++++ b/strings.txt
+@@ -342,10 +342,22 @@ PLUGIN_ZVUK_GIGAMIX_ERROR_LOAD_MORE
+ 	EN	Failed to load more tracks
+ 	RU	Не удалось загрузить больше треков
+ 
+ PLUGIN_ZVUK_GIGAMIX_ERROR_GENERATE
+ 	EN	Failed to generate playlist
+ 	RU	Не удалось создать плейлист
+ 
+ PLUGIN_ZVUK_GIGAMIX_ERROR_CURSOR
+ 	EN	Error: No cursor for pagination
+ 	RU	Ошибка: нет курсора для навигации
++
++PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS
++	EN	For You
++	RU	Плейлисты для вас
++
++PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_EMPTY
++	EN	No recommendations available
++	RU	Рекомендаций нет
++
++PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS_ERROR
++	EN	Failed to load recommendations
++	RU	Не удалось загрузить рекомендации

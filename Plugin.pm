@@ -341,8 +341,6 @@ sub _buildRootMenu {
 				{ name => cstring($client, 'PLUGIN_ZVUK_PLAYLISTS'),   type => 'link', url => \&handleUserPlaylists,   image => 'plugins/zvuk/html/images/playlists.png' },
 				{ name => cstring($client, 'PLUGIN_ZVUK_PODCASTS'),     type => 'link', url => \&handleFavoritePodcasts, image => 'plugins/zvuk/html/images/podcast_svg.png' },
 				{ name => cstring($client, 'PLUGIN_ZVUK_EPISODES'),    type => 'link', url => \&handleFavoriteEpisodes, image => 'plugins/zvuk/html/images/podcast_svg.png' },
-				# TODO: Synthesis Playlists API endpoint not available
-				# { name => 'Synthesis Playlists', type => 'link', url => \&handleSynthesisPlaylists, image => 'plugins/zvuk/html/images/playlists.png' },
 			],
 		},
 	);
@@ -431,7 +429,7 @@ sub searchArtists {
 
 sub searchAlbums {
 	my ($client, $cb, $args) = @_;
-	_searchGeneric($client, $cb, $args, 'releases', \&_renderAlbum, \&searchAlbums);
+	_searchGeneric($client, $cb, $args, 'releases', \&_renderRelease, \&searchAlbums);
 }
 
 sub searchPlaylists {
@@ -553,7 +551,7 @@ sub handleArtistAlbums {
 
 	$api->getArtistAlbums(sub {
 		my $items = shift || [];
-		$cb->({ items => [ map { _renderAlbum($_) } @$items ] });
+		$cb->({ items => [ map { _renderRelease($_) } @$items ] });
 	}, $id);
 }
 
@@ -592,17 +590,6 @@ sub handlePlaylist {
 	}, $id);
 }
 
-sub handlePersonalWave {
-	my ($client, $cb) = @_;
-	my $api = _get_api_client($client);
-
-	$api->getPersonalWave(sub {
-		my $items = shift || [];
-		Plugins::Zvuk::API->cacheTrackMetadata($items);
-		$cb->({ items => [ map { _renderTrack($_, 1) } @$items ] });
-	});
-}
-
 sub handleCollection {
 	my ($client, $cb) = @_;
 	my $api = _get_api_client($client);
@@ -620,7 +607,7 @@ sub handleFavoriteAlbums {
 
 	$api->getCollection(sub {
 		my $items = shift || [];
-		$cb->({ items => [ map { _renderAlbum($_) } @$items ] });
+		$cb->({ items => [ map { _renderRelease($_) } @$items ] });
 	}, 'releases');
 }
 
@@ -652,16 +639,6 @@ sub handleFavoriteEpisodes {
 		my $items = shift || [];
 		$cb->({ items => [ map { _renderEpisode($_) } @$items ] });
 	}, 'episodes');
-}
-
-sub handleSynthesisPlaylists {
-	my ($client, $cb) = @_;
-	my $api = _get_api_client($client);
-
-	$api->getCollection(sub {
-		my $items = shift || [];
-		$cb->({ items => [ map { _renderPlaylist($_) } @$items ] });
-	}, 'synthesis_playlists');
 }
 
 sub handleUserPlaylists {
@@ -817,7 +794,7 @@ sub handleRecommendationAlbums {
 	my ($client, $cb, $args, $passthrough) = @_;
 
 	if ($passthrough && $passthrough->{releases}) {
-		$cb->({ items => [ map { _renderAlbum($_) } @{ $passthrough->{releases} } ] });
+		$cb->({ items => [ map { _renderRelease($_) } @{ $passthrough->{releases} } ] });
 		return;
 	}
 
@@ -842,7 +819,7 @@ sub handleRecommendationAlbums {
 			return;
 		}
 
-		$cb->({ items => [ map { _renderAlbum($_) } @$releases ] });
+		$cb->({ items => [ map { _renderRelease($_) } @$releases ] });
 	}, {
 		contentType => 'Music',
 		itemTypes   => ['Artist', 'Release', 'Playlist'],
@@ -913,9 +890,9 @@ sub handleEditorialPlaylists {
 
 		$log->info("Got " . scalar(@$ids) . " editorial playlist IDs, loading metadata");
 
-			# Step 2: Get lightweight metadata for all playlists
-			$api->getEditorialPlaylistMetadata(sub {
-				my $playlists = shift;
+		# Step 2: Get lightweight metadata for all playlists
+		$api->getShortPlaylists(sub {
+			my $playlists = shift;
 
 			unless ($playlists && @$playlists) {
 				$log->warn("getShortPlaylist returned empty results");
@@ -927,10 +904,10 @@ sub handleEditorialPlaylists {
 
 			$log->info("Got metadata for " . scalar(@$playlists) . " editorial playlists");
 			# Step 3: Render all playlists
-			my @items = map { _renderEditorialPlaylist($_) } @$playlists;
+			my @items = map { _renderPlaylist($_) } @$playlists;
 
 			$cb->({ items => \@items });
-		}, $ids);
+		}, $ids, { ttl => Plugins::Zvuk::API::DYNAMIC_TTL });
 	});
 }
 
@@ -1006,11 +983,6 @@ sub _renderRelease {
 	};
 }
 
-sub _renderAlbum {
-	my ($album) = @_;
-	return _renderRelease($album);
-}
-
 sub _renderArtist {
 	my ($artist) = @_;
 	my $url = 'zvuk://artist:' . $artist->{id};
@@ -1032,26 +1004,18 @@ sub _renderArtist {
 sub _renderPlaylist {
 	my ($playlist) = @_;
 	return {
-		name      => $playlist->{title},
-		type      => 'link',
-		url       => \&handlePlaylist,
+		name        => $playlist->{title},
+		line1       => $playlist->{title},
+		line2       => $playlist->{description} || "",
+		type        => 'link',
+		url         => \&handlePlaylist,
 		passthrough => [{ id => $playlist->{id} }],
-		image     => Plugins::Zvuk::API->getImageUrl($playlist),
+		image       => Plugins::Zvuk::API->getImageUrl($playlist),
 	};
 }
 
 sub _renderEditorialPlaylist {
-	my ($playlist) = @_;
-
-	return {
-		name      => $playlist->{title},
-		line1     => $playlist->{title},
-		line2     => $playlist->{description} || "",
-		type      => 'link',
-		url       => \&handlePlaylist,
-		passthrough => [{ id => $playlist->{id} }],
-		image     => Plugins::Zvuk::API->getImageUrl($playlist),
-	};
+	return _renderPlaylist(@_);
 }
 
 sub _renderPodcast {

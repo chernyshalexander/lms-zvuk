@@ -186,6 +186,10 @@ PLUGIN_ZVUK_TOP_TRACKS
 	EN	Top Tracks
 	RU	Популярные треки
 
+PLUGIN_ZVUK_ARTISTS
+	EN	Artists
+	RU	Исполнители
+
 PLUGIN_ZVUK_ALBUMS
 	EN	Albums
 	RU	Альбомы

@@ -638,6 +638,15 @@ sub handleImageProxy {
 		return;
 	}
 
+	unless ($url =~ m{^https://(?:[a-zA-Z0-9-]+\.)*(?:zvuk\.(?:com|ru)|sberzvuk\.com)/}i) {
+		$response->code(403);
+		$response->content_type('text/plain');
+		my $err_msg = 'Forbidden: untrusted image host';
+		$response->content_length(length($err_msg));
+		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$err_msg);
+		return;
+	}
+
 	# Strip size suffix (e.g. _150x150_f or _50x50_o) added by LMS or client
 	# since Zvuk static CDN returns 403 Forbidden for resized filenames,
 	# but returns 200 OK for the original image file.
@@ -650,7 +659,7 @@ sub handleImageProxy {
 	my %headers = (
 		'User-Agent' => Plugins::Zvuk::API::USER_AGENT,
 	);
-	if ($token) {
+	if ($token && $url =~ m{^https://(?:[a-zA-Z0-9-]+\.)*(?:zvuk\.(?:com|ru)|sberzvuk\.com)/}i) {
 		$headers{'x-auth-token'} = $token;
 		$headers{'Cookie'} = "auth=$token";
 	}

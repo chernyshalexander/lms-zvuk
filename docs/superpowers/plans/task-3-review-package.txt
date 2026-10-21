@@ -1,0 +1,39 @@
+=== COMMIT LOG ===
+692debd feat: Add Personalized Playlists to root menu
+
+=== FILE STAT ===
+ Plugin.pm | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+=== FULL DIFF ===
+diff --git a/Plugin.pm b/Plugin.pm
+index 5394b5b..b37146f 100644
+--- a/Plugin.pm
++++ b/Plugin.pm
+@@ -152,20 +152,26 @@ sub _buildRootMenu {
+ 				{ name => cstring($client, 'PLUGIN_ZVUK_SEARCH_ALBUMS'),    type => 'search', url => \&searchAlbums },
+ 				{ name => cstring($client, 'PLUGIN_ZVUK_SEARCH_PLAYLISTS'), type => 'search', url => \&searchPlaylists },
+ 			],
+ 		},
+ 		{
+ 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
+ 			type  => 'link',
+ 			image => 'plugins/zvuk/html/images/radio.png',
+ 			items => _getWaveMenuItems($client),
+ 		},
++		{
++			name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
++			type  => 'link',
++			image => 'plugins/zvuk/html/images/playlists.png',
++			url   => \&handlePersonalizedPlaylists,
++		},
+ 		{
+ 			name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
+ 			type  => 'link',
+ 			image => 'plugins/zvuk/html/images/gigamix.png',
+ 			url   => \&handleGigaMix,
+ 		},
+ 		{
+ 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),
+ 			type  => 'outline',
+ 			image => 'plugins/zvuk/html/images/favorites.png',

@@ -58,4 +58,29 @@ sub code         { my $self = shift; $self->{code} = shift if @_; return $self->
 sub content_type { my $self = shift; $self->{content_type} = shift if @_; return $self->{content_type}; }
 sub content_length { my $self = shift; $self->{content_length} = shift if @_; return $self->{content_length}; }
 
+package Test::FakeTrack;
+sub new { my ($class, $url) = @_; return bless { url => $url }, $class; }
+sub url { return $_[0]->{url}; }
+sub content_type { my $self = shift; $self->{content_type} = shift if @_; return $self->{content_type}; }
+
+package Test::FakeSong;
+sub new {
+    my ($class, %args) = @_;
+    return bless {
+        track      => Test::FakeTrack->new($args{url}),
+        client     => $args{client},
+        pluginData => {},
+    }, $class;
+}
+sub track      { return $_[0]->{track}; }
+sub master     { return $_[0]->{client}; }
+sub duration   { my $self = shift; $self->{duration} = shift if @_; return $self->{duration}; }
+sub streamUrl  { my $self = shift; $self->{streamUrl} = shift if @_; return $self->{streamUrl}; }
+sub pluginData {
+    my $self = shift;
+    if (@_ == 2) { $self->{pluginData}{$_[0]} = $_[1]; return $_[1]; }
+    elsif (@_ == 1) { return $self->{pluginData}{$_[0]}; }
+    return $self->{pluginData};
+}
+
 1;
