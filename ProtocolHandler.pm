@@ -464,7 +464,7 @@ sub _explodeAtlas {
 
 			my @urls = map { 'zvuk://' . ($_->{id} || $_->{track_id}) } grep { $_ && ref $_ eq 'HASH' && ($_->{id} || $_->{track_id}) } @$tracks;
 			$cb->(\@urls);
-		}, $island_id, 20);
+		}, $island_id, 3);
 	};
 
 	# Optionally notify backend of wave start (PUT)
@@ -688,7 +688,7 @@ sub _loadMoreAtlasTracks {
 				$client, ['playlist', 'add', 'zvuk://' . $tid]
 			);
 		}
-	}, $island_id, 20, $cursor);
+	}, $island_id, 3, $cursor);
 }
 
 sub _getAPIHandler {

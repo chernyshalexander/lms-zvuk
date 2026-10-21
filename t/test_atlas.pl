@@ -65,6 +65,16 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	close $fh;
 }
 
+my $wave_3tracks_json;
+if ($wave_json_content) {
+	my $decoded = JSON::XS::decode_json($wave_json_content);
+	if ($decoded->{tracks} && ref $decoded->{tracks} eq 'ARRAY') {
+		my @first3 = @{ $decoded->{tracks} }[0 .. 2];
+		$decoded->{tracks} = \@first3;
+		$wave_3tracks_json = JSON::XS::encode_json($decoded);
+	}
+}
+
 # ===================================================================
 # SECTION 1: Atlas API Client (Plugins::Zvuk::API::Atlas)
 # ===================================================================
@@ -186,6 +196,26 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
 	my ($url, %headers) = @{ $req->{args} };
 	like($url, qr{/api/v1/map/islands/$island_id/wave\?cursor=cursor_token_abc&limit=20}, 'T1.5: URL contains cursor and limit query params');
+}
+
+# Test 1.5b: getIslandWave default limit is 3 when limit is omitted
+{
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
+		{ code => 200, content => $wave_3tracks_json || $wave_json_content }
+	);
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my ($wave_res, $wave_err);
+	my $island_id = '621ceafb-995c-5510-b601-5d4b14f02c08';
+	$atlas->getIslandWave(sub {
+		($wave_res, $wave_err) = @_;
+	}, $island_id);
+
+	is($wave_err, undef, 'T1.5b: getIslandWave without limit parameter succeeded');
+	my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url) = @{ $req->{args} };
+	like($url, qr{/api/v1/map/islands/$island_id/wave\?limit=3}, 'T1.5b: Default limit is 3 when omitted');
 }
 
 # Test 1.6: Automatic Token Refresh on HTTP 401
@@ -513,8 +543,8 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	Plugins::Zvuk::API::Async->_resetThrottlerForTesting();
 	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
 	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
-		{ code => 200, content => '{"island_alive":true}' }, # PUT start wave
-		{ code => 200, content => $wave_json_content },       # GET wave tracks
+		{ code => 200, content => '{"island_alive":true}' },               # PUT start wave
+		{ code => 200, content => $wave_3tracks_json || $wave_json_content }, # GET wave tracks
 	);
 
 	my $exploded_urls;
@@ -524,8 +554,13 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	});
 
 	ok(ref $exploded_urls eq 'ARRAY', 'T3.2: explodePlaylist returned array of URLs');
-	is(scalar(@$exploded_urls), 20, 'T3.2: Returned 20 track URLs for wave');
+	is(scalar(@$exploded_urls), 3, 'T3.2: Returned 3 track URLs for wave (3-track batching like Wave)');
 	is($exploded_urls->[0], 'zvuk://34015579', 'T3.2: First URL is zvuk://34015579');
+
+	# Check explode request sent limit=3
+	my $last_req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
+	my ($url) = @{ $last_req->{args} };
+	like($url, qr{limit=3}, 'T3.2: Explode request sent limit=3 (3-track batching like Wave)');
 
 	# Check client state flags in pluginData
 	is($client->pluginData('zvuk_atlas_active'), 1, 'T3.2: zvuk_atlas_active set to 1');
@@ -542,7 +577,7 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
 	@Slim::Control::Request::EXECUTED_REQUESTS = ();
 	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
-		{ code => 200, content => $wave_json_content }
+		{ code => 200, content => $wave_3tracks_json || $wave_json_content }
 	);
 
 	my $initial_cursor = $client->pluginData('zvuk_atlas_cursor');
@@ -553,9 +588,10 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	my ($url) = @{ $last_req->{args} };
 	like($url, qr{/api/v1/map/islands/621ceafb-995c-5510-b601-5d4b14f02c08/wave\?}, 'T3.3: Sent wave auto-load request');
 	like($url, qr{cursor=}, 'T3.3: Included cursor in request');
+	like($url, qr{limit=3}, 'T3.3: Auto-extend request sent limit=3 (3-track batching like Wave)');
 
 	# Check that tracks were appended to LMS playlist
-	is(scalar(@Slim::Control::Request::EXECUTED_REQUESTS), 20, 'T3.3: Appended 20 tracks via playlist add');
+	is(scalar(@Slim::Control::Request::EXECUTED_REQUESTS), 3, 'T3.3: Appended 3 tracks via playlist add (3-track batching like Wave)');
 	is($Slim::Control::Request::EXECUTED_REQUESTS[0]{cmd}[1], 'add', 'T3.3: Request command was playlist add');
 	is($Slim::Control::Request::EXECUTED_REQUESTS[0]{cmd}[2], 'zvuk://34015579', 'T3.3: Added track URL is zvuk://34015579');
 }
@@ -582,9 +618,9 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
 	Plugins::Zvuk::API->cache->clear();
 	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
-		{ code => 200, content => $map_json_content },       # GET map to pick random island
-		{ code => 200, content => '{"island_alive":true}' }, # PUT start wave
-		{ code => 200, content => $wave_json_content },       # GET wave tracks
+		{ code => 200, content => $map_json_content },                        # GET map to pick random island
+		{ code => 200, content => '{"island_alive":true}' },                  # PUT start wave
+		{ code => 200, content => $wave_3tracks_json || $wave_json_content }, # GET wave tracks
 	);
 
 	my $exploded_random_urls;
@@ -593,10 +629,75 @@ if (-f "$capture_dir/verify_wave_jazz_r2.json") {
 	});
 
 	ok(ref $exploded_random_urls eq 'ARRAY', 'T3.5: explodePlaylist for zvuk://atlas:random returned array of URLs');
-	is(scalar(@$exploded_random_urls), 20, 'T3.5: Returned 20 tracks for random island wave');
+	is(scalar(@$exploded_random_urls), 3, 'T3.5: Returned 3 tracks for random island wave');
 	is($client->pluginData('zvuk_atlas_active'), 1, 'T3.5: zvuk_atlas_active set to 1');
 	like($client->pluginData('zvuk_atlas_island_id'), qr/^[0-9a-fA-F-]+$/, 'T3.5: Random island ID selected and stored');
 	ok(defined $client->pluginData('zvuk_atlas_cursor'), 'T3.5: Cursor stored for auto-extension');
 }
 
+# ===================================================================
+# SECTION 4: Localization & Web Canvas Verification
+# ===================================================================
+
+# Test 4.1: strings.txt Taste Atlas English menu notice
+{
+	my $strings_file = "$repo_root/strings.txt";
+	ok(-f $strings_file, 'T4.1: strings.txt exists');
+
+	open my $sfh, '<:utf8', $strings_file or die "Cannot open strings.txt: $!";
+	my %parsed_strings;
+	my $current_token;
+	while (my $line = <$sfh>) {
+		chomp $line;
+		if ($line =~ /^([A-Z0-9_]+)$/) {
+			$current_token = $1;
+		} elsif ($current_token && $line =~ /^\t(EN|RU)\t(.*)$/) {
+			$parsed_strings{$current_token}{$1} = $2;
+		}
+	}
+	close $sfh;
+
+	my @atlas_menu_tokens = qw(
+		PLUGIN_ZVUK_ATLAS_ALL_ISLANDS
+		PLUGIN_ZVUK_ATLAS_GENRES
+		PLUGIN_ZVUK_ATLAS_MOODS
+		PLUGIN_ZVUK_ATLAS_RANDOM
+		PLUGIN_ZVUK_ATLAS_WEB_MAP
+	);
+
+	for my $tok (@atlas_menu_tokens) {
+		ok(exists $parsed_strings{$tok}, "T4.1: $tok exists in strings.txt");
+		like($parsed_strings{$tok}{EN}, qr/\(in Russian\)$/, "T4.1: $tok has '(in Russian)' suffix in English");
+		unlike($parsed_strings{$tok}{RU}, qr/\(in Russian\)/, "T4.1: $tok Russian text does NOT have '(in Russian)' suffix");
+	}
+}
+
+# Test 4.2: HTML/EN/plugins/zvuk/atlasStandalone.html ASCII-cleanliness & Canvas Styles
+{
+	my $html_file = "$repo_root/HTML/EN/plugins/zvuk/atlasStandalone.html";
+	ok(-f $html_file, 'T4.2: atlasStandalone.html exists');
+
+	open my $hfh, '<:raw', $html_file or die "Cannot open atlasStandalone.html: $!";
+	local $/;
+	my $html_content = <$hfh>;
+	close $hfh;
+
+	# Verify 100% ASCII clean (prevents LMS Template Toolkit encoding crash)
+	my @non_ascii = ($html_content =~ /([^\x00-\x7F])/g);
+	is(scalar(@non_ascii), 0, 'T4.2: atlasStandalone.html is 100% ASCII-clean');
+
+	# Verify quadrant opacity values (0.14 - 0.16)
+	like($html_content, qr/rgba\(239,\s*68,\s*68,\s*0\.14\)/, 'T4.2: Q2 Drive tint is 0.14');
+	like($html_content, qr/rgba\(245,\s*158,\s*11,\s*0\.14\)/, 'T4.2: Q1 Joy tint is 0.14');
+	like($html_content, qr/rgba\(59,\s*130,\s*246,\s*0\.16\)/, 'T4.2: Q3 Melancholy tint is 0.16');
+	like($html_content, qr/rgba\(16,\s*185,\s*129,\s*0\.14\)/, 'T4.2: Q4 Calm tint is 0.14');
+
+	# Verify 2-pass vector stroke halo
+	like($html_content, qr/ctx\.strokeText\(isl\.title,\s*p\.x,\s*textY\)/, 'T4.2: Implements ctx.strokeText halo');
+	like($html_content, qr/ctx\.strokeStyle\s*=\s*'rgba\(13,\s*17,\s*23,\s*0\.95\)'/, 'T4.2: Dark halo stroke style');
+	like($html_content, qr/ctx\.miterLimit\s*=\s*2/, 'T4.2: miterLimit is set to 2');
+	like($html_content, qr/ctx\.lineJoin\s*=\s*'round'/, 'T4.2: lineJoin is round');
+}
+
 done_testing();
+

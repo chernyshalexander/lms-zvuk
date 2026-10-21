@@ -664,23 +664,23 @@ PLUGIN_ZVUK_ATLAS_DESC
 	RU	Исследуйте персональную карту вкуса и острова на atlas.zvuk.com
 
 PLUGIN_ZVUK_ATLAS_ALL_ISLANDS
-	EN	All Islands (Top Taste)
+	EN	All Islands (in Russian)
 	RU	Все острова (Топ вашего вкуса)
 
 PLUGIN_ZVUK_ATLAS_GENRES
-	EN	By Genre Families
+	EN	By Genre Families (in Russian)
 	RU	По семействам жанров
 
 PLUGIN_ZVUK_ATLAS_MOODS
-	EN	By Moods
+	EN	By Moods (in Russian)
 	RU	По настроениям
 
 PLUGIN_ZVUK_ATLAS_RANDOM
-	EN	Random Island (I'm Feeling Lucky)
+	EN	Random Island (in Russian)
 	RU	Случайный остров (Мне повезёт)
 
 PLUGIN_ZVUK_ATLAS_WEB_MAP
-	EN	Open Taste Map (Web)
+	EN	Open Taste Map (in Russian)
 	RU	Открыть карту вкуса (Web)
 
 PLUGIN_ZVUK_ATLAS_PLAY_STREAM

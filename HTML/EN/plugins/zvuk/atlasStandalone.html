@@ -734,17 +734,19 @@ canvas#atlasCanvas:active {
 			}
 
 			if (showLabel) {
-				ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#c9d1d9';
+				var textY = (isl.labelPos === 'top') ? (p.y - radius - 4) : (p.y + radius + 4);
+				ctx.save();
 				ctx.font = ((isSelected || isHovered) ? 'bold ' : '') + fontSize + 'px sans-serif';
 				ctx.textAlign = 'center';
-				if (isl.labelPos === 'top') {
-					ctx.textBaseline = 'bottom';
-					ctx.fillText(isl.title, p.x, p.y - radius - 4);
-				} else {
-					ctx.textBaseline = 'top';
-					ctx.fillText(isl.title, p.x, p.y + radius + 4);
-				}
-				ctx.textBaseline = 'alphabetic';
+				ctx.textBaseline = (isl.labelPos === 'top') ? 'bottom' : 'top';
+				ctx.lineWidth = Math.max(2.5, fontSize * 0.25);
+				ctx.lineJoin = 'round';
+				ctx.miterLimit = 2;
+				ctx.strokeStyle = 'rgba(13, 17, 23, 0.95)';
+				ctx.strokeText(isl.title, p.x, textY);
+				ctx.fillStyle = (isSelected || isHovered) ? '#ffffff' : '#f0f6fc';
+				ctx.fillText(isl.title, p.x, textY);
+				ctx.restore();
 			}
 		}
 
@@ -767,13 +769,13 @@ canvas#atlasCanvas:active {
 		var center = worldToScreen(0, 0);
 
 		// Quadrant tints
-		ctx.fillStyle = 'rgba(239, 68, 68, 0.03)';   // Q2: top-left
+		ctx.fillStyle = 'rgba(239, 68, 68, 0.14)';   // Q2: top-left
 		ctx.fillRect(0, 0, center.x, center.y);
-		ctx.fillStyle = 'rgba(245, 158, 11, 0.03)';  // Q1: top-right
+		ctx.fillStyle = 'rgba(245, 158, 11, 0.14)';  // Q1: top-right
 		ctx.fillRect(center.x, 0, w - center.x, center.y);
-		ctx.fillStyle = 'rgba(59, 130, 246, 0.03)';  // Q3: bottom-left
+		ctx.fillStyle = 'rgba(59, 130, 246, 0.16)';  // Q3: bottom-left
 		ctx.fillRect(0, center.y, center.x, h - center.y);
-		ctx.fillStyle = 'rgba(16, 185, 129, 0.03)';  // Q4: bottom-right
+		ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';  // Q4: bottom-right
 		ctx.fillRect(center.x, center.y, w - center.x, h - center.y);
 
 		// Axes

@@ -302,7 +302,7 @@ sub startIslandWave {
 	$self->_request('PUT', "/api/v1/map/islands/$islandId/wave", undef, {}, $cb, \%request_opts);
 }
 
-# GET /api/v1/map/islands/{island_id}/wave?limit=20[&cursor=...] — Island wave stream tracks
+# GET /api/v1/map/islands/{island_id}/wave?limit=3[&cursor=...] — Island wave stream tracks
 sub getIslandWave {
 	my ($self, $cb, $islandId, $limit, $cursor, $opts) = @_;
 	if (ref $limit eq 'HASH') {
@@ -318,7 +318,7 @@ sub getIslandWave {
 	return $cb->(undef, 'Missing islandId') unless defined $islandId && length($islandId);
 
 	my %params = (
-		limit => $limit || 20,
+		limit => $limit || 3,
 	);
 	$params{cursor} = $cursor if defined $cursor && length($cursor);
 
