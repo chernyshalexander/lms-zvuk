@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
@@ -18,17 +19,6 @@ unshift @INC, $tmpdir;
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::WaveUI;
 require Plugins::Zvuk::WaveSettings;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 my $client = Test::FakeClient->new(id => 'boom_player_1');
 
@@ -68,13 +58,13 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
 
     ok(ref $menuAfter eq 'HASH', "handleGenreToggle callback returns updated menu");
     my ($toggledItem) = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} eq $genreName } @{ $menuAfter->{items} };
-    ok($toggledItem->{name} =~ /\[x\]/, "toggled genre item display updated to checked [x]");
+    like($toggledItem->{name}, qr/\[x\]/, "toggled genre item display updated to checked [x]");
     ok(!exists $toggledItem->{nextWindow} || $toggledItem->{nextWindow} ne 'refresh', "refreshed genre item for button player still omits nextWindow => 'refresh'");
 
     # Toggle back
     Plugins::Zvuk::WaveUI::handleGenreToggle($client, sub { $menuAfter = shift }, { isButton => 1 }, { genre => $genreName });
     ($toggledItem) = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} eq $genreName } @{ $menuAfter->{items} };
-    ok($toggledItem->{name} =~ /\[ \]/, "toggled back genre item display updated to unchecked [ ]");
+    like($toggledItem->{name}, qr/\[ \]/, "toggled back genre item display updated to unchecked [ ]");
 }
 
 # Test 4: Start Wave menu item behavior for VFD button player vs standard UI
@@ -82,32 +72,33 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
     my $waveItemsButton = Plugins::Zvuk::WaveUI::_getWaveMenuItems($client, { isButton => 1 });
     my ($startItemButton) = grep { $_->{play} && $_->{play} eq 'zvuk://wave' } @$waveItemsButton;
 
-    ok(ref $startItemButton->{url} eq 'CODE', "Start Wave menu item on button player uses CODE ref for url (enables rotary knob press playback)");
+    is(ref $startItemButton->{url}, 'CODE', "Start Wave menu item on button player uses CODE ref for url (enables rotary knob press playback)");
 
     # Test handleStartWave execution and button mode stack cleanup
     my @executedCmds;
-    local *Test::FakeClient::execute = sub {
-        my ($self, $cmd) = @_;
-        push @executedCmds, $cmd;
-    };
+    {
+        no warnings 'once', 'redefine';
+        local *Test::FakeClient::execute = sub {
+            my ($self, $cmd) = @_;
+            push @executedCmds, $cmd;
+        };
 
-    my @modeStack = ('xmlbrowser'); # Simulate temporary xmlbrowser mode pushed by onRight
-    no warnings 'redefine', 'once';
-    local *Slim::Buttons::Common::mode = sub { return $modeStack[-1]; };
-    local *Slim::Buttons::Common::popMode = sub { return pop @modeStack; };
-    local *Slim::Buttons::Common::pushModeLeft = sub { my ($c, $m) = @_; push @modeStack, $m; };
+        my @modeStack = ('xmlbrowser'); # Simulate temporary xmlbrowser mode pushed by onRight
+        local *Slim::Buttons::Common::mode = sub { return $modeStack[-1]; };
+        local *Slim::Buttons::Common::popMode = sub { return pop @modeStack; };
+        local *Slim::Buttons::Common::pushModeLeft = sub { my ($c, $m) = @_; push @modeStack, $m; };
 
-    Plugins::Zvuk::WaveUI::handleStartWave($client, sub {}, { isButton => 1 });
+        Plugins::Zvuk::WaveUI::handleStartWave($client, sub {}, { isButton => 1 });
 
-    ok(scalar(@executedCmds) == 1, "handleStartWave executes playlist play command");
-    ok($executedCmds[0][0] eq 'playlist' && $executedCmds[0][1] eq 'play' && $executedCmds[0][2] eq 'zvuk://wave', "executed command is 'playlist play zvuk://wave'");
-    ok($modeStack[-1] eq 'playlist', "mode stack cleanly ends in playlist mode");
-    ok(scalar(@modeStack) == 1, "temporary xmlbrowser mode was popped before pushing playlist mode (prevents empty screen & stack underflow)");
+        is(scalar(@executedCmds), 1, "handleStartWave executes playlist play command");
+        is_deeply($executedCmds[0], ['playlist', 'play', 'zvuk://wave', 'PLUGIN_ZVUK_MENU_WAVE_START'], "executed command is 'playlist play zvuk://wave'");
+        is($modeStack[-1], 'playlist', "mode stack cleanly ends in playlist mode");
+        is(scalar(@modeStack), 1, "temporary xmlbrowser mode was popped before pushing playlist mode (prevents empty screen & stack underflow)");
+    }
 
     my $waveItemsWeb = Plugins::Zvuk::WaveUI::_getWaveMenuItems($client, {});
     my ($startItemWeb) = grep { $_->{play} && $_->{play} eq 'zvuk://wave' } @$waveItemsWeb;
     ok(!ref $startItemWeb->{url}, "Start Wave menu item on non-button UI retains scalar url 'zvuk://wave'");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

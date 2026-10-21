@@ -12,22 +12,12 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use Time::HiRes qw(time);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
 require "$Bin/../Throttle.pm";
 require "$Bin/../Retry.pm";
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 # ---------------------------------------------------------------------
 # Throttle.pm::acquire -- once the rate limit is hit, the scheduled $when
@@ -41,8 +31,8 @@ sub ok {
     $throttle->acquire(sub { push @delays, shift });  # immediate, fills the 1 slot
     $throttle->acquire(sub { push @delays, shift });  # must be scheduled
 
-    ok(scalar(@delays) == 1, "second acquire() is deferred, not immediate");
-    ok(scalar(@Slim::Utils::Timers::SCHEDULED) == 1, "exactly one timer was scheduled");
+    is(scalar(@delays), 1, "second acquire() is deferred, not immediate");
+    is(scalar(@Slim::Utils::Timers::SCHEDULED), 1, "exactly one timer was scheduled");
 
     my $when = $Slim::Utils::Timers::SCHEDULED[0]{when};
     my $now  = time();
@@ -50,7 +40,7 @@ sub ok {
     ok($when < $now + 5, "scheduled \$when is not absurdly far in the future either");
 
     Slim::Utils::Timers::fireAll();
-    ok(scalar(@delays) == 2, "firing the timer runs the deferred acquire callback");
+    is(scalar(@delays), 2, "firing the timer runs the deferred acquire callback");
 }
 
 # ---------------------------------------------------------------------
@@ -75,7 +65,7 @@ sub ok {
         },
     );
 
-    ok(scalar(@Slim::Utils::Timers::SCHEDULED) == 1, "retryable error schedules exactly one backoff timer");
+    is(scalar(@Slim::Utils::Timers::SCHEDULED), 1, "retryable error schedules exactly one backoff timer");
 
     my $when = $Slim::Utils::Timers::SCHEDULED[0]{when};
     my $now  = time();
@@ -85,9 +75,8 @@ sub ok {
     ok(!defined $final, "on_success_cb has not fired yet -- still waiting on the (correctly deferred) backoff timer");
 
     Slim::Utils::Timers::fireAll();
-    ok($attempt == 2, "firing the timer retries the operation");
+    is($attempt, 2, "firing the timer retries the operation");
     ok(defined $final && $final->{data} eq 'ok', "retry eventually succeeds and reports the final result");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

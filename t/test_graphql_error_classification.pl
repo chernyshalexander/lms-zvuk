@@ -18,6 +18,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -28,17 +29,6 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::API::Async;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 sub drain {
     my ($doneRef) = @_;
@@ -73,7 +63,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->_graphql(sub { $result = shift }, 'testOp400', 'query{}', {}, { ttl => 0 });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1,
         "HTTP 400 makes exactly one attempt -- not retried");
     ok(defined $result && $result->{error}, "callback receives an error result for HTTP 400");
 }
@@ -93,7 +83,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->_graphql(sub { $result = shift }, 'testOp503', 'query{}', {}, { ttl => 0 });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 2,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 2,
         "HTTP 503 is retried -- second attempt is made");
     ok(defined $result && !$result->{error} && $result->{ok} == 1,
         "retry succeeds and returns the second attempt's data");
@@ -115,10 +105,9 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->_graphql(sub { $result = shift }, 'testOpNetErr', 'query{}', {}, { ttl => 0 });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 2,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 2,
         "a genuine network error (no HTTP response) is still retried");
     ok(defined $result && !$result->{error}, "retry succeeds after the transient network error");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -19,17 +20,6 @@ unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::API;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 {
     no warnings 'once';
@@ -44,11 +34,11 @@ my $batch1 = [
 ];
 
 my $res1 = Plugins::Zvuk::API->cacheTrackMetadata($batch1);
-ok(ref($res1) eq 'ARRAY', "cacheTrackMetadata returns an array ref");
-ok(scalar(@$res1) == 3, "Batch 1 returned all 3 tracks");
-ok($res1->[0]{title} eq 'Track 101', "Track 101 title is correct");
-ok($res1->[1]{title} eq 'Track 102', "Track 102 title is correct");
-ok($res1->[2]{title} eq 'Track 103', "Track 103 title is correct");
+is(ref($res1), 'ARRAY', "cacheTrackMetadata returns an array ref");
+is(scalar(@$res1), 3, "Batch 1 returned all 3 tracks");
+is($res1->[0]{title}, 'Track 101', "Track 101 title is correct");
+is($res1->[1]{title}, 'Track 102', "Track 102 title is correct");
+is($res1->[2]{title}, 'Track 103', "Track 103 title is correct");
 
 # Test batch 2: contains track 102 (already cached in batch 1) in the middle
 my $batch2 = [
@@ -58,15 +48,15 @@ my $batch2 = [
 ];
 
 my $res2 = Plugins::Zvuk::API->cacheTrackMetadata($batch2);
-ok(ref($res2) eq 'ARRAY', "Batch 2 with cached item still returns an array ref (not single item)");
-ok(scalar(@$res2) == 3, "Batch 2 returned all 3 tracks despite cached item in middle");
-ok($res2->[0]{id} == 104, "Track 104 is present");
-ok($res2->[1]{id} == 102, "Track 102 is retrieved from cache");
-ok($res2->[2]{id} == 105, "Track 105 was processed and not aborted");
+is(ref($res2), 'ARRAY', "Batch 2 with cached item still returns an array ref (not single item)");
+is(scalar(@$res2), 3, "Batch 2 returned all 3 tracks despite cached item in middle");
+is($res2->[0]{id}, 104, "Track 104 is present");
+is($res2->[1]{id}, 102, "Track 102 is retrieved from cache");
+is($res2->[2]{id}, 105, "Track 105 was processed and not aborted");
 
 # Verify track 105 is indeed in cache
 my $cached_105 = Plugins::Zvuk::API->cache->get("zvuk_meta_105");
-ok(defined $cached_105 && $cached_105->{title} eq 'Track 105', "Track 105 was properly cached");
+ok(defined $cached_105, "Track 105 was properly cached");
+is($cached_105 ? $cached_105->{title} : undef, 'Track 105', "Track 105 title is correct");
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

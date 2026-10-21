@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use utf8;
+use open qw(:std :utf8);
 no warnings 'once';
 
 use FindBin qw($Bin);

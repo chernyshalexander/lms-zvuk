@@ -14,6 +14,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
@@ -33,17 +34,6 @@ require Plugins::Zvuk::WaveSettings;
 require Plugins::Zvuk::WaveUI;
 require Plugins::Zvuk::WebHandlers;
 
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
-
 # ---------------------------------------------------------------------
 # Fixtures: two accounts, one player.
 # ---------------------------------------------------------------------
@@ -61,33 +51,33 @@ $Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId} = 'acctA
 # =======================================================================
 # P0.1 - stale pluginData('zvuk_api') after switching account
 # =======================================================================
-print "\n--- P0.1: account switch must be seen by Wave/streaming ---\n";
+note("--- P0.1: account switch must be seen by Wave/streaming ---");
 
 my $api_before = Plugins::Zvuk::WaveUI::_getAPIHandler($client);
-ok(defined $api_before && $api_before->accountId eq 'acctA',
+is($api_before ? $api_before->accountId : undef, 'acctA',
     "WaveUI::_getAPIHandler resolves acctA before switch");
 
 my $ph_api_before = Plugins::Zvuk::ProtocolHandler::_getAPIHandler($client);
-ok(defined $ph_api_before && $ph_api_before->accountId eq 'acctA',
+is($ph_api_before ? $ph_api_before->accountId : undef, 'acctA',
     "ProtocolHandler::_getAPIHandler resolves acctA before switch");
 
 Plugins::Zvuk::Plugin::_switchAccount($client, sub { }, {}, 'acctB');
 
-ok($Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId} eq 'acctB',
+is($Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId}, 'acctB',
     "_switchAccount updates the client's userId pref to acctB");
 
 my $api_after = Plugins::Zvuk::WaveUI::_getAPIHandler($client);
-ok(defined $api_after && $api_after->accountId eq 'acctB',
+is($api_after ? $api_after->accountId : undef, 'acctB',
     "WaveUI::_getAPIHandler resolves acctB after switch (was stale acctA)");
 
 my $ph_api_after = Plugins::Zvuk::ProtocolHandler::_getAPIHandler($client);
-ok(defined $ph_api_after && $ph_api_after->accountId eq 'acctB',
+is($ph_api_after ? $ph_api_after->accountId : undef, 'acctB',
     "ProtocolHandler::_getAPIHandler resolves acctB after switch (was stale acctA)");
 
 # =======================================================================
 # P0.2 - Web UI Wave Settings must save/load under the real account, not 'default'
 # =======================================================================
-print "\n--- P0.2: Web UI wave settings must use the real player's account ---\n";
+note("--- P0.2: Web UI wave settings must use the real player's account ---");
 
 # Second player pinned to acctA, to prove the fix picks the RIGHT account
 # rather than merely picking "whichever one is not default".
@@ -115,5 +105,4 @@ my $savedForDefault = Plugins::Zvuk::WaveSettings::loadSettings('default');
 ok(abs(($savedForDefault->{popular} // -1) - 0.91) > 1e-9,
     "handleSaveWaveSettingsWeb does NOT also/instead save under the hardcoded 'default' key");
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

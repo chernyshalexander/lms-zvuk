@@ -3,7 +3,13 @@
 use strict;
 use warnings;
 
+unless (caller) {
+    require Test::More;
+    Test::More::plan(skip_all => 'Helper library, not a standalone test');
+}
+
 package Test::FakeClient;
+no warnings 'once';
 my $next_id = 1;
 sub new {
     my ($class, %args) = @_;

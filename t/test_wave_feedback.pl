@@ -12,6 +12,7 @@ use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use JSON::PP qw(decode_json);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
@@ -26,17 +27,6 @@ require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::API;
 require Plugins::Zvuk::API::Async;
 require Plugins::Zvuk::ProtocolHandler;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 sub drain {
     my ($doneRef) = @_;
@@ -79,7 +69,8 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->getPersonalWave(sub { $result = shift });
     drain(\$result);
 
-    ok(defined $result && scalar(@$result) == 1, "Test 1: getPersonalWave succeeds without contentInput");
+    is(ref $result, 'ARRAY', "Test 1: getPersonalWave returns array ref");
+    is(scalar(@$result), 1, "Test 1: returns 1 track");
     my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[0]{args};
     my $body = decode_json($req->[-1]);
     ok(!exists $body->{variables}{contentInput}, "Test 1: contentInput is omitted when not provided");
@@ -110,15 +101,16 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->getPersonalWave(sub { $result = shift }, undef, $feedback);
     drain(\$result);
 
-    ok(defined $result && scalar(@$result) == 1, "Test 2: getPersonalWave succeeds with contentInput");
+    is(ref $result, 'ARRAY', "Test 2: getPersonalWave returns array ref");
+    is(scalar(@$result), 1, "Test 2: returns 1 track");
     my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[0]{args};
     my $body = decode_json($req->[-1]);
     my $input = $body->{variables}{contentInput};
     ok(defined $input, "Test 2: contentInput passed in variables");
-    ok($input->{trackId} eq '999', "Test 2: trackId matches feedback");
-    ok($input->{trackDuration} == 240, "Test 2: trackDuration matches feedback");
-    ok($input->{playDuration} == 180, "Test 2: playDuration matches feedback");
-    ok($input->{isSkipped} == 0, "Test 2: isSkipped is false (not skipped)");
+    is($input->{trackId}, '999', "Test 2: trackId matches feedback");
+    is($input->{trackDuration}, 240, "Test 2: trackDuration matches feedback");
+    is($input->{playDuration}, 180, "Test 2: playDuration matches feedback");
+    is($input->{isSkipped}, 0, "Test 2: isSkipped is false (not skipped)");
 }
 
 # ---------------------------------------------------------------------
@@ -159,8 +151,8 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
 
     my $last_track = $client->pluginData('zvuk_wave_last_track');
     ok(defined $last_track, "Test 3: zvuk_wave_last_track is stored");
-    ok($last_track->{id} eq '55555', "Test 3: recorded track ID is correct");
-    ok($last_track->{duration} == 210, "Test 3: recorded track duration is 210");
+    is($last_track->{id}, '55555', "Test 3: recorded track ID is correct");
+    is($last_track->{duration}, 210, "Test 3: recorded track duration is 210");
     ok(defined $last_track->{started} && $last_track->{started} > 0, "Test 3: recorded started timestamp is valid");
 }
 
@@ -195,8 +187,8 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     my $input = $body->{variables}{contentInput};
 
     ok(defined $input, "Test 4: _loadMoreWaveTracks passed contentInput");
-    ok($input->{trackId} eq '77777', "Test 4: input trackId matches previous track");
-    ok($input->{isSkipped} == 1, "Test 4: isSkipped is true (30s < 100s threshold)");
+    is($input->{trackId}, '77777', "Test 4: input trackId matches previous track");
+    is($input->{isSkipped}, 1, "Test 4: isSkipped is true (30s < 100s threshold)");
 }
 
 # ---------------------------------------------------------------------
@@ -215,9 +207,8 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     my $stopReq = Test::MockStopRequest->new($client, 'stop');
     Plugins::Zvuk::Plugin::_onStop($stopReq);
 
-    ok($client->pluginData('zvuk_wave_active') == 0, "Test 5: zvuk_wave_active reset to 0 on stop");
+    is($client->pluginData('zvuk_wave_active'), 0, "Test 5: zvuk_wave_active reset to 0 on stop");
     ok(!defined $client->pluginData('zvuk_wave_last_track'), "Test 5: zvuk_wave_last_track reset to undef on stop");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

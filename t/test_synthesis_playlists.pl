@@ -12,8 +12,11 @@
 # Run: perl t/test_synthesis_playlists.pl
 use strict;
 use warnings;
+use utf8;
+use open qw(:std :utf8);
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -24,17 +27,6 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::API::Async;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
 
@@ -56,14 +48,13 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     my $result;
     $api->getSynthesisPlaylists(sub { $result = shift });
 
-    ok($captured_args[0] eq 'getShortPlaylist', "operationName is 'getShortPlaylist'");
-    ok($captured_args[2]{ids} && ref($captured_args[2]{ids}) eq 'ARRAY',
-        "variables.ids is an array ref");
-    ok(join(',', @{ $captured_args[2]{ids} }) eq '3,4,6,11,12,13,14,15',
+    is($captured_args[0], 'getShortPlaylist', "operationName is 'getShortPlaylist'");
+    is(ref($captured_args[2]{ids}), 'ARRAY', "variables.ids is an array ref");
+    is_deeply($captured_args[2]{ids}, [3,4,6,11,12,13,14,15],
         "requests the fixed synthesis playlist ID set (3,4,6,11-15)");
-    ok(ref $result eq 'ARRAY' && scalar(@$result) == 2,
-        "getSynthesisPlaylists returns a bare array on success");
-    ok($result->[0]{title} eq 'Синтез 1', "playlist metadata is passed through");
+    is(ref($result), 'ARRAY', "getSynthesisPlaylists returns a bare array on success");
+    is(scalar(@$result), 2, "returns 2 playlists");
+    is($result->[0]{title}, 'Синтез 1', "playlist metadata is passed through");
 }
 
 # ---------------------------------------------------------------------
@@ -81,9 +72,9 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     my $result;
     $api->getSynthesisPlaylists(sub { $result = shift });
 
-    ok(ref $result eq 'HASH' && $result->{error} eq 'No token',
+    is(ref($result), 'HASH', "getSynthesisPlaylists returns hash on error");
+    is($result->{error}, 'No token',
         "getSynthesisPlaylists propagates _graphql error hash unchanged");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

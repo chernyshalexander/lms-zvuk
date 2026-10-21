@@ -6,8 +6,11 @@
 # Run: perl t/test_editorial_playlists.pl
 use strict;
 use warnings;
+use utf8;
+use open qw(:std :utf8);
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
@@ -19,17 +22,6 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 my $client = Test::FakeClient->new(id => 'player1');
 
@@ -54,7 +46,7 @@ Plugins::Zvuk::Plugin::_buildRootMenu($client, sub { $rootMenu = shift });
 my ($editorialItem) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::Plugin::handleEditorialPlaylists } @{ $rootMenu->{items} };
 
 ok(defined $editorialItem, "Root menu contains editorial playlists link");
-ok($editorialItem->{name} ne '', "Editorial playlists menu item has a name");
+isnt($editorialItem ? $editorialItem->{name} : '', '', "Editorial playlists menu item has a name");
 
 # ---------------------------------------------------------------------
 # Test 3: Verify API methods exist
@@ -77,17 +69,12 @@ ok($editorialItem->{name} ne '', "Editorial playlists menu item has a name");
     ok($has_render, "_renderEditorialPlaylist rendering helper exists");
 }
 
-# ---------------------------------------------------------------------
-# Summary and manual testing checklist
-# ---------------------------------------------------------------------
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
+note("Manual testing checklist:");
+note("1. Start LMS and navigate to Plugins → Zvuk");
+note("2. Verify 'Подборки' menu item appears");
+note("3. Click 'Подборки' and verify playlist list loads");
+note("4. Click individual playlist and verify tracks display");
+note("5. Test error handling with invalid token");
+note("6. Verify menu appears in different UI skins (Default, Material)");
 
-print "\nManual testing checklist:\n";
-print "1. Start LMS and navigate to Plugins → Zvuk\n";
-print "2. Verify 'Подборки' menu item appears\n";
-print "3. Click 'Подборки' and verify playlist list loads\n";
-print "4. Click individual playlist and verify tracks display\n";
-print "5. Test error handling with invalid token\n";
-print "6. Verify menu appears in different UI skins (Default, Material)\n";
-
-exit($failures ? 1 : 0);
+done_testing();

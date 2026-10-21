@@ -10,6 +10,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -21,17 +22,6 @@ unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::ProtocolHandler;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 # ---------------------------------------------------------------------
 # _renderEpisode must produce a playable audio item, not a text item.
@@ -46,9 +36,9 @@ sub ok {
         podcast  => { id => 7, title => 'Podcast Title' },
     });
 
-    ok($item->{type} eq 'audio', "_renderEpisode sets type => 'audio' (was 'text')");
-    ok($item->{url} eq 'zvuk://episode:42', "_renderEpisode url is zvuk://episode:<id>");
-    ok($item->{play} eq 'zvuk://episode:42', "_renderEpisode play is zvuk://episode:<id>");
+    is($item->{type}, 'audio', "_renderEpisode sets type => 'audio' (was 'text')");
+    is($item->{url}, 'zvuk://episode:42', "_renderEpisode url is zvuk://episode:<id>");
+    is($item->{play}, 'zvuk://episode:42', "_renderEpisode play is zvuk://episode:<id>");
 }
 
 # ---------------------------------------------------------------------
@@ -59,8 +49,8 @@ sub ok {
     no strict 'refs';
     my $parse = \&{'Plugins::Zvuk::ProtocolHandler::_parseZvukId'};
 
-    ok($parse->('zvuk://12345') eq '12345', "_parseZvukId parses bare track URL");
-    ok($parse->('zvuk://episode:42') eq '42', "_parseZvukId parses zvuk://episode:<id>");
+    is($parse->('zvuk://12345'), '12345', "_parseZvukId parses bare track URL");
+    is($parse->('zvuk://episode:42'), '42', "_parseZvukId parses zvuk://episode:<id>");
 }
 
 # ---------------------------------------------------------------------
@@ -75,5 +65,4 @@ sub ok {
     ok(!defined $albumFmt, "getFormatForURL still excludes container URL zvuk://album:<id>");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

@@ -14,6 +14,7 @@ use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use JSON::PP qw(decode_json);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -26,17 +27,6 @@ unshift @INC, $tmpdir;
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::API;
 require Plugins::Zvuk::API::Async;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 sub drain {
     my ($doneRef) = @_;
@@ -76,16 +66,16 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     drain(\$data);
 
     ok(defined $data && !$error, "Test 1: GET request succeeds");
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1, "Test 1: exactly 1 HTTP request made");
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1, "Test 1: exactly 1 HTTP request made");
     
     my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[0]{args};
     my $called_url = $req->[0];
-    ok($called_url eq 'https://zvuk.com/api/test?a=one&b=two', "Test 1: query params sorted deterministically");
+    is($called_url, 'https://zvuk.com/api/test?a=one&b=two', "Test 1: query params sorted deterministically");
     
     my %headers = @$req[1..$#$req];
-    ok($headers{'x-auth-token'} eq 'token123', "Test 1: x-auth-token passed correctly");
-    ok($headers{'user-agent'} eq Plugins::Zvuk::API->USER_AGENT, "Test 1: user-agent passed correctly");
-    ok($data->{result}{items}[0]{title} eq 'Item 42', "Test 1: payload parsed accurately");
+    is($headers{'x-auth-token'}, 'token123', "Test 1: x-auth-token passed correctly");
+    is($headers{'user-agent'}, Plugins::Zvuk::API->USER_AGENT, "Test 1: user-agent passed correctly");
+    is($data->{result}{items}[0]{title}, 'Item 42', "Test 1: payload parsed accurately");
 }
 
 # ---------------------------------------------------------------------
@@ -107,13 +97,13 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     drain(\$data1);
 
     ok(defined $data1 && $data1->{result}{cached_val} == 999, "Test 2: first request gets data");
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1, "Test 2: first request issues HTTP GET");
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1, "Test 2: first request issues HTTP GET");
 
     # Second request to same URL with TTL should hit cache
     $api->_http_get('https://zvuk.com/api/cacheable', undef, sub { $data2 = shift }, { ttl => 300 });
 
     ok(defined $data2 && $data2->{result}{cached_val} == 999, "Test 2: second request returns cached data");
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1, "Test 2: second request did NOT make HTTP call (cache hit)");
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1, "Test 2: second request did NOT make HTTP call (cache hit)");
 }
 
 # ---------------------------------------------------------------------
@@ -138,7 +128,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     drain(\$data);
 
     ok(defined $data && $data->{result}{recovered} == 1, "Test 3: recovered after transient 503");
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 2, "Test 3: exactly 2 attempts made (1 retry)");
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 2, "Test 3: exactly 2 attempts made (1 retry)");
 }
 
 # ---------------------------------------------------------------------
@@ -163,8 +153,8 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
 
     ok(!defined $data, "Test 4: HTTP 400 returns undef data");
     ok(defined $error, "Test 4: error is reported");
-    ok($code == 400, "Test 4: HTTP 400 status code preserved");
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1, "Test 4: exactly 1 attempt made -- NOT retried");
+    is($code, 400, "Test 4: HTTP 400 status code preserved");
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1, "Test 4: exactly 1 attempt made -- NOT retried");
 }
 
 # ---------------------------------------------------------------------
@@ -186,12 +176,11 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     drain(\$profile_res);
 
     ok(defined $profile_res && $profile_res->{id} == 777, "Test 5: getProfile returns profile data");
-    ok($profile_res->{name} eq 'Profile User', "Test 5: profile name is correct");
+    is($profile_res->{name}, 'Profile User', "Test 5: profile name is correct");
     
     my $req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[0]{args};
     my %headers = @$req[1..$#$req];
-    ok($headers{'x-auth-token'} eq 'custom_token_xyz', "Test 5: custom token passed to headers");
+    is($headers{'x-auth-token'}, 'custom_token_xyz', "Test 5: custom token passed to headers");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

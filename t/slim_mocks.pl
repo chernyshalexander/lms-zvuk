@@ -8,6 +8,11 @@
 use strict;
 use warnings;
 
+unless (caller) {
+    require Test::More;
+    Test::More::plan(skip_all => 'Helper library, not a standalone test');
+}
+
 use JSON::PP ();
 
 # LMS defines this as a compile-time constant in the server bootstrap;
@@ -286,6 +291,7 @@ package JSON::XS;
 require Exporter;
 our @ISA = ('JSON::PP', 'Exporter');
 our @EXPORT = qw(encode_json decode_json);
+no warnings 'once';
 *encode_json = \&JSON::PP::encode_json;
 *decode_json = \&JSON::PP::decode_json;
 $INC{'JSON/XS.pm'} = 1;
@@ -294,6 +300,7 @@ package JSON::XS::VersionOneAndTwo;
 require Exporter;
 our @ISA = ('Exporter');
 our @EXPORT = qw(encode_json decode_json to_json from_json);
+no warnings 'once';
 *encode_json = \&JSON::PP::encode_json;
 *decode_json = \&JSON::PP::decode_json;
 *to_json     = \&JSON::PP::encode_json;

@@ -12,6 +12,7 @@ use warnings;
 use FindBin qw($Bin);
 use JSON::PP qw(decode_json);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 
@@ -22,17 +23,6 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 sub drain {
     my ($doneRef) = @_;
@@ -70,11 +60,11 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->getMusicRecommendations(sub { $result = shift }, { contentType => 'Music' });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1,
         "Scenario 1: only 1 GraphQL query is sent when totalPages == 1");
     ok(defined $result && !$result->{error}, "Scenario 1 succeeds");
-    ok(scalar(@{$result->{allItems}}) == 1, "Scenario 1: returns exactly 1 item");
-    ok($result->{artists}[0]{title} eq 'Artist 1', "Scenario 1: artist is correct");
+    is(scalar(@{$result->{allItems}}), 1, "Scenario 1: returns exactly 1 item");
+    is($result->{artists}[0]{title}, 'Artist 1', "Scenario 1: artist is correct");
 }
 
 # ---------------------------------------------------------------------
@@ -106,7 +96,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->getMusicRecommendations(sub { $result = shift }, { contentType => 'Music' });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 2,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 2,
         "Scenario 2: exactly 2 GraphQL queries are sent when totalPages > 1");
     
     # Verify the requested pages in variables
@@ -115,17 +105,17 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     my $first_req_vars = decode_json($first_args->[-1]);
     my $second_req_vars = decode_json($second_args->[-1]);
     
-    ok($first_req_vars->{variables}{pages}[0] == 1, "Scenario 2: first query requests page 1");
-    ok($second_req_vars->{variables}{pages}[0] == 2 && $second_req_vars->{variables}{pages}[1] == 3,
+    is($first_req_vars->{variables}{pages}[0], 1, "Scenario 2: first query requests page 1");
+    is_deeply($second_req_vars->{variables}{pages}, [2, 3],
         "Scenario 2: second query requests pages [2, 3]");
 
     ok(defined $result && !$result->{error}, "Scenario 2 succeeds");
-    ok(scalar(@{$result->{allItems}}) == 3, "Scenario 2: returns all 3 items from pages 1, 2, 3");
+    is(scalar(@{$result->{allItems}}), 3, "Scenario 2: returns all 3 items from pages 1, 2, 3");
     
     # Assert correct sorting by page number (page 1, page 2, page 3)
-    ok($result->{allItems}[0]{id} eq 'a1', "Scenario 2: item 1 is from page 1");
-    ok($result->{allItems}[1]{id} eq 'r2', "Scenario 2: item 2 is from page 2 (sorted)");
-    ok($result->{allItems}[2]{id} eq 'p3', "Scenario 2: item 3 is from page 3 (sorted)");
+    is($result->{allItems}[0]{id}, 'a1', "Scenario 2: item 1 is from page 1");
+    is($result->{allItems}[1]{id}, 'r2', "Scenario 2: item 2 is from page 2 (sorted)");
+    is($result->{allItems}[2]{id}, 'p3', "Scenario 2: item 3 is from page 3 (sorted)");
 }
 
 # ---------------------------------------------------------------------
@@ -146,17 +136,16 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
     $api->getMusicRecommendations(sub { $result = shift }, { contentType => 'Music', page => 2 });
     drain(\$result);
 
-    ok(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG) == 1,
+    is(scalar(@Slim::Networking::SimpleAsyncHTTP::POST_LOG), 1,
         "Scenario 3: only 1 query is sent when a specific page is requested");
     
     my $req_args = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[0]{args};
     my $req_vars = decode_json($req_args->[-1]);
-    ok($req_vars->{variables}{pages}[0] == 2, "Scenario 3: query requests page 2");
+    is($req_vars->{variables}{pages}[0], 2, "Scenario 3: query requests page 2");
     
     ok(defined $result && !$result->{error}, "Scenario 3 succeeds");
-    ok(scalar(@{$result->{allItems}}) == 1, "Scenario 3: returns exactly 1 item");
-    ok($result->{allItems}[0]{id} eq 'r2', "Scenario 3: returned item is correct");
+    is(scalar(@{$result->{allItems}}), 1, "Scenario 3: returns exactly 1 item");
+    is($result->{allItems}[0]{id}, 'r2', "Scenario 3: returned item is correct");
 }
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();

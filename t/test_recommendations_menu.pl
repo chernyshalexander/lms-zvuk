@@ -14,6 +14,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use Test::More;
 
 require "$Bin/slim_mocks.pl";
 require "$Bin/test_helpers.pl";
@@ -25,17 +26,6 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
-
-my $failures = 0;
-sub ok {
-    my ($cond, $desc) = @_;
-    if ($cond) {
-        print "ok - $desc\n";
-    } else {
-        print "NOT OK - $desc\n";
-        $failures++;
-    }
-}
 
 my $client = Test::FakeClient->new(id => 'player1');
 
@@ -70,7 +60,7 @@ package main;
     my $menu;
     Plugins::Zvuk::Plugin::handleRecommendations($client, sub { $menu = shift });
 
-    ok($call_count == 1, "handleRecommendations issues exactly one getMusicRecommendations call");
+    is($call_count, 1, "handleRecommendations issues exactly one getMusicRecommendations call");
 
     my ($artistsItem)   = grep { $_->{url} == \&Plugins::Zvuk::Plugin::handleRecommendationArtists } @{ $menu->{items} };
     my ($albumsItem)    = grep { $_->{url} == \&Plugins::Zvuk::Plugin::handleRecommendationAlbums } @{ $menu->{items} };
@@ -91,8 +81,8 @@ package main;
     Plugins::Zvuk::Plugin::handleRecommendationArtists(
         $client, sub { $artistsMenu = shift }, {}, $artistsItem->{passthrough}[0]
     );
-    ok($call_count == 0, "handleRecommendationArtists uses passthrough without calling the API again");
-    ok($artistsMenu->{items}[0]{name} =~ /Artist A/, "handleRecommendationArtists renders the passed-through artist");
+    is($call_count, 0, "handleRecommendationArtists uses passthrough without calling the API again");
+    like($artistsMenu->{items}[0]{name}, qr/Artist A/, "handleRecommendationArtists renders the passed-through artist");
 
     # -------------------------------------------------------------
     # Without passthrough (deep link), it must still fall back to the API.
@@ -100,8 +90,8 @@ package main;
     $call_count = 0;
     my $fallbackMenu;
     Plugins::Zvuk::Plugin::handleRecommendationAlbums($client, sub { $fallbackMenu = shift }, {}, undef);
-    ok($call_count == 1, "handleRecommendationAlbums falls back to the API when no passthrough is given");
-    ok($fallbackMenu->{items}[0]{name} =~ /Album B/, "fallback path still renders correctly");
+    is($call_count, 1, "handleRecommendationAlbums falls back to the API when no passthrough is given");
+    like($fallbackMenu->{items}[0]{name}, qr/Album B/, "fallback path still renders correctly");
 }
 
 # ---------------------------------------------------------------------
@@ -127,8 +117,7 @@ ok((grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::Plugin::han
     "that outline also contains the Recommendations (dynamicBlock) link");
 
 my @topLevelPersonalized = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::Plugin::handlePersonalizedPlaylists } @{ $rootMenu->{items} };
-ok(scalar(@topLevelPersonalized) == 0,
+is(scalar(@topLevelPersonalized), 0,
     "Personalized Playlists is no longer a separate top-level root menu entry");
 
-print "\n" . ($failures ? "$failures assertion(s) FAILED\n" : "All assertions passed\n");
-exit($failures ? 1 : 0);
+done_testing();
