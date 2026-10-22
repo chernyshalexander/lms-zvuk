@@ -29,10 +29,6 @@ require Plugins::Zvuk::UI::Wave;
 require Plugins::Zvuk::UI::Atlas;
 require Plugins::Zvuk::UI::GigaMix;
 require Plugins::Zvuk::UI::InfoMenu;
-require Plugins::Zvuk::WaveUI;
-require Plugins::Zvuk::AtlasUI;
-require Plugins::Zvuk::GigaMix;
-require Plugins::Zvuk::Browse::InfoMenu;
 
 subtest 'Plugins::Zvuk::Session account lifecycle & auto-healing' => sub {
 	my $prefs = Slim::Utils::Prefs::preferences('plugin.zvuk');
@@ -98,34 +94,24 @@ subtest 'Plugins::Zvuk::API delegation to Session and unified getClient' => sub 
 	is($api->{userId}, 'user_test', 'API client has resolved userId');
 };
 
-subtest 'UI Namespaces & Backward-Compatible Shims' => sub {
+subtest 'UI Namespaces functions existence' => sub {
 	# Wave
-	is(\&Plugins::Zvuk::WaveUI::handleStartWave, \&Plugins::Zvuk::UI::Wave::handleStartWave,
-		'WaveUI::handleStartWave aliased to UI::Wave::handleStartWave');
-	is(\&Plugins::Zvuk::WaveUI::_getWaveMenuItems, \&Plugins::Zvuk::UI::Wave::_getWaveMenuItems,
-		'WaveUI::_getWaveMenuItems aliased to UI::Wave::_getWaveMenuItems');
+	ok(Plugins::Zvuk::UI::Wave->can('handleStartWave'), 'UI::Wave has handleStartWave');
+	ok(Plugins::Zvuk::UI::Wave->can('_getWaveMenuItems'), 'UI::Wave has _getWaveMenuItems');
 
 	# Atlas
-	is(\&Plugins::Zvuk::AtlasUI::handleAtlasMenu, \&Plugins::Zvuk::UI::Atlas::handleAtlasMenu,
-		'AtlasUI::handleAtlasMenu aliased to UI::Atlas::handleAtlasMenu');
-	is(\&Plugins::Zvuk::AtlasUI::handleAllIslands, \&Plugins::Zvuk::UI::Atlas::handleAllIslands,
-		'AtlasUI::handleAllIslands aliased to UI::Atlas::handleAllIslands');
-	is(\&Plugins::Zvuk::AtlasUI::handleStartIslandWave, \&Plugins::Zvuk::UI::Atlas::handleStartIslandWave,
-		'AtlasUI::handleStartIslandWave aliased to UI::Atlas::handleStartIslandWave');
+	ok(Plugins::Zvuk::UI::Atlas->can('handleAtlasMenu'), 'UI::Atlas has handleAtlasMenu');
+	ok(Plugins::Zvuk::UI::Atlas->can('handleAllIslands'), 'UI::Atlas has handleAllIslands');
+	ok(Plugins::Zvuk::UI::Atlas->can('handleStartIslandWave'), 'UI::Atlas has handleStartIslandWave');
 
 	# GigaMix
-	is(\&Plugins::Zvuk::GigaMix::handleGigaMix, \&Plugins::Zvuk::UI::GigaMix::handleGigaMix,
-		'GigaMix::handleGigaMix aliased to UI::GigaMix::handleGigaMix');
-	is(\&Plugins::Zvuk::GigaMix::_renderGigaMixPlaylist, \&Plugins::Zvuk::UI::GigaMix::_renderGigaMixPlaylist,
-		'GigaMix::_renderGigaMixPlaylist aliased to UI::GigaMix::_renderGigaMixPlaylist');
+	ok(Plugins::Zvuk::UI::GigaMix->can('handleGigaMix'), 'UI::GigaMix has handleGigaMix');
+	ok(Plugins::Zvuk::UI::GigaMix->can('_renderGigaMixPlaylist'), 'UI::GigaMix has _renderGigaMixPlaylist');
 
 	# InfoMenu
-	is(\&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu, \&Plugins::Zvuk::UI::InfoMenu::trackInfoMenu,
-		'Browse::InfoMenu::trackInfoMenu aliased to UI::InfoMenu::trackInfoMenu');
-	is(\&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu, \&Plugins::Zvuk::UI::InfoMenu::albumInfoMenu,
-		'Browse::InfoMenu::albumInfoMenu aliased to UI::InfoMenu::albumInfoMenu');
-	is(\&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu, \&Plugins::Zvuk::UI::InfoMenu::artistInfoMenu,
-		'Browse::InfoMenu::artistInfoMenu aliased to UI::InfoMenu::artistInfoMenu');
+	ok(Plugins::Zvuk::UI::InfoMenu->can('trackInfoMenu'), 'UI::InfoMenu has trackInfoMenu');
+	ok(Plugins::Zvuk::UI::InfoMenu->can('albumInfoMenu'), 'UI::InfoMenu has albumInfoMenu');
+	ok(Plugins::Zvuk::UI::InfoMenu->can('artistInfoMenu'), 'UI::InfoMenu has artistInfoMenu');
 };
 
 done_testing();

@@ -25,7 +25,7 @@ unshift @INC, $tmpdir;
 require Plugins::Zvuk::API;
 require Plugins::Zvuk::API::Atlas;
 require Plugins::Zvuk::API::Async;
-require Plugins::Zvuk::AtlasUI;
+require Plugins::Zvuk::UI::Atlas;
 require Plugins::Zvuk::ProtocolHandler;
 require Plugins::Zvuk::Plugin;
 
@@ -331,7 +331,7 @@ if ($wave_json_content) {
 }
 
 # ===================================================================
-# SECTION 2: Multi-client LMS Navigation UI (Plugins::Zvuk::AtlasUI)
+# SECTION 2: Multi-client LMS Navigation UI (Plugins::Zvuk::UI::Atlas)
 # ===================================================================
 
 # Test 2.1: Root menu integration
@@ -340,7 +340,7 @@ if ($wave_json_content) {
 	Plugins::Zvuk::Plugin::_buildRootMenu($client, sub { $root_menu = shift; });
 	ok(ref $root_menu eq 'HASH' && ref $root_menu->{items} eq 'ARRAY', 'T2.1: Root menu built successfully');
 
-	my ($atlas_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleAtlasMenu } @{ $root_menu->{items} };
+	my ($atlas_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::UI::Atlas::handleAtlasMenu } @{ $root_menu->{items} };
 	ok(defined $atlas_item, 'T2.1: Root menu contains Taste Atlas (PLUGIN_ZVUK_ATLAS) menu item');
 	ok(defined $atlas_item->{name} && length($atlas_item->{name}), 'T2.1: Atlas item has localized display name');
 }
@@ -358,19 +358,19 @@ if ($wave_json_content) {
 	{
 		no warnings 'redefine', 'once';
 		local *Slim::Utils::Misc::canFollowWeblinks = sub { return 1; };
-		Plugins::Zvuk::AtlasUI::handleAtlasMenu($client, sub { $atlas_menu = shift; }, {});
+		Plugins::Zvuk::UI::Atlas::handleAtlasMenu($client, sub { $atlas_menu = shift; }, {});
 	}
 
 	ok(ref $atlas_menu eq 'HASH' && ref $atlas_menu->{items} eq 'ARRAY', 'T2.2: handleAtlasMenu returns menu');
 	my @items = @{ $atlas_menu->{items} };
 
-	my ($all_isl) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleAllIslands } @items;
+	my ($all_isl) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::UI::Atlas::handleAllIslands } @items;
 	ok(defined $all_isl, 'T2.2: Menu contains "All Islands" item');
 
-	my ($genres_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleGenresMenu } @items;
+	my ($genres_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::UI::Atlas::handleGenresMenu } @items;
 	ok(defined $genres_item, 'T2.2: Menu contains "By Genre Families" item');
 
-	my ($moods_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleMoodsMenu } @items;
+	my ($moods_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::UI::Atlas::handleMoodsMenu } @items;
 	ok(defined $moods_item, 'T2.2: Menu contains "By Moods" item');
 
 	my ($random_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:random' } @items;
@@ -379,14 +379,14 @@ if ($wave_json_content) {
 
 	# And for button player, it uses CODE ref
 	my $btn_atlas_menu;
-	Plugins::Zvuk::AtlasUI::handleAtlasMenu($client, sub { $btn_atlas_menu = shift; }, { isButton => 1 });
+	Plugins::Zvuk::UI::Atlas::handleAtlasMenu($client, sub { $btn_atlas_menu = shift; }, { isButton => 1 });
 	my ($btn_random_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:random' } @{ $btn_atlas_menu->{items} };
-	ok(ref($btn_random_item->{url}) eq 'CODE' && $btn_random_item->{url} == \&Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave,
+	ok(ref($btn_random_item->{url}) eq 'CODE' && $btn_random_item->{url} == \&Plugins::Zvuk::UI::Atlas::handleStartRandomIslandWave,
 		'T2.2: Random Island uses CODE ref for button player');
 
 	# Test 2.3: All Islands sorting by share / track_count
 	my $all_islands_menu;
-	Plugins::Zvuk::AtlasUI::handleAllIslands($client, sub { $all_islands_menu = shift; }, {});
+	Plugins::Zvuk::UI::Atlas::handleAllIslands($client, sub { $all_islands_menu = shift; }, {});
 	ok(ref $all_islands_menu eq 'HASH', 'T2.3: handleAllIslands returned menu');
 	is(scalar(@{ $all_islands_menu->{items} }), 79, 'T2.3: All 79 islands displayed');
 
@@ -399,7 +399,7 @@ if ($wave_json_content) {
 # Test 2.4: Genre Families grouping (53 genres)
 {
 	my $genres_menu;
-	Plugins::Zvuk::AtlasUI::handleGenresMenu($client, sub { $genres_menu = shift; }, {});
+	Plugins::Zvuk::UI::Atlas::handleGenresMenu($client, sub { $genres_menu = shift; }, {});
 	ok(ref $genres_menu eq 'HASH', 'T2.4: handleGenresMenu returned menu');
 
 	my @genres = @{ $genres_menu->{items} };
@@ -412,7 +412,7 @@ if ($wave_json_content) {
 
 	# Drilldown into Genre: handleGenreIslands
 	my $genre_islands;
-	Plugins::Zvuk::AtlasUI::handleGenreIslands($client, sub { $genre_islands = shift; }, {}, { genre => 'рок' });
+	Plugins::Zvuk::UI::Atlas::handleGenreIslands($client, sub { $genre_islands = shift; }, {}, { genre => 'рок' });
 	is(scalar(@{ $genre_islands->{items} }), 5, 'T2.4: Rock genre contains exactly 5 islands');
 	my ($cold_rock) = grep { $_->{passthrough}[0]{island_id} eq '1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @{ $genre_islands->{items} };
 	ok(defined $cold_rock, 'T2.4: "Холодный рок" island is inside rock genre folder');
@@ -421,7 +421,7 @@ if ($wave_json_content) {
 # Test 2.5: Moods grouping (36 moods)
 {
 	my $moods_menu;
-	Plugins::Zvuk::AtlasUI::handleMoodsMenu($client, sub { $moods_menu = shift; }, {});
+	Plugins::Zvuk::UI::Atlas::handleMoodsMenu($client, sub { $moods_menu = shift; }, {});
 	ok(ref $moods_menu eq 'HASH', 'T2.5: handleMoodsMenu returned menu');
 
 	my @moods = @{ $moods_menu->{items} };
@@ -429,7 +429,7 @@ if ($wave_json_content) {
 
 	# Drilldown into Mood: handleMoodIslands
 	my $mood_islands;
-	Plugins::Zvuk::AtlasUI::handleMoodIslands($client, sub { $mood_islands = shift; }, {}, { mood => 'одиночество' });
+	Plugins::Zvuk::UI::Atlas::handleMoodIslands($client, sub { $mood_islands = shift; }, {}, { mood => 'одиночество' });
 	ok(scalar(@{ $mood_islands->{items} }) >= 1, 'T2.5: Mood drilldown returned islands');
 	my ($lonely_classical) = grep { $_->{passthrough}[0]{island_id} eq 'b97564c8-6b97-5a31-8078-e2dcd7748a27' } @{ $mood_islands->{items} };
 	ok(defined $lonely_classical, 'T2.5: "Одинокая классика" is inside "одиночество" mood folder');
@@ -438,14 +438,14 @@ if ($wave_json_content) {
 # Test 2.6: Island Detail and Track List
 {
 	my $island_detail;
-	Plugins::Zvuk::AtlasUI::handleIslandDetail($client, sub { $island_detail = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	Plugins::Zvuk::UI::Atlas::handleIslandDetail($client, sub { $island_detail = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
 	ok(ref $island_detail eq 'HASH', 'T2.6: handleIslandDetail returned menu');
 	my @detail_items = @{ $island_detail->{items} };
 
 	my ($play_stream_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @detail_items;
 	ok(defined $play_stream_item, 'T2.6: Island detail has "Play Island Wave" item');
 
-	my ($tracks_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::AtlasUI::handleIslandTrackList } @detail_items;
+	my ($tracks_item) = grep { ref($_->{url}) eq 'CODE' && $_->{url} == \&Plugins::Zvuk::UI::Atlas::handleIslandTrackList } @detail_items;
 	ok(defined $tracks_item, 'T2.6: Island detail has "Island Tracks" item');
 
 	# Test track list fetching
@@ -453,7 +453,7 @@ if ($wave_json_content) {
 		{ code => 200, content => $islands_json_content }
 	);
 	my $tracks_menu;
-	Plugins::Zvuk::AtlasUI::handleIslandTrackList($client, sub { $tracks_menu = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	Plugins::Zvuk::UI::Atlas::handleIslandTrackList($client, sub { $tracks_menu = shift; }, {}, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
 	is(scalar(@{ $tracks_menu->{items} }), 50, 'T2.6: handleIslandTrackList returned 50 playable tracks');
 	my $first_track = $tracks_menu->{items}[0];
 	is($first_track->{url}, 'zvuk://47730977', 'T2.6: Track URL format is zvuk://<id>');
@@ -483,13 +483,13 @@ if ($wave_json_content) {
 {
 	# 1. Verify no nextWindow => 'refresh' in menus for button players
 	my $button_all_islands;
-	Plugins::Zvuk::AtlasUI::handleAllIslands($client, sub { $button_all_islands = shift; }, { isButton => 1 });
+	Plugins::Zvuk::UI::Atlas::handleAllIslands($client, sub { $button_all_islands = shift; }, { isButton => 1 });
 	my @refresh_items = grep { ($_->{nextWindow} // '') eq 'refresh' } @{ $button_all_islands->{items} };
 	is(scalar(@refresh_items), 0, 'T2.7: Button player items do NOT contain nextWindow => refresh (prevents mode pop crash)');
 
 	# 2. Island detail on button player uses CODE ref for playback
 	my $button_detail;
-	Plugins::Zvuk::AtlasUI::handleIslandDetail($client, sub { $button_detail = shift; }, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	Plugins::Zvuk::UI::Atlas::handleIslandDetail($client, sub { $button_detail = shift; }, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
 	my ($btn_play_item) = grep { ($_->{play} // '') eq 'zvuk://atlas:1511fc72-2331-59d2-913f-9ce8ed2b04ad' } @{ $button_detail->{items} };
 	ok(ref $btn_play_item->{url} eq 'CODE', 'T2.7: Play stream item uses CODE ref for button player (enables rotary knob click)');
 
@@ -507,7 +507,7 @@ if ($wave_json_content) {
 	local *Slim::Buttons::Common::popMode = sub { return pop @mode_stack; };
 	local *Slim::Buttons::Common::pushModeLeft = sub { my ($c, $m) = @_; push @mode_stack, $m; };
 
-	Plugins::Zvuk::AtlasUI::handleStartIslandWave($client, sub {}, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
+	Plugins::Zvuk::UI::Atlas::handleStartIslandWave($client, sub {}, { isButton => 1 }, { island_id => '1511fc72-2331-59d2-913f-9ce8ed2b04ad' });
 
 	is(scalar(@executed_cmds), 1, 'T2.7: handleStartIslandWave executed 1 command');
 	is($executed_cmds[0][1], 'play', 'T2.7: Command is play');
@@ -517,7 +517,7 @@ if ($wave_json_content) {
 	# 4. Test handleStartRandomIslandWave on button player
 	@executed_cmds = ();
 	@mode_stack = ('xmlbrowser');
-	Plugins::Zvuk::AtlasUI::handleStartRandomIslandWave($client, sub {}, { isButton => 1 });
+	Plugins::Zvuk::UI::Atlas::handleStartRandomIslandWave($client, sub {}, { isButton => 1 });
 	is(scalar(@executed_cmds), 1, 'T2.7: handleStartRandomIslandWave executed command');
 	like($executed_cmds[0][2], qr{^zvuk://atlas:[0-9a-fA-F-]+$}, 'T2.7: Random island played valid zvuk://atlas:<id>');
 }

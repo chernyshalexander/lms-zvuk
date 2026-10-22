@@ -34,7 +34,7 @@ unshift @INC, $tmpdir;
 require Plugins::Zvuk::API;
 require Plugins::Zvuk::API::Async;
 require Plugins::Zvuk::ProtocolHandler;
-require Plugins::Zvuk::GigaMix;
+require Plugins::Zvuk::UI::GigaMix;
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::StreamManager;
 
@@ -282,7 +282,7 @@ subtest 'GigaMix stream lifecycle, auto-extension and clean termination' => sub 
 
 	# B. GigaMix Menu rendering adds "Play GigaMix Stream" item at top
 	my $rendered_menu;
-	Plugins::Zvuk::GigaMix::_renderGigaMixPlaylist($client, sub { $rendered_menu = shift }, {
+	Plugins::Zvuk::UI::GigaMix::_renderGigaMixPlaylist($client, sub { $rendered_menu = shift }, {
 		genId        => 'gen_test_1',
 		playlistName => 'Cyberpunk Beats',
 		cursor       => 'cursor_page_1',

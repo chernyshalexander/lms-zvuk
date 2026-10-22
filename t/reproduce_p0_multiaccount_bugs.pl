@@ -31,7 +31,7 @@ require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::ProtocolHandler;
 require Plugins::Zvuk::Settings;
 require Plugins::Zvuk::WaveSettings;
-require Plugins::Zvuk::WaveUI;
+require Plugins::Zvuk::UI::Wave;
 require Plugins::Zvuk::WebHandlers;
 
 # ---------------------------------------------------------------------
@@ -53,9 +53,9 @@ $Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId} = 'acctA
 # =======================================================================
 note("--- P0.1: account switch must be seen by Wave/streaming ---");
 
-my $api_before = Plugins::Zvuk::WaveUI::_getAPIHandler($client);
+my $api_before = Plugins::Zvuk::UI::Wave::_getAPIHandler($client);
 is($api_before ? $api_before->accountId : undef, 'acctA',
-    "WaveUI::_getAPIHandler resolves acctA before switch");
+    "UI::Wave::_getAPIHandler resolves acctA before switch");
 
 my $ph_api_before = Plugins::Zvuk::ProtocolHandler::_getAPIHandler($client);
 is($ph_api_before ? $ph_api_before->accountId : undef, 'acctA',
@@ -66,9 +66,9 @@ Plugins::Zvuk::Plugin::_switchAccount($client, sub { }, {}, 'acctB');
 is($Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId}, 'acctB',
     "_switchAccount updates the client's userId pref to acctB");
 
-my $api_after = Plugins::Zvuk::WaveUI::_getAPIHandler($client);
+my $api_after = Plugins::Zvuk::UI::Wave::_getAPIHandler($client);
 is($api_after ? $api_after->accountId : undef, 'acctB',
-    "WaveUI::_getAPIHandler resolves acctB after switch (was stale acctA)");
+    "UI::Wave::_getAPIHandler resolves acctB after switch (was stale acctA)");
 
 my $ph_api_after = Plugins::Zvuk::ProtocolHandler::_getAPIHandler($client);
 is($ph_api_after ? $ph_api_after->accountId : undef, 'acctB',

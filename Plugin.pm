@@ -26,11 +26,7 @@ use Plugins::Zvuk::UI::InfoMenu;
 use Plugins::Zvuk::ProtocolHandler;
 use Plugins::Zvuk::Settings;
 use Plugins::Zvuk::WaveSettings;
-use Plugins::Zvuk::GigaMix;
-use Plugins::Zvuk::WaveUI;
 use Plugins::Zvuk::WebHandlers;
-use Plugins::Zvuk::Browse::InfoMenu;
-use Plugins::Zvuk::AtlasUI;
 use Plugins::Zvuk::StreamManager;
 
 my $log = logger('plugin.zvuk');
@@ -57,7 +53,7 @@ sub initPlugin {
 	});
 
 	Plugins::Zvuk::ProtocolHandler->register();
-	Plugins::Zvuk::Browse::InfoMenu->init();
+	Plugins::Zvuk::UI::InfoMenu->init();
 	
 	if (main::WEBUI) {
 		Plugins::Zvuk::Settings->new();
@@ -155,19 +151,19 @@ sub initPlugin {
 		if (eval { Slim::Menu::TrackInfo->can('registerInfoProvider') }) {
 			Slim::Menu::TrackInfo->registerInfoProvider( zvuk => (
 				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu,
+				func  => \&Plugins::Zvuk::UI::InfoMenu::trackInfoMenu,
 			) );
 		}
 		if (eval { Slim::Menu::AlbumInfo->can('registerInfoProvider') }) {
 			Slim::Menu::AlbumInfo->registerInfoProvider( zvuk => (
 				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu,
+				func  => \&Plugins::Zvuk::UI::InfoMenu::albumInfoMenu,
 			) );
 		}
 		if (eval { Slim::Menu::ArtistInfo->can('registerInfoProvider') }) {
 			Slim::Menu::ArtistInfo->registerInfoProvider( zvuk => (
 				before => 'top',
-				func  => \&Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu,
+				func  => \&Plugins::Zvuk::UI::InfoMenu::artistInfoMenu,
 			) );
 		}
 	};
@@ -257,13 +253,13 @@ sub _buildRootMenu {
 			name  => cstring($client, 'PLUGIN_ZVUK_WAVE'),
 			type  => 'link',
 			image => 'plugins/zvuk/html/images/radio.png',
-			items => Plugins::Zvuk::WaveUI::_getWaveMenuItems($client, $args),
+			items => Plugins::Zvuk::UI::Wave::_getWaveMenuItems($client, $args),
 		},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_ATLAS'),
 			type  => 'outline',
 			image => 'plugins/zvuk/html/images/playlists.png',
-			url   => \&Plugins::Zvuk::AtlasUI::handleAtlasMenu,
+			url   => \&Plugins::Zvuk::UI::Atlas::handleAtlasMenu,
 		},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
@@ -294,7 +290,7 @@ sub _buildRootMenu {
 				name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
 				type  => 'link',
 				image => 'plugins/zvuk/html/images/playlists.png',
-				url   => \&Plugins::Zvuk::GigaMix::handleGigaMix,
+				url   => \&Plugins::Zvuk::UI::GigaMix::handleGigaMix,
 			},
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_MY_MUSIC'),

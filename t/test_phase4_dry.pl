@@ -23,8 +23,8 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::UI::Common;
-require Plugins::Zvuk::WaveUI;
-require Plugins::Zvuk::AtlasUI;
+require Plugins::Zvuk::UI::Wave;
+require Plugins::Zvuk::UI::Atlas;
 require Plugins::Zvuk::WebHandlers;
 
 subtest 'Plugins::Zvuk::UI::Common::uiKind' => sub {
@@ -59,9 +59,9 @@ subtest 'Plugins::Zvuk::UI::Common::uiKind' => sub {
 		is(Plugins::Zvuk::UI::Common::uiKind($client, {}), 'jive', 'fallback returns jive');
 	}
 
-	# 6. Backward compatible delegates in WaveUI and AtlasUI
-	is(Plugins::Zvuk::WaveUI::_uiKind($client, { isButton => 1 }), 'player_buttons', 'WaveUI::_uiKind delegates to UI::Common');
-	is(Plugins::Zvuk::AtlasUI::_uiKind($client, { isWeb => 1 }), 'classic_web', 'AtlasUI::_uiKind delegates to UI::Common');
+	# 6. UI::Wave and UI::Atlas delegate _uiKind to UI::Common
+	is(Plugins::Zvuk::UI::Wave::_uiKind($client, { isButton => 1 }), 'player_buttons', 'UI::Wave::_uiKind delegates to UI::Common');
+	is(Plugins::Zvuk::UI::Atlas::_uiKind($client, { isWeb => 1 }), 'classic_web', 'UI::Atlas::_uiKind delegates to UI::Common');
 };
 
 subtest 'Plugins::Zvuk::UI::Common::popVfdMode' => sub {

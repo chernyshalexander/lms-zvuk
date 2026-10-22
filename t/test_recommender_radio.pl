@@ -18,7 +18,7 @@ unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
 require Plugins::Zvuk::ProtocolHandler;
-require Plugins::Zvuk::Browse::InfoMenu;
+require Plugins::Zvuk::UI::InfoMenu;
 require Plugins::Zvuk::API::Async;
 
 # Set up test prefs and client
@@ -188,7 +188,7 @@ is($client->pluginData('zvuk_radio_cursor'), undef, 'T5: cursor reset to undef')
 # -------------------------------------------------------------------
 # Test 6: Browse/InfoMenu.pm trackInfoMenu and artistInfoMenu
 # -------------------------------------------------------------------
-my $track_menu = Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu(
+my $track_menu = Plugins::Zvuk::UI::InfoMenu::trackInfoMenu(
 	$client,
 	'zvuk://101',
 	undef,
@@ -223,7 +223,7 @@ Plugins::Zvuk::API->cacheTrackMetadata([
 		release  => { id => 777, title => 'Cached Album' },
 	}
 ]);
-my $cached_track_menu = Plugins::Zvuk::Browse::InfoMenu::trackInfoMenu(
+my $cached_track_menu = Plugins::Zvuk::UI::InfoMenu::trackInfoMenu(
 	$client,
 	'zvuk://999',
 	undef,
@@ -236,7 +236,7 @@ is($c_items->[1]{url}, 'zvuk://radio:artist:888', 'T6c: Artist Radio from cache'
 is($c_items->[2]{url}, 'zvuk://radio:release:777', 'T6c: Album Radio from cache');
 
 # Test artistInfoMenu
-my $artist_menu = Plugins::Zvuk::Browse::InfoMenu::artistInfoMenu(
+my $artist_menu = Plugins::Zvuk::UI::InfoMenu::artistInfoMenu(
 	$client,
 	'zvuk://artist:201',
 	undef,

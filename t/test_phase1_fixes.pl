@@ -23,7 +23,7 @@ require Plugins::Zvuk::API;
 require Plugins::Zvuk::API::Async;
 require Plugins::Zvuk::WebHandlers;
 require Plugins::Zvuk::ProtocolHandler;
-require Plugins::Zvuk::GigaMix;
+require Plugins::Zvuk::UI::GigaMix;
 
 # =========================================================================
 # 1. WebHandlers::handleImageProxy Security & Allowlist
@@ -238,7 +238,7 @@ subtest 'GigaMix menu rendering does not activate stream' => sub {
     $client->pluginData('zvuk_gigamix_cursor', undef);
     $client->pluginData('zvuk_gigamix_prompt', undef);
 
-    my $renderPlaylist = \&Plugins::Zvuk::GigaMix::_renderGigaMixPlaylist;
+    my $renderPlaylist = \&Plugins::Zvuk::UI::GigaMix::_renderGigaMixPlaylist;
     my $result_menu;
 
     $renderPlaylist->($client, sub { $result_menu = shift }, {

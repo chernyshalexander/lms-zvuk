@@ -17,7 +17,7 @@ symlink($repo_root, "$tmpdir/Plugins/Zvuk") or die "symlink: $!";
 unshift @INC, $tmpdir;
 
 require Plugins::Zvuk::Plugin;
-require Plugins::Zvuk::Browse::InfoMenu;
+require Plugins::Zvuk::UI::InfoMenu;
 require Plugins::Zvuk::API::Async;
 
 # Test 1: _renderRelease structure
@@ -44,7 +44,7 @@ my $client = Test::FakeClient->new(id => 'player1');
 	$Slim::Utils::Prefs::CLIENT_STORE{'plugin.zvuk'}{ $client->id }{userId} = 'acctA';
 }
 
-my $menu = Plugins::Zvuk::Browse::InfoMenu::albumInfoMenu($client, 'zvuk://album:12345', undef, { album => 'Test Album' });
+my $menu = Plugins::Zvuk::UI::InfoMenu::albumInfoMenu($client, 'zvuk://album:12345', undef, { album => 'Test Album' });
 
 ok($menu, 'albumInfoMenu returned a menu');
 my $items = $menu->{items};

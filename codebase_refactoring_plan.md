@@ -154,16 +154,18 @@ Branch: `experiment`
   - `UI/GigaMix.pm` -> `Plugins::Zvuk::UI::GigaMix`
   - `UI/InfoMenu.pm` -> `Plugins::Zvuk::UI::InfoMenu` (consolidated from `Browse/InfoMenu.pm`)
   - `UI/Common.pm` -> `Plugins::Zvuk::UI::Common`
-- **100% Coderef-Preserving Shims**:
-  - Root files (`WaveUI.pm`, `AtlasUI.pm`, `GigaMix.pm`, `Browse/InfoMenu.pm`) act as thin symbol-table aliasing shims (`*func = \&NewPackage::func`).
-  - Ensures exact coderef equality tests (`$item->{url} == \&Plugins::Zvuk::AtlasUI::handleAtlasMenu`) pass 100% without breaking any third-party plugins, LMS bookmarks, or existing test suites.
+- **Direct UI Namespace Migration & Shims Removal**:
+  - `Plugin.pm` migrated all remaining direct references to `Plugins::Zvuk::UI::*`.
+  - All test suites under `t/` updated to require and call `Plugins::Zvuk::UI::*` directly.
+  - Obsolete root shims (`WaveUI.pm`, `AtlasUI.pm`, `GigaMix.pm`, `Browse/InfoMenu.pm`) and legacy `Browse/` directory removed.
 
 ### 4. Verification Record
 - Created `t/test_phase5_namespaces.pl` and symlink `t/test_phase5_namespaces.t`:
   - Verified `Plugins::Zvuk::Session` account creation, retrieval, token access, player binding, and stale account auto-healing.
   - Verified `Plugins::Zvuk::API` delegation and unified `getClient` facade.
-  - Verified exact symbol aliasing between legacy shims and `UI::*` modules across Wave, Atlas, GigaMix, and InfoMenu.
+  - Verified `Plugins::Zvuk::UI::{Wave, Atlas, GigaMix, InfoMenu}` function definitions and registration.
 - Complete Test Suite: **23 test files, 551 tests, 100% PASS** via `prove -I. -It t/`.
 - Strict Perl 5.14+ compatibility maintained across all new and refactored modules.
+
 
 
