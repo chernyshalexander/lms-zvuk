@@ -13,7 +13,7 @@ Branch: `experiment`
 | **Phase 2** | Test Harness Normalization: normalize test suite to `Test::More` and enable `prove` test runner | ✅ Completed | `e5dd90c` |
 | **Phase 3** | StreamManager & Stream Lifecycle Unification: unified atomic state, race condition prevention, external album change isolation, GigaMix stream launching & clean completion | ✅ Completed | `5a2bef6` |
 | **Phase 4** | Code Duplication Elimination (DRY in WebHandlers/UI): `_sendJsonResponse`, external OAuth template, wave settings unification, `UI::Common` | ✅ Completed | `9fa206f` |
-| **Phase 5** | Namespace Reorganization: `Session.pm` extraction, `API.pm` facade, UI/ relocation | ✅ Completed | Phase 5 implementation |
+| **Phase 5** | Namespace Reorganization: `Session.pm` extraction, `API.pm` facade, UI/ relocation | ✅ Completed | `8bfd58d` |
 
 ---
 
