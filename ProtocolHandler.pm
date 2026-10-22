@@ -15,6 +15,7 @@ use Time::HiRes qw(time);
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
 use Plugins::Zvuk::WaveSettings;
+use Plugins::Zvuk::StreamManager;
 
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
@@ -62,56 +63,8 @@ sub getNextTrack {
 	my $client = $song->master();
 	$log->info("Resolving Zvuk stream for track ID: $id");
 
-	# auto-load next batch of wave tracks when approaching end of queue
 	if ($client) {
-		my $is_wave = $client->pluginData('zvuk_wave_active');
-		if ($is_wave) {
-			my $playlist_size = Slim::Player::Playlist::count($client);
-			my $current_index = Slim::Player::Source::playingSongIndex($client);
-			if (defined $playlist_size && defined $current_index
-					&& ($playlist_size - $current_index) <= 2) {
-				_loadMoreWaveTracks($client);
-			}
-		}
-	}
-
-	# auto-load next batch of GigaMix tracks when approaching end of queue if autoplay enabled
-	if ($client && $prefs->get('gigamix_autoplay')) {
-		my $is_gigamix = $client->pluginData('zvuk_gigamix_active');
-		if ($is_gigamix) {
-			my $playlist_size = Slim::Player::Playlist::count($client);
-			my $current_index = Slim::Player::Source::playingSongIndex($client);
-			if (defined $playlist_size && defined $current_index
-					&& ($playlist_size - $current_index) <= 2) {
-				_loadMoreGigaMixTracks($client);
-			}
-		}
-	}
-
-	# auto-load next batch of radio tracks when approaching end of queue
-	if ($client) {
-		my $is_radio = $client->pluginData('zvuk_radio_active');
-		if ($is_radio) {
-			my $playlist_size = Slim::Player::Playlist::count($client);
-			my $current_index = Slim::Player::Source::playingSongIndex($client);
-			if (defined $playlist_size && defined $current_index
-					&& ($playlist_size - $current_index) <= 2) {
-				_loadMoreRadioTracks($client);
-			}
-		}
-	}
-
-	# auto-load next batch of atlas tracks when approaching end of queue
-	if ($client) {
-		my $is_atlas = $client->pluginData('zvuk_atlas_active');
-		if ($is_atlas) {
-			my $playlist_size = Slim::Player::Playlist::count($client);
-			my $current_index = Slim::Player::Source::playingSongIndex($client);
-			if (defined $playlist_size && defined $current_index
-					&& ($playlist_size - $current_index) <= 2) {
-				_loadMoreAtlasTracks($client);
-			}
-		}
+		Plugins::Zvuk::StreamManager->checkAndExtendQueue($client);
 	}
 
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
@@ -211,7 +164,7 @@ sub getNextTrack {
 sub getMetadataFor {
 	my ($class, $client, $url) = @_;
 
-	return {} if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas):} || $url eq 'zvuk://wave';
+	return {} if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas|gigamix):} || $url eq 'zvuk://wave';
 
 	my $id = _parseZvukId($url);
 	return {} unless $id;
@@ -279,7 +232,7 @@ sub getHeaders {
 
 sub getFormatForURL {
 	my ($class, $url) = @_;
-	return if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas):} || $url eq 'zvuk://wave';
+	return if $url =~ m{^zvuk://(?:album|playlist|artist|radio|atlas|gigamix):} || $url eq 'zvuk://wave';
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 	return $prefQuality eq 'flac' ? 'flc' : 'mp3';
 }
@@ -320,6 +273,15 @@ sub explodePlaylist {
 		return _explodeRadio($client, $entity_type, $entity_id, $cb);
 	}
 
+	# Handle GigaMix Stream
+	if ($url =~ m{^zvuk://gigamix:(.*)}) {
+		my $escaped_prompt = $1;
+		require URI::Escape;
+		my $prompt = URI::Escape::uri_unescape($escaped_prompt);
+		utf8::decode($prompt);
+		return _explodeGigaMix($client, $prompt, $cb);
+	}
+
 	my ($type, $id) = $url =~ m{zvuk://(\w+)(?::(\d+))?};
 	return $cb->([$url]) unless $type;
 
@@ -329,6 +291,9 @@ sub explodePlaylist {
 	}
 
 	return $cb->([$url]) unless $id;
+
+	# Non-stream containers: reset active stream state so stream tracks never leak into ordinary albums
+	Plugins::Zvuk::StreamManager->stopStream($client);
 
 	my %dispatch = (
 		album    => 'Plugins::Zvuk::Plugin::handleAlbum',
@@ -357,18 +322,22 @@ sub _explodeWave {
 
 	# Get current account ID
 	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
+	unless ($api) {
+		$log->error("No API handler available for client");
+		Plugins::Zvuk::StreamManager->stopStream($client);
+		return $cb->([]);
+	}
+
+	my $account_id = $api->can('accountId') ? $api->accountId() : 'default';
 
 	# Load wave settings for this account
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 
-	# Store in pluginData for later use
-	$client->pluginData(zvuk_wave_settings => $wave_settings) if $client;
+	Plugins::Zvuk::StreamManager->startStream($client, 'wave', {
+		settings => $wave_settings,
+	});
 
-	$client->pluginData(zvuk_wave_active => 1) if $client;
-	$client->pluginData(zvuk_wave_last_track => undef) if $client;
-
-	_getAPIHandler($client)->getPersonalWave(sub {
+	$api->getPersonalWave(sub {
 		my $items = shift || [];
 		return unless $items && @$items;
 
@@ -388,17 +357,19 @@ sub _explodeRadio {
 
 	$log->info("Starting Recommender Radio for $type $id");
 
-	if ($client) {
-		$client->pluginData(zvuk_wave_active => 0);
-		$client->pluginData(zvuk_gigamix_active => 0);
-		$client->pluginData(zvuk_radio_active => 1);
-		$client->pluginData(zvuk_radio_entity_id => $id);
-		$client->pluginData(zvuk_radio_entity_type => $type);
-		$client->pluginData(zvuk_radio_cursor => 0);
-		$client->pluginData(zvuk_radio_loading => 0);
-	}
+	Plugins::Zvuk::StreamManager->startStream($client, 'radio', {
+		id     => $id,
+		type   => $type,
+		cursor => 0,
+	});
 
 	my $api = _getAPIHandler($client);
+	unless ($api) {
+		$log->error("No API handler available for client");
+		Plugins::Zvuk::StreamManager->stopStream($client);
+		return $cb->([]);
+	}
+
 	$api->getRecommenderRadio(sub {
 		my $res = shift || {};
 		my $tracks = $res->{tracks} || [];
@@ -406,10 +377,11 @@ sub _explodeRadio {
 
 		if (!@$tracks) {
 			$log->warn("No tracks returned for radio $type $id");
-			$client->pluginData(zvuk_radio_active => 0) if $client;
+			Plugins::Zvuk::StreamManager->stopStream($client);
 			return $cb->([]);
 		}
 
+		Plugins::Zvuk::StreamManager->updateContext($client, { cursor => $cursor });
 		$client->pluginData(zvuk_radio_cursor => $cursor) if $client && defined $cursor;
 		$log->info("Got " . scalar(@$tracks) . " radio tracks, cursor: " . ($cursor // 'none'));
 		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
@@ -424,20 +396,15 @@ sub _explodeAtlas {
 
 	$log->info("Starting Atlas Island Wave for island $island_id");
 
-	if ($client) {
-		$client->pluginData(zvuk_wave_active     => 0);
-		$client->pluginData(zvuk_gigamix_active  => 0);
-		$client->pluginData(zvuk_radio_active    => 0);
-		$client->pluginData(zvuk_atlas_active    => 1);
-		$client->pluginData(zvuk_atlas_island_id => $island_id);
-		$client->pluginData(zvuk_atlas_cursor    => undef);
-		$client->pluginData(zvuk_atlas_loading   => 0);
-	}
+	Plugins::Zvuk::StreamManager->startStream($client, 'atlas', {
+		island_id => $island_id,
+		cursor    => undef,
+	});
 
 	my $api = _getAPIHandler($client);
 	unless ($api) {
 		$log->error("No API handler available for client");
-		$client->pluginData(zvuk_atlas_active => 0) if $client;
+		Plugins::Zvuk::StreamManager->stopStream($client);
 		return $cb->([]);
 	}
 
@@ -449,10 +416,11 @@ sub _explodeAtlas {
 
 			if (!@$tracks) {
 				$log->warn("No tracks returned for atlas island wave $island_id: " . ($err || 'empty'));
-				$client->pluginData(zvuk_atlas_active => 0) if $client;
+				Plugins::Zvuk::StreamManager->stopStream($client);
 				return $cb->([]);
 			}
 
+			Plugins::Zvuk::StreamManager->updateContext($client, { cursor => $cursor });
 			$client->pluginData(zvuk_atlas_cursor => $cursor) if $client && defined $cursor;
 			$log->info("Got " . scalar(@$tracks) . " atlas wave tracks, cursor: " . ($cursor // 'none'));
 
@@ -477,6 +445,52 @@ sub _explodeAtlas {
 	}
 }
 
+sub _explodeGigaMix {
+	my ($client, $prompt, $cb) = @_;
+
+	$log->info("Starting GigaMix Stream for prompt: $prompt");
+
+	Plugins::Zvuk::StreamManager->startStream($client, 'gigamix', {
+		prompt    => $prompt,
+		cursor    => undef,
+		is_stream => 1,
+	});
+
+	my $api = _getAPIHandler($client);
+	unless ($api) {
+		$log->error("No API handler available for client");
+		Plugins::Zvuk::StreamManager->stopStream($client);
+		return $cb->([]);
+	}
+
+	$api->getGenerativePlaylist(sub {
+		my $result = shift || {};
+		my $tracks = $result->{tracks} || [];
+		my $cursor = $result->{cursor};
+
+		if ($result->{error}) {
+			$log->error("GigaMix stream failed: $result->{error}");
+			Plugins::Zvuk::StreamManager->stopStream($client);
+			return $cb->([]);
+		}
+
+		if (!@$tracks) {
+			$log->warn("No tracks returned for GigaMix stream '$prompt'");
+			Plugins::Zvuk::StreamManager->stopStream($client);
+			return $cb->([]);
+		}
+
+		Plugins::Zvuk::StreamManager->updateContext($client, { cursor => $cursor });
+		$client->pluginData(zvuk_gigamix_cursor => $cursor) if $client;
+
+		$log->info("Got " . scalar(@$tracks) . " GigaMix tracks, cursor: " . ($cursor // 'none'));
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		my @urls = map { 'zvuk://' . $_->{id} } @$tracks;
+		$cb->(\@urls);
+	}, { queryText => $prompt });
+}
+
 sub isRemote { 1 }
 
 sub getIcon {
@@ -486,205 +500,22 @@ sub getIcon {
 
 sub _loadMoreWaveTracks {
 	my ($client) = @_;
-	return unless $client;
-
-	my $content_input;
-	my $last = $client->pluginData('zvuk_wave_last_track');
-	if ($last && $last->{id}) {
-		my $elapsed       = time() - ($last->{started} || time());
-		my $play_duration = ($last->{duration} && $elapsed > $last->{duration}) ? $last->{duration} : $elapsed;
-		my $is_skipped    = ($last->{duration} && $play_duration < ($last->{duration} * 0.5)) ? \1 : \0;
-
-		$content_input = {
-			trackId       => $last->{id},
-			trackDuration => int($last->{duration} || 0),
-			playDuration  => int($play_duration),
-			isSkipped     => $is_skipped,
-		};
-	}
-
-	# Load stored wave settings (or use defaults)
-	my $wave_settings = $client->pluginData('zvuk_wave_settings');
-	my $api = _getAPIHandler($client);
-	my $account_id = $api && $api->can('accountId') ? $api->accountId() : 'default';
-	$wave_settings ||= Plugins::Zvuk::WaveSettings::loadSettings($account_id);
-
-	_getAPIHandler($client)->getPersonalWave(sub {
-		my $items = shift || [];
-		return unless $items && @$items;
-
-		$log->info("automatically loaded " . scalar(@$items) . " more tracks");
-		Plugins::Zvuk::API->cacheTrackMetadata($items);
-
-		for my $track (@$items) {
-			Slim::Control::Request::executeRequest(
-				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
-			);
-		}
-	}, $wave_settings, $content_input);
+	Plugins::Zvuk::StreamManager->extendQueue($client, 'wave');
 }
 
 sub _loadMoreGigaMixTracks {
 	my ($client) = @_;
-	return unless $client;
-
-	my $cursor = $client->pluginData('zvuk_gigamix_cursor');
-	my $prompt = $client->pluginData('zvuk_gigamix_prompt');
-	return unless $cursor && $prompt;
-
-	my $api = _getAPIHandler($client);
-	return unless $api;
-
-	$api->getGenerativePlaylistPage(sub {
-		my $result = shift || {};
-
-		if ($result->{error}) {
-			$log->error("GigaMix autoplay: failed to load more tracks: $result->{error}");
-
-			# Clear GigaMix context on error
-			$client->pluginData('zvuk_gigamix_active', 0);
-
-			# Show notification to user about the error
-			Slim::Control::Request::notifyFromArray($client, [
-				'notify', 'GigaMix autoplay error: ' . $result->{error}
-			]);
-			return;
-		}
-
-		my $tracks = $result->{tracks} || [];
-		unless (@$tracks) {
-			$log->info("GigaMix autoplay: no more tracks available");
-
-			# Clear GigaMix context when no more tracks are available
-			$client->pluginData('zvuk_gigamix_active', 0);
-
-			# Notify user that GigaMix has ended
-			Slim::Control::Request::notifyFromArray($client, [
-				'notify', 'GigaMix playlist complete - no more tracks available'
-			]);
-			return;
-		}
-
-		# Add tracks to playlist
-		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-
-		foreach my $track (@$tracks) {
-			Slim::Control::Request::executeRequest(
-				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
-			);
-		}
-
-		# Update cursor for next auto-extend
-		if ($result->{cursor}) {
-			$client->pluginData('zvuk_gigamix_cursor', $result->{cursor});
-		}
-
-		$log->info("GigaMix: auto-extended playlist with " . scalar(@$tracks) . " tracks");
-	}, { cursor => $cursor, limit => 5 });
+	Plugins::Zvuk::StreamManager->extendQueue($client, 'gigamix');
 }
 
 sub _loadMoreRadioTracks {
 	my ($client) = @_;
-	return unless $client;
-
-	if ($client->pluginData('zvuk_radio_loading')) {
-		$log->debug("Radio batch already loading, skipping duplicate request");
-		return;
-	}
-
-	my $id     = $client->pluginData('zvuk_radio_entity_id');
-	my $type   = $client->pluginData('zvuk_radio_entity_type');
-	my $cursor = $client->pluginData('zvuk_radio_cursor') // 0;
-	return unless defined $id && defined $type;
-
-	my $api = _getAPIHandler($client);
-	return unless $api;
-
-	$client->pluginData(zvuk_radio_loading => 1);
-	$log->info("Auto-loading more radio tracks for $type $id at cursor $cursor");
-
-	$api->getRecommenderRadio(sub {
-		my $res = shift || {};
-		$client->pluginData(zvuk_radio_loading => 0) if $client;
-
-		if ($res->{error}) {
-			$log->error("Radio auto-load failed: $res->{error}");
-			$client->pluginData(zvuk_radio_active => 0) if $client;
-			return;
-		}
-
-		my $tracks = $res->{tracks} || [];
-		unless (@$tracks) {
-			$log->info("Radio complete: no more tracks available from Zvuk");
-			$client->pluginData(zvuk_radio_active => 0) if $client;
-			return;
-		}
-
-		my $new_cursor = $res->{cursor};
-		$client->pluginData(zvuk_radio_cursor => $new_cursor) if $client && defined $new_cursor;
-
-		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-		$log->info("Radio: auto-extended playlist with " . scalar(@$tracks) . " tracks, next cursor: " . ($new_cursor // 'none'));
-
-		for my $track (@$tracks) {
-			Slim::Control::Request::executeRequest(
-				$client, ['playlist', 'add', 'zvuk://' . $track->{id}]
-			);
-		}
-	}, $id, $type, 3, $cursor);
+	Plugins::Zvuk::StreamManager->extendQueue($client, 'radio');
 }
 
 sub _loadMoreAtlasTracks {
 	my ($client) = @_;
-	return unless $client;
-
-	if ($client->pluginData('zvuk_atlas_loading')) {
-		$log->debug("Atlas batch already loading, skipping duplicate request");
-		return;
-	}
-
-	my $island_id = $client->pluginData('zvuk_atlas_island_id');
-	my $cursor    = $client->pluginData('zvuk_atlas_cursor');
-	return unless defined $island_id;
-
-	my $api = _getAPIHandler($client);
-	return unless $api;
-
-	$client->pluginData(zvuk_atlas_loading => 1);
-	$log->info("Auto-loading more atlas tracks for island $island_id at cursor " . ($cursor // 'none'));
-
-	$api->getAtlasIslandWave(sub {
-		my ($res, $err) = @_;
-		$client->pluginData(zvuk_atlas_loading => 0) if $client;
-
-		if ($err || !$res) {
-			$log->error("Atlas auto-load failed: " . ($err || 'no response'));
-			$client->pluginData(zvuk_atlas_active => 0) if $client;
-			return;
-		}
-
-		my $tracks = ($res && ref $res eq 'HASH' && $res->{tracks}) ? $res->{tracks} : [];
-		unless (@$tracks) {
-			$log->info("Atlas wave complete: no more tracks available from Zvuk");
-			$client->pluginData(zvuk_atlas_active => 0) if $client;
-			return;
-		}
-
-		my $new_cursor = $res->{next_cursor};
-		$client->pluginData(zvuk_atlas_cursor => $new_cursor) if $client;
-
-		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-		$log->info("Atlas: auto-extended playlist with " . scalar(@$tracks) . " tracks, next cursor: " . ($new_cursor // 'none'));
-
-		for my $track (@$tracks) {
-			next unless $track && ref $track eq 'HASH';
-			my $tid = $track->{id} || $track->{track_id};
-			next unless $tid;
-			Slim::Control::Request::executeRequest(
-				$client, ['playlist', 'add', 'zvuk://' . $tid]
-			);
-		}
-	}, $island_id, 3, $cursor);
+	Plugins::Zvuk::StreamManager->extendQueue($client, 'atlas');
 }
 
 sub _getAPIHandler {

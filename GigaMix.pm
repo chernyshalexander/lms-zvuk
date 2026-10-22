@@ -6,6 +6,7 @@ use utf8;
 
 use Slim::Utils::Log;
 use Slim::Utils::Strings qw(cstring);
+use URI::Escape qw(uri_escape_utf8);
 
 my $log = logger('plugin.zvuk');
 
@@ -100,9 +101,14 @@ sub handleGigaMixAddMore {
 
 		# Save GigaMix context for autoplay at end of playlist
 		if ($newCursor) {
-			$client->pluginData('zvuk_gigamix_active', 1);
-			$client->pluginData('zvuk_gigamix_cursor', $newCursor);
-			$client->pluginData('zvuk_gigamix_prompt', $prompt);
+			require Plugins::Zvuk::StreamManager;
+			Plugins::Zvuk::StreamManager->startStream($client, 'gigamix', {
+				cursor => $newCursor,
+				prompt => $prompt,
+			});
+		} else {
+			require Plugins::Zvuk::StreamManager;
+			Plugins::Zvuk::StreamManager->stopStream($client);
 		}
 
 		$log->info("GigaMix: successfully added " . scalar(@$newTracks) . " tracks to playlist");
@@ -187,6 +193,15 @@ sub _renderGigaMixPlaylist {
 	}
 
 	my @items;
+
+	my $escaped_prompt = uri_escape_utf8($prompt // '');
+	push @items, {
+		name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_PLAY_STREAM'),
+		line1 => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_PLAY_STREAM'),
+		type  => 'audio',
+		url   => "zvuk://gigamix:$escaped_prompt",
+		play  => "zvuk://gigamix:$escaped_prompt",
+	};
 
 	push @items, map { Plugins::Zvuk::Plugin::_renderTrack($_, 1) } @$tracks;
 

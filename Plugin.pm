@@ -25,6 +25,7 @@ use Plugins::Zvuk::WaveUI;
 use Plugins::Zvuk::WebHandlers;
 use Plugins::Zvuk::Browse::InfoMenu;
 use Plugins::Zvuk::AtlasUI;
+use Plugins::Zvuk::StreamManager;
 
 my $log = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
@@ -172,25 +173,7 @@ sub initPlugin {
 
 sub _onStop {
 	my ($request) = @_;
-	my $client = $request->client();
-	return unless $client;
-
-	my $action = $request->getRequest(0);
-	if ($action eq 'stop' || ($action eq 'playlist' && $request->getRequest(1) eq 'clear')) {
-		$client->pluginData(zvuk_wave_active => 0);
-		$client->pluginData(zvuk_gigamix_active => 0);
-		$client->pluginData(zvuk_radio_active => 0);
-		$client->pluginData(zvuk_radio_entity_id => undef);
-		$client->pluginData(zvuk_radio_entity_type => undef);
-		$client->pluginData(zvuk_radio_cursor => undef);
-		$client->pluginData(zvuk_radio_loading => 0);
-		$client->pluginData(zvuk_atlas_active => 0);
-		$client->pluginData(zvuk_atlas_island_id => undef);
-		$client->pluginData(zvuk_atlas_cursor => undef);
-		$client->pluginData(zvuk_atlas_loading => 0);
-		$client->pluginData(zvuk_wave_last_track => undef);
-		$log->debug("Cleared zvuk_wave_active, zvuk_gigamix_active, zvuk_radio_active, zvuk_atlas_active and zvuk_wave_last_track flags");
-	}
+	Plugins::Zvuk::StreamManager->onPlaylistChange($request);
 }
 
 sub _clear_api_client {

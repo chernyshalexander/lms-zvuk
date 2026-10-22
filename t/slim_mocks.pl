@@ -251,7 +251,8 @@ sub clients   { return values %CLIENTS; }
 $INC{'Slim/Player/Client.pm'} = 1;
 
 package Slim::Player::Playlist;
-sub count { return 10; }
+our $MOCK_COUNT = 10;
+sub count { return defined $MOCK_COUNT ? $MOCK_COUNT : 10; }
 $INC{'Slim/Player/Playlist.pm'} = 1;
 
 package Slim::Player::ProtocolHandlers;
@@ -268,7 +269,8 @@ sub handlerForURL {
 $INC{'Slim/Player/ProtocolHandlers.pm'} = 1;
 
 package Slim::Player::Source;
-sub playingSongIndex { return 1; }
+our $MOCK_PLAYING_INDEX = 1;
+sub playingSongIndex { return defined $MOCK_PLAYING_INDEX ? $MOCK_PLAYING_INDEX : 1; }
 $INC{'Slim/Player/Source.pm'} = 1;
 
 package Slim::Music::Info;
@@ -278,9 +280,14 @@ $INC{'Slim/Music/Info.pm'} = 1;
 
 package Slim::Control::Request;
 our @EXECUTED_REQUESTS;
+our @NOTIFICATIONS;
 sub executeRequest {
     my ($client, $cmd) = @_;
     push @EXECUTED_REQUESTS, { client => $client, cmd => $cmd };
+}
+sub notifyFromArray {
+    my ($client, $args) = @_;
+    push @NOTIFICATIONS, { client => $client, args => $args };
 }
 sub addDispatch { }
 sub subscribe   { }
