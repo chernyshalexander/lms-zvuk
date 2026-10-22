@@ -47,82 +47,38 @@ use constant USER_AGENT =>
 # --- Image resolutions ---
 use constant IMAGE_SIZE => '500x500';
 
+use Plugins::Zvuk::Session;
+
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
 
-# Return userId of the active or default configured account
-sub getSomeUserId {
-    my $accounts = $prefs->get('accounts');
-    return unless ref $accounts eq 'HASH' && keys %$accounts;
+# --- Session & Multi-Account Management (delegated to Plugins::Zvuk::Session) ---
 
-    my $defaultUserId = $prefs->get('defaultUserId');
-    if (defined $defaultUserId && length($defaultUserId) && $accounts->{$defaultUserId} && $accounts->{$defaultUserId}{token}) {
-        return $defaultUserId;
-    }
+sub getSomeUserId      { shift; Plugins::Zvuk::Session->getSomeUserId(@_) }
+sub getUserdata        { shift; Plugins::Zvuk::Session->getUserdata(@_) }
+sub getToken           { shift; Plugins::Zvuk::Session->getToken(@_) }
+sub extractAccountName { shift; Plugins::Zvuk::Session->extractAccountName(@_) }
+sub getUserIdForClient { shift; Plugins::Zvuk::Session->getUserIdForClient(@_) }
+sub hasAccounts        { shift; Plugins::Zvuk::Session->hasAccounts(@_) }
+sub getAccounts        { shift; Plugins::Zvuk::Session->getAccounts(@_) }
+sub saveAccount        { shift; Plugins::Zvuk::Session->saveAccount(@_) }
+sub deleteAccount      { shift; Plugins::Zvuk::Session->deleteAccount(@_) }
 
-    # Otherwise return the first account with a valid token
-    foreach my $id (sort keys %$accounts) {
-        if ($accounts->{$id} && $accounts->{$id}{token}) {
-            return $id;
-        }
-    }
-    return;
-}
+# --- Unified API Client Facade ---
 
-# Return account data for a given userId
-sub getUserdata {
-    my ($class, $userId);
-    if (@_ <= 1) {
-        $class = __PACKAGE__;
-        $userId = $_[0] if @_ == 1 && $_[0] ne __PACKAGE__;
-    } else {
-        ($class, $userId) = @_;
-    }
-    $userId ||= Plugins::Zvuk::API->getSomeUserId();
-    return unless defined $userId && length($userId);
-    my $accounts = $prefs->get('accounts') || return;
-    return unless ref $accounts eq 'HASH';
-    return $accounts->{$userId};
-}
+# Returns unified async API client for a client player or userId
+sub getClient {
+	my ($class, $client_or_userId) = @_;
+	my $userId;
+	if (ref $client_or_userId) {
+		$userId = Plugins::Zvuk::Session->getUserIdForClient($client_or_userId);
+	} else {
+		$userId = $client_or_userId || Plugins::Zvuk::Session->getSomeUserId();
+	}
+	return unless defined $userId && length($userId);
 
-# Return the token for a given userId
-sub getToken {
-    my ($class, $userId);
-    if (@_ <= 1) {
-        $class = __PACKAGE__;
-        $userId = $_[0] if @_ == 1 && $_[0] ne __PACKAGE__;
-    } else {
-        ($class, $userId) = @_;
-    }
-    $userId ||= Plugins::Zvuk::API->getSomeUserId();
-    return unless defined $userId && length($userId);
-    my $data = Plugins::Zvuk::API->getUserdata($userId);
-    return unless $data;
-    return $data->{token};
-}
-
-# Extract human-readable account display name from profile object
-sub extractAccountName {
-    my ($class, $profile, $userId) = @_;
-    my $accountName = "Account " . ($userId || '');
-
-    if ($profile && ref($profile) eq 'HASH') {
-        if ($profile->{external_profile} && ref($profile->{external_profile}) eq 'HASH') {
-            my $extProf = $profile->{external_profile};
-            my @nameParts;
-            push @nameParts, $extProf->{first_name} if $extProf->{first_name};
-            push @nameParts, $extProf->{middle_name} if $extProf->{middle_name};
-            push @nameParts, $extProf->{last_name} if $extProf->{last_name};
-            $accountName = join(' ', @nameParts) if @nameParts;
-        }
-        elsif ($profile->{name}) {
-            $accountName = $profile->{name};
-        }
-        elsif ($profile->{username}) {
-            $accountName = $profile->{username};
-        }
-    }
-    return $accountName;
+	require Plugins::Zvuk::API::Async;
+	return Plugins::Zvuk::API::Async->new({ userId => $userId });
 }
 
 # Return the configured quality preference

@@ -12,8 +12,8 @@ Branch: `experiment`
 | **Phase 1** | Hygiene, Security & Cleanup: security allowlist for image proxy, disable flacdrm, fix clearClient & GigaMix menu, clean dead code, add PLUGIN_ZVUK_ARTISTS, track tests in git | ✅ Completed | `ed79d9b` |
 | **Phase 2** | Test Harness Normalization: normalize test suite to `Test::More` and enable `prove` test runner | ✅ Completed | `e5dd90c` |
 | **Phase 3** | StreamManager & Stream Lifecycle Unification: unified atomic state, race condition prevention, external album change isolation, GigaMix stream launching & clean completion | ✅ Completed | `5a2bef6` |
-| **Phase 4** | Code Duplication Elimination (DRY in WebHandlers/UI): `_sendJsonResponse`, external OAuth template, wave settings unification, `UI::Common` | ✅ Completed | Phase 4 implementation |
-| **Phase 5** | Namespace Reorganization: `Session.pm` extraction, `API.pm` facade, UI/ relocation | ⏳ Next | Alignment & Implementation |
+| **Phase 4** | Code Duplication Elimination (DRY in WebHandlers/UI): `_sendJsonResponse`, external OAuth template, wave settings unification, `UI::Common` | ✅ Completed | `9fa206f` |
+| **Phase 5** | Namespace Reorganization: `Session.pm` extraction, `API.pm` facade, UI/ relocation | ✅ Completed | Phase 5 implementation |
 
 ---
 
@@ -122,4 +122,48 @@ Branch: `experiment`
   - Verified `_sendJsonResponse` and `_sendJsonError` status codes, JSON payload, extra attributes, and charset.
   - Verified physical template file existence and rendering in `handleOAuthCallback`, `handleWaveSettingsWebUI`, and `handleWaveSettingsStandalone`.
 - Test harness: 22 test files, 548 tests, **100% PASS**.
+
+---
+
+## Phase 5 Details: Namespace Reorganization and Facade API
+
+### 1. `Plugins::Zvuk::Session` (`Session.pm`)
+- **Extracted Multi-Account & Credential Management**:
+  - Centralized all account state and token operations in `Plugins::Zvuk::Session`:
+    - `getAccounts()`: returns configured accounts hashref.
+    - `hasAccounts()`: checks if at least one valid account with token exists.
+    - `getSomeUserId()`: resolves default or first active account.
+    - `getUserdata($userId)`: fetches credentials and profile name for account.
+    - `getToken($userId)`: retrieves auth token.
+    - `getUserIdForClient($client)`: resolves player's account with auto-healing fallback if client's stored account was deleted or invalidated.
+    - `extractAccountName($profile, $userId)`: parses first/middle/last name, username, or fallback account name.
+    - `saveAccount($userId, $data)`: saves account and auto-heals default account pointer.
+    - `deleteAccount($userId)`: deletes account and auto-heals default account pointer.
+- **Backward-Compatible Delegation in `API.pm` and `Plugin.pm`**:
+  - `Plugins::Zvuk::API` delegates all account operations (`getSomeUserId`, `getUserdata`, `getToken`, `extractAccountName`, `getUserIdForClient`, `hasAccounts`, `getAccounts`, `saveAccount`, `deleteAccount`) directly to `Session`.
+  - `Plugin.pm::_getUserIdForClient` delegates directly to `Plugins::Zvuk::Session::getUserIdForClient($client)`.
+
+### 2. `Plugins::Zvuk::API` as Unified Facade
+- **`getClient($client_or_userId)`**:
+  - Unified entry point for callers to obtain an authenticated API client without having to manually resolve player-to-account bindings or instantiate specialized clients.
+
+### 3. Relocation of UI Controllers to `UI/`
+- **Clean Namespace Hierarchy**:
+  - `UI/Wave.pm` -> `Plugins::Zvuk::UI::Wave`
+  - `UI/Atlas.pm` -> `Plugins::Zvuk::UI::Atlas`
+  - `UI/GigaMix.pm` -> `Plugins::Zvuk::UI::GigaMix`
+  - `UI/InfoMenu.pm` -> `Plugins::Zvuk::UI::InfoMenu` (consolidated from `Browse/InfoMenu.pm`)
+  - `UI/Common.pm` -> `Plugins::Zvuk::UI::Common`
+- **100% Coderef-Preserving Shims**:
+  - Root files (`WaveUI.pm`, `AtlasUI.pm`, `GigaMix.pm`, `Browse/InfoMenu.pm`) act as thin symbol-table aliasing shims (`*func = \&NewPackage::func`).
+  - Ensures exact coderef equality tests (`$item->{url} == \&Plugins::Zvuk::AtlasUI::handleAtlasMenu`) pass 100% without breaking any third-party plugins, LMS bookmarks, or existing test suites.
+
+### 4. Verification Record
+- Created `t/test_phase5_namespaces.pl` and symlink `t/test_phase5_namespaces.t`:
+  - Verified `Plugins::Zvuk::Session` account creation, retrieval, token access, player binding, and stale account auto-healing.
+  - Verified `Plugins::Zvuk::API` delegation and unified `getClient` facade.
+  - Verified exact symbol aliasing between legacy shims and `UI::*` modules across Wave, Atlas, GigaMix, and InfoMenu.
+- Complete Test Suite: **23 test files, 551 tests, 100% PASS** via `prove -I. -It t/`.
+- Strict Perl 5.14+ compatibility maintained across all new and refactored modules.
+
 

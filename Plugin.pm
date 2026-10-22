@@ -17,6 +17,12 @@ use Slim::Utils::Strings qw(string cstring);
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
+use Plugins::Zvuk::Session;
+use Plugins::Zvuk::UI::Common;
+use Plugins::Zvuk::UI::Wave;
+use Plugins::Zvuk::UI::Atlas;
+use Plugins::Zvuk::UI::GigaMix;
+use Plugins::Zvuk::UI::InfoMenu;
 use Plugins::Zvuk::ProtocolHandler;
 use Plugins::Zvuk::Settings;
 use Plugins::Zvuk::WaveSettings;
@@ -205,30 +211,7 @@ sub _init_api_client {
 
 sub _getUserIdForClient {
 	my ($client) = @_;
-	my $accounts = $prefs->get('accounts');
-	$accounts = {} unless ref $accounts eq 'HASH';
-
-	my $userId = $client ? $prefs->client($client)->get('userId') : undef;
-
-	# If client has a valid, existing account with a token, use it
-	if (defined $userId && length($userId) && $accounts->{$userId} && $accounts->{$userId}{token}) {
-		return $userId;
-	}
-
-	# Stale or non-existent client userId (or client has none set):
-	# Fall back to defaultUserId or any valid configured account
-	my $fallbackUserId = Plugins::Zvuk::API->getSomeUserId();
-
-	# Self-heal: update client's preference to valid account
-	if ($client && defined $fallbackUserId && length($fallbackUserId)) {
-		eval {
-			$prefs->client($client)->set('userId', $fallbackUserId);
-		};
-		my $clientId = (ref $client && $client->can('id')) ? $client->id : "$client";
-		$log->info("Zvuk: Auto-healed client $clientId userId: " . (defined $userId ? $userId : 'undef') . " -> $fallbackUserId");
-	}
-
-	return $fallbackUserId;
+	return Plugins::Zvuk::Session->getUserIdForClient($client);
 }
 
 sub _get_api_client {
