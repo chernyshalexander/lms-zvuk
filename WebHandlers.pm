@@ -42,9 +42,33 @@ sub _clientForWebRequest {
 	return $client;
 }
 
-# Web UI handler for displaying wave settings (AJAX or standalone)
-sub handleWaveSettingsWebUI {
-	my ($httpClient, $response) = @_;
+sub _sendJsonResponse {
+	my ($httpClient, $response, $data, $code) = @_;
+	$code ||= 200;
+	$response->code($code);
+	$response->content_type('application/json; charset=utf-8');
+
+	my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
+	my $json = ref $data ? $json_encoder->encode($data) : ($data // '{}');
+	$response->content_length(length($json));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+}
+
+sub _sendJsonError {
+	my ($httpClient, $response, $error_msg, $code, $extra) = @_;
+	$code ||= 400;
+	my $payload = {
+		success => 0,
+		error   => $error_msg || 'Unknown error',
+	};
+	if ($extra && ref $extra eq 'HASH') {
+		@{$payload}{keys %$extra} = values %$extra;
+	}
+	return _sendJsonResponse($httpClient, $response, $payload, $code);
+}
+
+sub _renderWaveSettingsPage {
+	my ($httpClient, $response, $template) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
 	require Slim::Web::HTTP;
@@ -85,9 +109,6 @@ sub handleWaveSettingsWebUI {
 		webroot => '/html/',
 		playerid => ($client ? $client->id : ''),
 	};
-
-	# Use waveSliders.html for settings page integration
-	my $template = 'plugins/zvuk/waveSliders.html';
 
 	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
 	my $output_bytes = encode_utf8($$output_ref);
@@ -98,60 +119,16 @@ sub handleWaveSettingsWebUI {
 	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
 }
 
+# Web UI handler for displaying wave settings (AJAX or standalone)
+sub handleWaveSettingsWebUI {
+	my ($httpClient, $response) = @_;
+	_renderWaveSettingsPage($httpClient, $response, 'plugins/zvuk/waveSliders.html');
+}
+
 # Web UI handler for standalone wave settings page (from menu)
 sub handleWaveSettingsStandalone {
 	my ($httpClient, $response) = @_;
-
-	require Plugins::Zvuk::WaveSettings;
-	require Slim::Web::HTTP;
-	my $request = $response->request;
-	my $client = _clientForWebRequest($request);
-	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
-	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
-
-	# Build genres list for JavaScript
-	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
-	my @genre_list;
-	my %genre_labels;
-	foreach my $genre (@$genres) {
-		push @genre_list, { name => $genre->{name} };
-		my $label = Slim::Utils::Strings::string($genre->{label});
-		$label = decode_utf8($label) unless Encode::is_utf8($label);
-		$genre_labels{$genre->{name}} = $label;
-	}
-
-	# Filter/sanitize genres list in selected genres too
-	my @valid_genres;
-	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
-		foreach my $g (@{$wave_settings->{genres}}) {
-			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
-				push @valid_genres, $g;
-			}
-		}
-	}
-	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
-
-	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
-
-	my $vars = {
-		wave_settings => $wave_settings,
-		genres_json => $json_encoder->encode(\@genre_list),
-		genres_labels_json => $json_encoder->encode(\%genre_labels),
-		selected_genres_json => $json_encoder->encode($selected_genres),
-		webroot => '/html/',
-		playerid => ($client ? $client->id : ''),
-	};
-
-	# Use waveStandalone.html for menu access
-	my $template = 'plugins/zvuk/waveStandalone.html';
-
-	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, $vars);
-	my $output_bytes = encode_utf8($$output_ref);
-
-	$response->code(200);
-	$response->content_type('text/html; charset=utf-8');
-	$response->content_length(length($output_bytes));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
+	_renderWaveSettingsPage($httpClient, $response, 'plugins/zvuk/waveStandalone.html');
 }
 
 # Web AJAX handler for saving wave settings from web interface
@@ -170,11 +147,7 @@ sub handleSaveWaveSettingsWeb {
 
 	if ($@ || !$data) {
 		$log->error("Wave Settings Web: Failed to parse JSON: $@");
-		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Invalid JSON' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Invalid JSON', 400);
 		return;
 	}
 
@@ -196,11 +169,7 @@ sub handleSaveWaveSettingsWeb {
 	Plugins::Zvuk::WaveSettings::saveSettings($account_id, $settings);
 	$log->info("Wave settings saved from web interface for account $account_id");
 
-	$response->code(200);
-	$response->content_type('application/json');
-	my $json = encode_json({ success => 1 });
-	$response->content_length(length($json));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+	_sendJsonResponse($httpClient, $response, { success => 1 });
 }
 
 # Web AJAX handler for getting wave settings for modal initialization
@@ -230,11 +199,7 @@ sub handleGetWaveSettingsWeb {
 		genre_labels => \%genre_labels,
 	};
 
-	$response->code(200);
-	$response->content_type('application/json');
-	my $json = encode_json($response_data);
-	$response->content_length(length($json));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+	_sendJsonResponse($httpClient, $response, $response_data);
 }
 
 sub handleSaveOAuthToken {
@@ -273,24 +238,14 @@ sub handleSaveOAuthToken {
 
 	if (!$token) {
 		$log->error("OAuth: Missing token in request: body=$body");
-		$response->code(400);
-		$response->content_type('application/json; charset=utf-8');
-		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-		my $json = $json_encoder->encode({ success => 0, error => 'Missing token' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Missing token', 400);
 		return;
 	}
 
 	# Validate token format (32 hex characters)
 	if ($token !~ /^[0-9a-f]{32}$/i) {
 		$log->error("OAuth: Invalid token format: $token");
-		$response->code(400);
-		$response->content_type('application/json; charset=utf-8');
-		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-		my $json = $json_encoder->encode({ success => 0, error => 'Invalid token format' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Invalid token format', 400);
 		return;
 	}
 
@@ -340,32 +295,20 @@ sub handleSaveOAuthToken {
 
 				$log->info("OAuth: Token saved with real userId=$userId, name=$accountName");
 
-				$response->code(200);
-				$response->content_type('application/json');
-
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({
+				_sendJsonResponse($httpClient, $response, {
 					success => 1,
 					account => {
 						userId => $userId,
 						name   => $accountName,
 					}
 				});
-				$log->debug("OAuth: Sending async response: $json");
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 				$log->debug("OAuth: Response sent asynchronously");
 			}
 			else {
 				my $err = ($profile && $profile->{error}) ? $profile->{error} : 'Failed to validate profile';
 				$log->error("OAuth: Failed to fetch profile for token: $err");
 
-				$response->code(400);
-				$response->content_type('application/json; charset=utf-8');
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({ success => 0, error => $err });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, $err, 400);
 			}
 		},
 		$token
@@ -377,191 +320,14 @@ sub handleOAuthCallback {
 
 	$log->info("OAuth Callback: Serving browser-side fetch page");
 
-	# Return an HTML page that uses JS to fetch the token from zvuk.com
-	# The browser has zvuk.com session cookies, so fetch with credentials:include
-	# will return the authenticated profile. If CORS blocks it, manual paste is shown.
-	my $html = <<'END_HTML';
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Zvuk — Авторизация</title>
-	<style>
-		* { box-sizing: border-box; margin: 0; padding: 0; }
-		body {
-			font-family: Arial, sans-serif;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			min-height: 100vh;
-			background: #f5f5f5;
-			padding: 20px;
-		}
-		.container {
-			background: white;
-			padding: 40px;
-			border-radius: 8px;
-			text-align: center;
-			box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-			max-width: 480px;
-			width: 100%;
-		}
-		h2 { color: #333; margin-bottom: 24px; font-size: 20px; }
-		.spinner {
-			border: 3px solid #eee;
-			border-top: 3px solid #b8a6db;
-			border-radius: 50%;
-			width: 44px;
-			height: 44px;
-			animation: spin 0.8s linear infinite;
-			margin: 0 auto 16px;
-		}
-		@keyframes spin { to { transform: rotate(360deg); } }
-		.status { color: #666; font-size: 14px; line-height: 1.5; }
-		.status.ok  { color: #388e3c; font-weight: bold; }
-		.status.err { color: #d32f2f; }
-		#manualSection { display: none; margin-top: 24px; text-align: left; }
-		#manualSection p { font-size: 13px; color: #555; margin-bottom: 12px; line-height: 1.6; }
-		#manualSection a { color: #b8a6db; }
-		code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
-		input[type=text] {
-			width: 100%;
-			padding: 10px 12px;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-			font-size: 13px;
-			margin-bottom: 10px;
-			font-family: monospace;
-		}
-		input[type=text]:focus { outline: none; border-color: #b8a6db; }
-		button {
-			background: #b8a6db;
-			color: white;
-			border: none;
-			padding: 10px 24px;
-			border-radius: 4px;
-			cursor: pointer;
-			font-size: 14px;
-			width: 100%;
-		}
-		button:hover { background: #a594cc; }
-		#manualStatus { font-size: 12px; margin-top: 8px; }
-	</style>
-</head>
-<body>
-<div class="container">
-	<h2>Zvuk — Авторизация</h2>
-	<div id="autoSection">
-		<div class="spinner" id="spinner"></div>
-		<div class="status" id="statusText">Получаем токен авторизации...</div>
-	</div>
-	<div id="manualSection">
-		<p>
-			Автоматическое получение токена недоступно (CORS).
-			<br>
-			<a href="https://zvuk.com/api/tiny/profile" target="_blank">Откройте профиль</a>,
-			скопируйте значение поля <code>"token"</code> и вставьте ниже:
-		</p>
-		<input type="text" id="tokenInput" placeholder="Вставьте token...">
-		<button onclick="saveManualToken()">Сохранить</button>
-		<div class="status" id="manualStatus"></div>
-	</div>
-</div>
-<script>
-function setStatus(text, cls) {
-	var el = document.getElementById('statusText');
-	el.textContent = text;
-	el.className = 'status' + (cls ? ' ' + cls : '');
-}
+	my $template = 'plugins/zvuk/oauthCallback.html';
+	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, {});
+	my $output_bytes = $output_ref ? encode_utf8($$output_ref) : '';
 
-function notifyAndClose(success, error) {
-	if (window.opener) {
-		window.opener.postMessage(
-			success
-				? { type: 'zvukOAuthSuccess' }
-				: { type: 'zvukOAuthError', error: error || 'Unknown error' },
-			'*'
-		);
-	}
-	setTimeout(function() { window.close(); }, 2000);
-}
-
-function saveToken(token) {
-	return fetch('/plugins/zvuk/saveOAuthToken', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ token: token })
-	})
-	.then(function(r) { return r.json(); })
-	.then(function(data) {
-		if (data.success) {
-			document.getElementById('spinner').style.display = 'none';
-			setStatus('Авторизация успешна! Окно закроется...', 'ok');
-			notifyAndClose(true);
-		} else {
-			throw new Error(data.error || 'Server error');
-		}
-	});
-}
-
-function tryAutoFetch() {
-	fetch('https://zvuk.com/api/tiny/profile', {
-		credentials: 'include',
-		headers: {
-			'Accept': 'application/json',
-			'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-		}
-	})
-	.then(function(r) {
-		if (!r.ok) throw new Error('HTTP ' + r.status);
-		return r.json();
-	})
-	.then(function(data) {
-		var result = data && data.result || data;
-		var token = result && result.token;
-		var isAnon = result && result.is_anonymous;
-
-		if (!token) throw new Error('no_token');
-		if (isAnon) throw new Error('anonymous');
-
-		setStatus('Токен получен, сохраняем...');
-		return saveToken(token);
-	})
-	.catch(function(e) {
-		document.getElementById('spinner').style.display = 'none';
-		if (e.message === 'anonymous') {
-			setStatus('Вы не авторизованы. Войдите на zvuk.com и повторите.', 'err');
-		} else {
-			// CORS or network error — show manual fallback
-			setStatus('Автоматическое получение недоступно.', 'err');
-			document.getElementById('manualSection').style.display = 'block';
-		}
-	});
-}
-
-function saveManualToken() {
-	var token = document.getElementById('tokenInput').value.trim();
-	if (!token) return;
-	var ms = document.getElementById('manualStatus');
-	ms.textContent = 'Сохраняем...';
-	ms.className = 'status';
-	saveToken(token).catch(function(e) {
-		ms.textContent = 'Ошибка: ' + e.message;
-		ms.className = 'status err';
-	});
-}
-
-tryAutoFetch();
-</script>
-</body>
-</html>
-END_HTML
-
-	$html = encode_utf8($html);
 	$response->code(200);
 	$response->content_type('text/html; charset=utf-8');
-	$response->content_length(length($html));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$html);
+	$response->content_length(length($output_bytes));
+	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
 }
 
 sub handleGetAnonymousToken {
@@ -587,29 +353,17 @@ sub handleGetAnonymousToken {
 				$prefs->set('accounts', $accounts);
 				$log->info("Anonymous Token: Saved token");
 
-				$response->code(200);
-				$response->content_type('application/json');
-				my $json = encode_json({ success => 1 });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonResponse($httpClient, $response, { success => 1 });
 			}
 			else {
 				$log->error("Anonymous Token: No token in response: " . $resp->content);
-				$response->code(500);
-				$response->content_type('application/json');
-				my $json = encode_json({ success => 0, error => 'No token in response' });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, 'No token in response', 500);
 			}
 		},
 		sub {
 			my ($http, $error) = @_;
 			$log->error("Anonymous Token: HTTP error: $error");
-			$response->code(500);
-			$response->content_type('application/json');
-			my $json = encode_json({ success => 0, error => $error });
-			$response->content_length(length($json));
-			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			_sendJsonError($httpClient, $response, $error, 500);
 		}
 	);
 
@@ -709,11 +463,7 @@ sub handleRequestSmsCode {
 	my $rawPhone = $data && $data->{phone};
 
 	if (!$rawPhone) {
-		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Missing phone number' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Missing phone number', 400);
 		return;
 	}
 
@@ -725,11 +475,7 @@ sub handleRequestSmsCode {
 	$phone = "+$phone" unless $phone =~ /^\+/;
 
 	if ($phone !~ /^\+[1-9]\d{9,14}$/) {
-		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Invalid phone number format' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Invalid phone number format', 400);
 		return;
 	}
 
@@ -757,19 +503,11 @@ sub handleRequestSmsCode {
 				my $resp_data = eval { decode_json($resp_content) };
 				if ($resp_code == 200) {
 					$log->info("SMS OTP: Code successfully requested for $phone");
-					$response->code(200);
-					$response->content_type('application/json');
-					my $json = encode_json({ success => 1, phone => $phone });
-					$response->content_length(length($json));
-					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+					_sendJsonResponse($httpClient, $response, { success => 1, phone => $phone });
 				} else {
 					my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "HTTP error $resp_code";
 					$log->error("SMS OTP: Failed to send code for $phone: $err");
-					$response->code(400);
-					$response->content_type('application/json');
-					my $json = encode_json({ success => 0, error => $err });
-					$response->content_length(length($json));
-					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+					_sendJsonError($httpClient, $response, $err, 400);
 				}
 			},
 			sub {
@@ -777,14 +515,9 @@ sub handleRequestSmsCode {
 				my $code = $resp ? $resp->code : 500;
 				if ($code == 403 || ($error && $error =~ /403/)) {
 					$log->warn("SMS OTP: get-mcode rejected with 403 Forbidden by service security for $phone");
-					$response->code(400);
-					$response->content_type('application/json; charset=utf-8');
 					my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
 						|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
-					my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-					my $json = $json_encoder->encode({ success => 0, error => $err_text, blocked => 1 });
-					$response->content_length(length($json));
-					Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+					_sendJsonError($httpClient, $response, $err_text, 400, { blocked => 1 });
 					return;
 				}
 
@@ -795,12 +528,7 @@ sub handleRequestSmsCode {
 				}
 				$err_msg ||= $error || 'Network error';
 				$log->error("SMS OTP: Network/HTTP error requesting code for $phone: $err_msg");
-				$response->code(400);
-				$response->content_type('application/json; charset=utf-8');
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({ success => 0, error => $err_msg });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, $err_msg, 400);
 			},
 			{ timeout => 15 }
 		);
@@ -822,14 +550,9 @@ sub handleRequestSmsCode {
 
 			if ($auth_type && lc($auth_type) eq 'login_hint') {
 				$log->info("SMS OTP: Phone $phone routed to login_hint (SberID/password required)");
-				$response->code(400);
-				$response->content_type('application/json');
 				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_LOGIN_HINT')
 					|| 'Этот номер использует вход по Сбер ID или паролю. Пожалуйста, используйте кнопку «Войти через Zvuk» или введите токен вручную.';
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({ success => 0, error => $err_text, auth_type => 'login_hint' });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, $err_text, 400, { auth_type => 'login_hint' });
 				return;
 			}
 
@@ -841,13 +564,9 @@ sub handleRequestSmsCode {
 			my $code = $resp ? $resp->code : 500;
 			if ($code == 403 || ($error && $error =~ /403/)) {
 				$log->warn("SMS OTP: route-authorization-type rejected with 403 Forbidden for $phone");
-				$response->content_type('application/json; charset=utf-8');
 				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
 					|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({ success => 0, error => $err_text, blocked => 1 });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, $err_text, 400, { blocked => 1 });
 				return;
 			}
 			$log->warn("SMS OTP: route-authorization-type query failed ($error), falling back to get-mcode");
@@ -873,22 +592,14 @@ sub handleVerifySmsCode {
 	my $code  = $data && $data->{code};
 
 	if (!$phone || !$code) {
-		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Missing phone or code' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Missing phone or code', 400);
 		return;
 	}
 
 	# Clean code (digits only)
 	$code =~ s/\D//g;
 	if (length($code) < 4 || length($code) > 6) {
-		$response->code(400);
-		$response->content_type('application/json');
-		my $json = encode_json({ success => 0, error => 'Invalid code length' });
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+		_sendJsonError($httpClient, $response, 'Invalid code length', 400);
 		return;
 	}
 
@@ -936,30 +647,20 @@ sub handleVerifySmsCode {
 
 						$log->info("SMS OTP: Account saved: userId=$userId, name=$accountName");
 
-						$response->code(200);
-						$response->content_type('application/json');
-						my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-						my $json = $json_encoder->encode({
+						_sendJsonResponse($httpClient, $response, {
 							success => 1,
 							account => {
 								userId => $userId,
 								name   => $accountName,
 							}
 						});
-						$response->content_length(length($json));
-						Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 					},
 					$token
 				);
 			} else {
 				my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "Invalid code or login failed (HTTP $resp_code)";
 				$log->error("SMS OTP: Login failed for $phone: $err");
-				$response->code(400);
-				$response->content_type('application/json; charset=utf-8');
-				my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-				my $json = $json_encoder->encode({ success => 0, error => $err });
-				$response->content_length(length($json));
-				Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+				_sendJsonError($httpClient, $response, $err, 400);
 			}
 		},
 		sub {
@@ -975,12 +676,7 @@ sub handleVerifySmsCode {
 			}
 			$err_msg ||= $error || 'Verification request failed';
 			$log->error("SMS OTP: Network/HTTP error verifying code for $phone: $err_msg");
-			$response->code(400);
-			$response->content_type('application/json; charset=utf-8');
-			my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-			my $json = $json_encoder->encode({ success => 0, error => $err_msg });
-			$response->content_length(length($json));
-			Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
+			_sendJsonError($httpClient, $response, $err_msg, 400);
 		},
 		{ timeout => 15 }
 	);
@@ -1039,19 +735,11 @@ sub handleGetAtlasMapWeb {
 
 	$atlas->getMap(sub {
 		my ($map, $err) = @_;
-		my $json;
-		my $json_encoder = JSON::XS->new->utf8(1)->canonical(1);
-
 		if ($err || !$map) {
-			$response->code(500);
-			$json = $json_encoder->encode({ success => 0, error => ($err || 'Failed to load Atlas map') });
+			_sendJsonError($httpClient, $response, ($err || 'Failed to load Atlas map'), 500);
 		} else {
-			$response->code(200);
-			$json = $json_encoder->encode({ success => 1, map => $map });
+			_sendJsonResponse($httpClient, $response, { success => 1, map => $map });
 		}
-		$response->content_type('application/json; charset=utf-8');
-		$response->content_length(length($json));
-		Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$json);
 	});
 }
 

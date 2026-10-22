@@ -9,6 +9,7 @@ use Slim::Utils::Strings qw(cstring);
 use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::WaveSettings;
+use Plugins::Zvuk::UI::Common;
 
 my $log = logger('plugin.zvuk');
 
@@ -221,24 +222,7 @@ sub handleSlider {
 }
 
 sub _uiKind {
-	my ($client, $args) = @_;
-
-	# 1. Classic Web Skin
-	return 'classic_web' if $args && $args->{isWeb};
-
-	# 2. VFD buttons on classic hardware player (Boom, Transporter)
-	return 'player_buttons' if $args && $args->{isButton};
-
-	# 3. CLI / JSON-RPC / cometd (Material UI / Jive / SqueezePlay / mobile apps)
-	if ($client && Slim::Utils::Misc::canFollowWeblinks($client)) {
-		return 'weblink_capable'; # Material, iPeng, SqueezePad
-	}
-	if ($client && $client->can('controllerUA') && $client->controllerUA && $client->controllerUA =~ /^SqueezePlay/) {
-		return 'jive'; # Squeezebox Touch, Radio, Controller, desktop SqueezePlay
-	}
-
-	# 4. Unknown/fallback: default to jive/native UI
-	return 'jive';
+	return Plugins::Zvuk::UI::Common::uiKind(@_);
 }
 
 sub handleStartWave {
@@ -252,9 +236,7 @@ sub handleStartWave {
 	# We pop that temporary mode level first so the stack returns to the parent menu level,
 	# preventing an empty screen flicker and stack underflow when pressing BACK.
 	if (_uiKind($client, $args) eq 'player_buttons') {
-		if (defined &Slim::Buttons::Common::popMode && (Slim::Buttons::Common::mode($client) || '') eq 'xmlbrowser') {
-			Slim::Buttons::Common::popMode($client);
-		}
+		Plugins::Zvuk::UI::Common::popVfdMode($client);
 	}
 
 	$client->execute(['playlist', 'play', 'zvuk://wave', cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_START')]);

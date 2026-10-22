@@ -11,7 +11,9 @@ Branch: `experiment`
 |---|---|---|---|
 | **Phase 1** | Hygiene, Security & Cleanup: security allowlist for image proxy, disable flacdrm, fix clearClient & GigaMix menu, clean dead code, add PLUGIN_ZVUK_ARTISTS, track tests in git | ✅ Completed | `ed79d9b` |
 | **Phase 2** | Test Harness Normalization: normalize test suite to `Test::More` and enable `prove` test runner | ✅ Completed | `e5dd90c` |
-| **Phase 3** | StreamManager & Stream Lifecycle Unification: unified atomic state, race condition prevention, external album change isolation, GigaMix stream launching & clean completion | ✅ Completed | Phase 3 implementation |
+| **Phase 3** | StreamManager & Stream Lifecycle Unification: unified atomic state, race condition prevention, external album change isolation, GigaMix stream launching & clean completion | ✅ Completed | `5a2bef6` |
+| **Phase 4** | Code Duplication Elimination (DRY in WebHandlers/UI): `_sendJsonResponse`, external OAuth template, wave settings unification, `UI::Common` | ✅ Completed | Phase 4 implementation |
+| **Phase 5** | Namespace Reorganization: `Session.pm` extraction, `API.pm` facade, UI/ relocation | ⏳ Next | Alignment & Implementation |
 
 ---
 
@@ -82,3 +84,42 @@ Branch: `experiment`
   - Race condition protection (`is_loading` prevents duplicate concurrent calls across all 4 modes) and queue boundary verification (≤2 tracks remaining).
 - All 21 test files pass 100% via `prove -I. -It t/` (544 tests total).
 - Strict Perl 5.14+ compatibility verified (no lexical subroutines, no signatures).
+
+---
+
+## Phase 4 Details: Code Duplication Elimination (DRY in WebHandlers/UI)
+
+### 1. `WebHandlers.pm` Streamlining (1,059 -> 738 lines, -321 lines)
+- **JSON Response Consolidation**:
+  - Implemented `_sendJsonResponse($httpClient, $response, $data, $code)` and `_sendJsonError($httpClient, $response, $error_msg, $code, $extra)`:
+    - Standardized UTF-8 content type `application/json; charset=utf-8`.
+    - Computed accurate `Content-Length`.
+    - Used canonical `JSON::XS` encoding.
+    - Replaced ~30 repetitive response blocks across all handlers (`handleSaveOAuthToken`, `handleGetAnonymousToken`, `handleRequestSmsCode`, `handleVerifySmsCode`, `handleGetAtlasMapWeb`, etc.).
+- **Externalized OAuth Browser Callback HTML**:
+  - Moved 175 lines of inline HTML/CSS/JS from `WebHandlers.pm` into `HTML/EN/plugins/zvuk/oauthCallback.html`.
+  - Refactored `handleOAuthCallback` to cleanly render via `Slim::Web::HTTP::filltemplatefile('plugins/zvuk/oauthCallback.html', {})`.
+- **Wave Settings Page Parameterization**:
+  - Unified `handleWaveSettingsWebUI` and `handleWaveSettingsStandalone` into a single helper `_renderWaveSettingsPage($httpClient, $response, $template)`.
+  - Eliminated 55 lines of identical genre mapping, JSON encoding, and template filling logic.
+
+### 2. `Plugins::Zvuk::UI::Common` (`UI/Common.pm`)
+- **Centralized UI Kind Resolution**:
+  - Created `Plugins::Zvuk::UI::Common::uiKind($client, $args)` detecting:
+    - `classic_web` (`isWeb => 1`)
+    - `player_buttons` (`isButton => 1`)
+    - `weblink_capable` (`Slim::Utils::Misc::canFollowWeblinks`)
+    - `jive` (`SqueezePlay` user-agent or default fallback)
+- **Safe VFD Mode Popping**:
+  - Created `Plugins::Zvuk::UI::Common::popVfdMode($client)`: safely checks if `popMode` is available and current mode is `xmlbrowser` before popping to prevent menu crashes and stack underflow.
+- **Backward-Compatible Integration**:
+  - `WaveUI.pm` and `AtlasUI.pm` delegate their `_uiKind` and `popMode` calls to `UI::Common`.
+
+### 3. Verification
+- Created `t/test_phase4_dry.pl` and symlink `t/test_phase4_dry.t`:
+  - Verified `UI::Common::uiKind` across all 4 client kinds + fallbacks.
+  - Verified `UI::Common::popVfdMode` execution and guards.
+  - Verified `_sendJsonResponse` and `_sendJsonError` status codes, JSON payload, extra attributes, and charset.
+  - Verified physical template file existence and rendering in `handleOAuthCallback`, `handleWaveSettingsWebUI`, and `handleWaveSettingsStandalone`.
+- Test harness: 22 test files, 548 tests, **100% PASS**.
+

@@ -9,23 +9,12 @@ use Slim::Utils::Strings qw(cstring);
 use Slim::Utils::Prefs;
 
 use Plugins::Zvuk::API;
+use Plugins::Zvuk::UI::Common;
 
 my $log = logger('plugin.zvuk');
 
 sub _uiKind {
-	my ($client, $args) = @_;
-
-	return 'classic_web' if $args && $args->{isWeb};
-	return 'player_buttons' if $args && $args->{isButton};
-
-	if ($client && Slim::Utils::Misc::canFollowWeblinks($client)) {
-		return 'weblink_capable';
-	}
-	if ($client && $client->can('controllerUA') && $client->controllerUA && $client->controllerUA =~ /^SqueezePlay/) {
-		return 'jive';
-	}
-
-	return 'jive';
+	return Plugins::Zvuk::UI::Common::uiKind(@_);
 }
 
 sub _renderIslandItem {
@@ -505,9 +494,7 @@ sub handleStartIslandWave {
 	$log->info("Starting Atlas Island Wave playback for client " . ($client->name || ref($client) || ''));
 
 	if (_uiKind($client, $args) eq 'player_buttons') {
-		if (defined &Slim::Buttons::Common::popMode && (Slim::Buttons::Common::mode($client) || '') eq 'xmlbrowser') {
-			Slim::Buttons::Common::popMode($client);
-		}
+		Plugins::Zvuk::UI::Common::popVfdMode($client);
 	}
 
 	$client->execute(['playlist', 'play', "zvuk://atlas:$island_id"]);
@@ -547,9 +534,7 @@ sub handleStartRandomIslandWave {
 		$log->info("Starting Random Atlas Island Wave: " . ($chosen->{title} || '') . " ($island_id)");
 
 		if (_uiKind($client, $args) eq 'player_buttons') {
-			if (defined &Slim::Buttons::Common::popMode && (Slim::Buttons::Common::mode($client) || '') eq 'xmlbrowser') {
-				Slim::Buttons::Common::popMode($client);
-			}
+			Plugins::Zvuk::UI::Common::popVfdMode($client);
 		}
 
 		$client->execute(['playlist', 'play', "zvuk://atlas:$island_id"]);

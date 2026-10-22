@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Zvuk — Авторизация</title>
+	<style>
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body {
+			font-family: Arial, sans-serif;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 100vh;
+			background: #f5f5f5;
+			padding: 20px;
+		}
+		.container {
+			background: white;
+			padding: 40px;
+			border-radius: 8px;
+			text-align: center;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+			max-width: 480px;
+			width: 100%;
+		}
+		h2 { color: #333; margin-bottom: 24px; font-size: 20px; }
+		.spinner {
+			border: 3px solid #eee;
+			border-top: 3px solid #b8a6db;
+			border-radius: 50%;
+			width: 44px;
+			height: 44px;
+			animation: spin 0.8s linear infinite;
+			margin: 0 auto 16px;
+		}
+		@keyframes spin { to { transform: rotate(360deg); } }
+		.status { color: #666; font-size: 14px; line-height: 1.5; }
+		.status.ok  { color: #388e3c; font-weight: bold; }
+		.status.err { color: #d32f2f; }
+		#manualSection { display: none; margin-top: 24px; text-align: left; }
+		#manualSection p { font-size: 13px; color: #555; margin-bottom: 12px; line-height: 1.6; }
+		#manualSection a { color: #b8a6db; }
+		code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+		input[type=text] {
+			width: 100%;
+			padding: 10px 12px;
+			border: 1px solid #ddd;
+			border-radius: 4px;
+			font-size: 13px;
+			margin-bottom: 10px;
+			font-family: monospace;
+		}
+		input[type=text]:focus { outline: none; border-color: #b8a6db; }
+		button {
+			background: #b8a6db;
+			color: white;
+			border: none;
+			padding: 10px 24px;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 14px;
+			width: 100%;
+		}
+		button:hover { background: #a594cc; }
+		#manualStatus { font-size: 12px; margin-top: 8px; }
+	</style>
+</head>
+<body>
+<div class="container">
+	<h2>Zvuk — Авторизация</h2>
+	<div id="autoSection">
+		<div class="spinner" id="spinner"></div>
+		<div class="status" id="statusText">Получаем токен авторизации...</div>
+	</div>
+	<div id="manualSection">
+		<p>
+			Автоматическое получение токена недоступно (CORS).
+			<br>
+			<a href="https://zvuk.com/api/tiny/profile" target="_blank">Откройте профиль</a>,
+			скопируйте значение поля <code>"token"</code> и вставьте ниже:
+		</p>
+		<input type="text" id="tokenInput" placeholder="Вставьте token...">
+		<button onclick="saveManualToken()">Сохранить</button>
+		<div class="status" id="manualStatus"></div>
+	</div>
+</div>
+<script>
+function setStatus(text, cls) {
+	var el = document.getElementById('statusText');
+	el.textContent = text;
+	el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function notifyAndClose(success, error) {
+	if (window.opener) {
+		window.opener.postMessage(
+			success
+				? { type: 'zvukOAuthSuccess' }
+				: { type: 'zvukOAuthError', error: error || 'Unknown error' },
+			'*'
+		);
+	}
+	setTimeout(function() { window.close(); }, 2000);
+}
+
+function saveToken(token) {
+	return fetch('/plugins/zvuk/saveOAuthToken', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token: token })
+	})
+	.then(function(r) { return r.json(); })
+	.then(function(data) {
+		if (data.success) {
+			document.getElementById('spinner').style.display = 'none';
+			setStatus('Авторизация успешна! Окно закроется...', 'ok');
+			notifyAndClose(true);
+		} else {
+			throw new Error(data.error || 'Server error');
+		}
+	});
+}
+
+function tryAutoFetch() {
+	fetch('https://zvuk.com/api/tiny/profile', {
+		credentials: 'include',
+		headers: {
+			'Accept': 'application/json',
+			'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+		}
+	})
+	.then(function(r) {
+		if (!r.ok) throw new Error('HTTP ' + r.status);
+		return r.json();
+	})
+	.then(function(data) {
+		var result = data && data.result || data;
+		var token = result && result.token;
+		var isAnon = result && result.is_anonymous;
+
+		if (!token) throw new Error('no_token');
+		if (isAnon) throw new Error('anonymous');
+
+		setStatus('Токен получен, сохраняем...');
+		return saveToken(token);
+	})
+	.catch(function(e) {
+		document.getElementById('spinner').style.display = 'none';
+		if (e.message === 'anonymous') {
+			setStatus('Вы не авторизованы. Войдите на zvuk.com и повторите.', 'err');
+		} else {
+			// CORS or network error — show manual fallback
+			setStatus('Автоматическое получение недоступно.', 'err');
+			document.getElementById('manualSection').style.display = 'block';
+		}
+	});
+}
+
+function saveManualToken() {
+	var token = document.getElementById('tokenInput').value.trim();
+	if (!token) return;
+	var ms = document.getElementById('manualStatus');
+	ms.textContent = 'Сохраняем...';
+	ms.className = 'status';
+	saveToken(token).catch(function(e) {
+		ms.textContent = 'Ошибка: ' + e.message;
+		ms.className = 'status err';
+	});
+}
+
+tryAutoFetch();
+</script>
+</body>
+</html>
