@@ -61,6 +61,20 @@ sub getNextTrack {
 	}
 
 	my $client = $song->master();
+
+	my $userId = ref $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : undef;
+	$userId ||= Plugins::Zvuk::API->getSomeUserId();
+	my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+
+	if ($userdata && $userdata->{stale}) {
+		$log->warn("getNextTrack: Account is stale for user " . ($userId || 'unknown') . ", stopping playback");
+		if ($client) {
+			Plugins::Zvuk::Plugin->notifyAuthExpired($userId, $client);
+		}
+		$errorCb->(string('PLUGIN_ZVUK_AUTH_EXPIRED'));
+		return;
+	}
+
 	$log->info("Resolving Zvuk stream for track ID: $id");
 
 	if ($client) {
@@ -69,12 +83,34 @@ sub getNextTrack {
 
 	my $prefQuality = Plugins::Zvuk::API->getQuality();
 
-	_getAPIHandler($client)->getStream(sub {
+	my $api = _getAPIHandler($client);
+	if (!$api) {
+		$log->error("getNextTrack: No API handler available for client");
+		my $is_stale = ($userdata && $userdata->{stale});
+		if ($is_stale && $client) {
+			Plugins::Zvuk::Plugin->notifyAuthExpired($userId, $client);
+		}
+		my $err_msg = $is_stale
+			? string('PLUGIN_ZVUK_AUTH_EXPIRED')
+			: string('PLUGIN_ZVUK_ERROR_STREAM');
+		$errorCb->($err_msg);
+		return;
+	}
+
+	$api->getStream(sub {
 		my $data = shift;
 
 		if (!$data || !ref $data || !@$data) {
 			$log->error("getStream error for track $id: no response or empty");
-			$errorCb->(string('PLUGIN_ZVUK_ERROR_STREAM'));
+			my $ud = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+			my $is_stale = ($ud && $ud->{stale});
+			if ($is_stale) {
+				Plugins::Zvuk::Plugin->notifyAuthExpired($userId, $client);
+			}
+			my $err_msg = $is_stale
+				? string('PLUGIN_ZVUK_AUTH_EXPIRED')
+				: string('PLUGIN_ZVUK_ERROR_STREAM');
+			$errorCb->($err_msg);
 			return;
 		}
 
@@ -182,27 +218,35 @@ sub getMetadataFor {
 	}
 
 	my $icon = $class->getIcon();
+	my $quality = Plugins::Zvuk::API->getQuality();
+	my $type = $quality eq 'flac' ? 'flc' : 'mp3';
+
+	my $userId = ref $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : undef;
+	$userId ||= Plugins::Zvuk::API->getSomeUserId();
+	my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+	if ($userdata && $userdata->{stale}) {
+		return { type => $type, icon => $icon };
+	}
 
 	my $now = time();
 	@pendingMeta = grep { $_->{time} + 60 > $now } @pendingMeta;
 
 	if (!(grep { $_->{id} == $id } @pendingMeta) && scalar(@pendingMeta) < 10) {
 		push @pendingMeta, { id => $id, time => $now };
-		_getAPIHandler($client)->getTracks(sub {
-			my $tracks = shift;
+		my $api = _getAPIHandler($client);
+		if ($api) {
+			$api->getTracks(sub {
+				my $tracks = shift;
+				@pendingMeta = grep { $_->{id} != $id } @pendingMeta;
+				return unless $tracks && @$tracks;
+				Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+				$client->currentPlaylistUpdateTime(time()) if $client;
+				Slim::Control::Request::notifyFromArray($client, ['newmetadata']) if $client;
+			}, [$id]);
+		} else {
 			@pendingMeta = grep { $_->{id} != $id } @pendingMeta;
-			return unless $tracks && @$tracks;
-			Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-			$client->currentPlaylistUpdateTime(time()) if $client;
-			Slim::Control::Request::notifyFromArray($client, ['newmetadata']) if $client;
-		}, [$id]);
+		}
 	}
-
-	# Return format type based on quality preference
-	# getMetadataFor is called for all tracks in playlist, not just current,
-	# so we use the user's quality preference to determine the format
-	my $quality = Plugins::Zvuk::API->getQuality();
-	my $type = $quality eq 'flac' ? 'flc' : 'mp3';
 
 	return { type => $type, icon => $icon };
 }

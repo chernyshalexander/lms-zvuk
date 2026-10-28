@@ -15,7 +15,8 @@ use Encode qw(decode_utf8 encode_utf8);
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::WaveSettings;
 
-my $log = logger('plugin.zvuk');
+my $log   = logger('plugin.zvuk');
+my $prefs = preferences('plugin.zvuk');
 
 # Resolve the connected player for a raw web/AJAX request, so handlers that
 # only get ($httpClient, $response) can still find "the current account".
@@ -449,251 +450,6 @@ sub handleImageProxy {
 	$http->get($url, %headers);
 }
 
-
-# Request SMS OTP code for a phone number
-sub handleRequestSmsCode {
-	my ($httpClient, $response) = @_;
-
-	$log->info("SMS OTP: Received code request");
-
-	my $request = $response->request;
-	my $body = $request->content_ref ? ${$request->content_ref} : '';
-
-	my $data = eval { decode_json($body) };
-	my $rawPhone = $data && $data->{phone};
-
-	if (!$rawPhone) {
-		_sendJsonError($httpClient, $response, 'Missing phone number', 400);
-		return;
-	}
-
-	# Normalize phone number (strip whitespace, dashes, parens)
-	my $phone = $rawPhone;
-	$phone =~ s/[\s\-\(\)\.]+//g;
-	$phone =~ s/^8/+7/;
-	$phone =~ s/^7/+7/;
-	$phone = "+$phone" unless $phone =~ /^\+/;
-
-	if ($phone !~ /^\+[1-9]\d{9,14}$/) {
-		_sendJsonError($httpClient, $response, 'Invalid phone number format', 400);
-		return;
-	}
-
-	require URI::Escape;
-	my %headers = (
-		'x-c-p'         => 'Q',
-		'x-app-name'    => Plugins::Zvuk::API::APP_NAME,
-		'x-app-version' => Plugins::Zvuk::API::APP_VERSION_ANDROID,
-		'x-app-build'   => Plugins::Zvuk::API::APP_BUILD_ANDROID,
-		'user-agent'    => Plugins::Zvuk::API::USER_AGENT,
-		'accept'        => 'application/json',
-		'content-type'  => 'application/json',
-	);
-
-	my $do_get_mcode = sub {
-		my $mcode_url = Plugins::Zvuk::API::GET_MCODE_URL . '?phone=' . URI::Escape::uri_escape($phone) . '&type=login&length=4';
-		$log->info("SMS OTP: Requesting code for $phone via $mcode_url");
-
-		my $http_mcode = Slim::Networking::SimpleAsyncHTTP->new(
-			sub {
-				my $resp = shift;
-				my $resp_content = $resp->content;
-				my $resp_code = $resp->code;
-
-				my $resp_data = eval { decode_json($resp_content) };
-				if ($resp_code == 200) {
-					$log->info("SMS OTP: Code successfully requested for $phone");
-					_sendJsonResponse($httpClient, $response, { success => 1, phone => $phone });
-				} else {
-					my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "HTTP error $resp_code";
-					$log->error("SMS OTP: Failed to send code for $phone: $err");
-					_sendJsonError($httpClient, $response, $err, 400);
-				}
-			},
-			sub {
-				my ($http, $error, $resp) = @_;
-				my $code = $resp ? $resp->code : 500;
-				if ($code == 403 || ($error && $error =~ /403/)) {
-					$log->warn("SMS OTP: get-mcode rejected with 403 Forbidden by service security for $phone");
-					my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
-						|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
-					_sendJsonError($httpClient, $response, $err_text, 400, { blocked => 1 });
-					return;
-				}
-
-				my $err_msg;
-				if ($resp && $resp->content) {
-					my $resp_data = eval { decode_json($resp->content) };
-					$err_msg = $resp_data && ($resp_data->{error} || $resp_data->{message});
-				}
-				$err_msg ||= $error || 'Network error';
-				$log->error("SMS OTP: Network/HTTP error requesting code for $phone: $err_msg");
-				_sendJsonError($httpClient, $response, $err_msg, 400);
-			},
-			{ timeout => 15 }
-		);
-
-		$http_mcode->post($mcode_url, %headers, '{}');
-	};
-
-	# Step 1: Check authorization routing for this phone
-	my $route_url = Plugins::Zvuk::API::ROUTE_AUTH_URL . '?phone=' . URI::Escape::uri_escape($phone);
-	$log->info("SMS OTP: Checking authorization route for $phone via $route_url");
-
-	my $http_route = Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $resp = shift;
-			my $resp_content = $resp->content;
-			my $resp_data = eval { decode_json($resp_content) };
-
-			my $auth_type = $resp_data && ($resp_data->{result} && $resp_data->{result}{authorization_type} || $resp_data->{authorization_type});
-
-			if ($auth_type && lc($auth_type) eq 'login_hint') {
-				$log->info("SMS OTP: Phone $phone routed to login_hint (SberID/password required)");
-				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_LOGIN_HINT')
-					|| 'Этот номер использует вход по Сбер ID или паролю. Пожалуйста, используйте кнопку «Войти через Zvuk» или введите токен вручную.';
-				_sendJsonError($httpClient, $response, $err_text, 400, { auth_type => 'login_hint' });
-				return;
-			}
-
-			# Routed to OTP (or other): proceed with get-mcode
-			$do_get_mcode->();
-		},
-		sub {
-			my ($http, $error, $resp) = @_;
-			my $code = $resp ? $resp->code : 500;
-			if ($code == 403 || ($error && $error =~ /403/)) {
-				$log->warn("SMS OTP: route-authorization-type rejected with 403 Forbidden for $phone");
-				my $err_text = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
-					|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
-				_sendJsonError($httpClient, $response, $err_text, 400, { blocked => 1 });
-				return;
-			}
-			$log->warn("SMS OTP: route-authorization-type query failed ($error), falling back to get-mcode");
-			$do_get_mcode->();
-		},
-		{ timeout => 10 }
-	);
-
-	$http_route->post($route_url, %headers, '{}');
-}
-
-# Verify SMS OTP code and log in
-sub handleVerifySmsCode {
-	my ($httpClient, $response) = @_;
-
-	$log->info("SMS OTP: Received code verification request");
-
-	my $request = $response->request;
-	my $body = $request->content_ref ? ${$request->content_ref} : '';
-
-	my $data = eval { decode_json($body) };
-	my $phone = $data && $data->{phone};
-	my $code  = $data && $data->{code};
-
-	if (!$phone || !$code) {
-		_sendJsonError($httpClient, $response, 'Missing phone or code', 400);
-		return;
-	}
-
-	# Clean code (digits only)
-	$code =~ s/\D//g;
-	if (length($code) < 4 || length($code) > 6) {
-		_sendJsonError($httpClient, $response, 'Invalid code length', 400);
-		return;
-	}
-
-	require URI::Escape;
-	my $form_body = 'phone=' . URI::Escape::uri_escape($phone) . '&code=' . URI::Escape::uri_escape($code);
-	$log->info("SMS OTP: Verifying code for $phone via " . Plugins::Zvuk::API::LOGIN_OTP_URL);
-
-	my $http = Slim::Networking::SimpleAsyncHTTP->new(
-		sub {
-			my $resp = shift;
-			my $resp_content = $resp->content;
-			my $resp_code = $resp->code;
-
-			my $resp_data = eval { decode_json($resp_content) };
-			my $token = $resp_data && ($resp_data->{result} && $resp_data->{result}{token} || $resp_data->{token});
-
-			if ($token) {
-				$log->info("SMS OTP: Verification successful for $phone, fetching profile");
-
-				# Fetch profile to get real userId and display name
-				require Plugins::Zvuk::API::Async;
-				Plugins::Zvuk::API::Async->getProfile(
-					sub {
-						my $profile = shift;
-						my $userId = ($profile && $profile->{id}) || ($resp_data->{result} && $resp_data->{result}{id}) || ($resp_data->{id}) || substr($token, 0, 16);
-						my $accountName = Plugins::Zvuk::API->extractAccountName($profile, $userId);
-
-						my $prefs = preferences('plugin.zvuk');
-						my $accounts = $prefs->get('accounts') || {};
-
-						$accounts->{$userId} = {
-							token => $token,
-							name  => $accountName,
-							phone => $phone,
-							stale => 0,
-						};
-						$prefs->set('accounts', $accounts);
-
-						my $currDefault = $prefs->get('defaultUserId');
-						if (!$currDefault || !exists $accounts->{$currDefault} || !$accounts->{$currDefault}{token}) {
-							$prefs->set('defaultUserId', $userId);
-						}
-
-						Plugins::Zvuk::Plugin::_init_api_client($userId);
-
-						$log->info("SMS OTP: Account saved: userId=$userId, name=$accountName");
-
-						_sendJsonResponse($httpClient, $response, {
-							success => 1,
-							account => {
-								userId => $userId,
-								name   => $accountName,
-							}
-						});
-					},
-					$token
-				);
-			} else {
-				my $err = $resp_data && $resp_data->{error} ? $resp_data->{error} : "Invalid code or login failed (HTTP $resp_code)";
-				$log->error("SMS OTP: Login failed for $phone: $err");
-				_sendJsonError($httpClient, $response, $err, 400);
-			}
-		},
-		sub {
-			my ($http, $error, $resp) = @_;
-			my $code = $resp ? $resp->code : 500;
-			my $err_msg;
-			if ($code == 403 || ($error && $error =~ /403/)) {
-				$err_msg = Slim::Utils::Strings::string('PLUGIN_ZVUK_PHONE_AUTH_BLOCKED')
-					|| 'Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.';
-			} elsif ($resp && $resp->content) {
-				my $resp_data = eval { decode_json($resp->content) };
-				$err_msg = $resp_data && ($resp_data->{error} || $resp_data->{message});
-			}
-			$err_msg ||= $error || 'Verification request failed';
-			$log->error("SMS OTP: Network/HTTP error verifying code for $phone: $err_msg");
-			_sendJsonError($httpClient, $response, $err_msg, 400);
-		},
-		{ timeout => 15 }
-	);
-
-	my %headers = (
-		'x-c-p'         => 'Q',
-		'x-app-name'    => Plugins::Zvuk::API::APP_NAME,
-		'x-app-version' => Plugins::Zvuk::API::APP_VERSION_ANDROID,
-		'x-app-build'   => Plugins::Zvuk::API::APP_BUILD_ANDROID,
-		'user-agent'    => Plugins::Zvuk::API::USER_AGENT,
-		'accept'        => 'application/json',
-		'content-type'  => 'application/x-www-form-urlencoded',
-	);
-
-	$http->post(Plugins::Zvuk::API::LOGIN_OTP_URL, %headers, $form_body);
-}
-
 # --- Atlas of Taste Web Handlers ---
 
 sub handleAtlasStandalone {
@@ -740,6 +496,51 @@ sub handleGetAtlasMapWeb {
 		} else {
 			_sendJsonResponse($httpClient, $response, { success => 1, map => $map });
 		}
+	});
+}
+
+sub handleSimulateStale {
+	my ($httpClient, $response) = @_;
+
+	my $request = $response->request;
+	my $uri = $request->uri;
+	my $client = _clientForWebRequest($request);
+	my $userId = $uri->query_param('userId');
+	$userId ||= ($client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : undef);
+	$userId ||= Plugins::Zvuk::API->getSomeUserId();
+
+	my $restore = $uri->query_param('restore') ? 1 : 0;
+
+	my $accounts = $prefs->get('accounts') || {};
+	if (!$userId || !$accounts->{$userId}) {
+		_sendJsonError($httpClient, $response, "No account found for userId: " . ($userId || 'none'), 404);
+		return;
+	}
+
+	if ($restore) {
+		$accounts->{$userId}{stale} = 0;
+		$prefs->set('accounts', $accounts);
+		$log->info("SimulateStale: Restored account $userId (stale=0)");
+		_sendJsonResponse($httpClient, $response, {
+			success => 1,
+			userId  => $userId,
+			stale   => 0,
+			message => "Account $userId restored (stale=0)",
+		});
+		return;
+	}
+
+	$accounts->{$userId}{stale} = 1;
+	$prefs->set('accounts', $accounts);
+	$log->warn("SimulateStale: Marked account $userId as stale (simulation)");
+
+	Plugins::Zvuk::Plugin->notifyAuthExpired($userId);
+
+	_sendJsonResponse($httpClient, $response, {
+		success => 1,
+		userId  => $userId,
+		stale   => 1,
+		message => "Account $userId marked as stale (simulation). showBriefly triggered.",
 	});
 }
 

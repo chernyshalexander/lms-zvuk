@@ -54,45 +54,29 @@ PLUGIN_ZVUK_AUTH_EXPIRED
 	EN	Authorization expired. Please re-login in plugin settings.
 	RU	Срок авторизации истёк. Требуется повторный вход в настройках плагина.
 
-PLUGIN_ZVUK_PHONE_AUTH_TITLE
-	EN	Login via Phone Number (SMS)
-	RU	Вход по номеру телефона (SMS)
+PLUGIN_ZVUK_AUTH_EXPIRED_TITLE
+	EN	Zvuk: Session Expired
+	RU	Zvuk: Сессия истекла
 
-PLUGIN_ZVUK_PHONE_AUTH_DESC
-	EN	Fast native authorization via SMS code directly from Zvuk
-	RU	Быстрый нативный вход по коду из SMS напрямую от сервиса Звук
+PLUGIN_ZVUK_AUTH_EXPIRED_DESC
+	EN	Authorization token is invalid or expired. Please re-login in plugin settings.
+	RU	Срок действия токена истёк. Пожалуйста, выполните повторный вход в настройках плагина.
 
-PLUGIN_ZVUK_SEND_SMS_BUTTON
-	EN	Get SMS Code
-	RU	Получить SMS-код
+PLUGIN_ZVUK_AUTH_EXPIRED_BADGE
+	EN	Session Expired
+	RU	Сессия истекла
 
-PLUGIN_ZVUK_SMS_CODE_PLACEHOLDER
-	EN	Code from SMS
-	RU	Код из SMS
+PLUGIN_ZVUK_AUTH_EXPIRED_BANNER
+	EN	Authorization expired for account '%s'. Please re-login to restore access.
+	RU	Срок действия авторизации для учётной записи «%s» истёк. Пожалуйста, выполните повторный вход для восстановления доступа.
 
-PLUGIN_ZVUK_LOGIN_BUTTON
-	EN	Log in
-	RU	Войти
+PLUGIN_ZVUK_SIMULATE_STALE
+	EN	Simulate expired session
+	RU	Смоделировать истекшую сессию
 
-PLUGIN_ZVUK_SMS_CODE_SENT
-	EN	Verification code sent to [phone]
-	RU	Код подтверждения отправлен на номер [phone]
-
-PLUGIN_ZVUK_INVALID_PHONE
-	EN	Invalid phone number format. Please enter as +7...
-	RU	Некорректный формат номера телефона. Введите в формате +7...
-
-PLUGIN_ZVUK_INVALID_SMS_CODE
-	EN	Please enter the SMS code
-	RU	Пожалуйста, введите код из SMS
-
-PLUGIN_ZVUK_PHONE_LOGIN_HINT
-	EN	This account uses Sber ID or password login. Please use "Login with Zvuk" or paste token manually.
-	RU	Этот номер использует вход по Сбер ID или паролю. Пожалуйста, используйте кнопку «Войти через Zvuk» или введите токен вручную.
-
-PLUGIN_ZVUK_PHONE_AUTH_BLOCKED
-	EN	Direct SMS authorization is unavailable: request rejected by service security (anti-bot protection). Please use "Login with Zvuk" button below or paste your token manually.
-	RU	Вход по SMS недоступен: запрос отклонён защитой сервиса Звук (защита от ботов). Пожалуйста, используйте кнопку «Войти через Zvuk» ниже или введите токен вручную.
+PLUGIN_ZVUK_RESTORE_STALE
+	EN	Restore session
+	RU	Восстановить сессию
 
 PLUGIN_ZVUK_QUALITY
 	EN	Streaming Quality
@@ -646,6 +630,18 @@ PLUGIN_ZVUK_LIKE_ALBUM
 PLUGIN_ZVUK_UNLIKE_ALBUM
 	EN	Remove Album from Collection
 	RU	Удалить альбом из коллекции
+
+PLUGIN_ZVUK_LIKE_TRACK
+	EN	Like
+	RU	Нравится
+
+PLUGIN_ZVUK_DISLIKE_TRACK
+	EN	Dislike
+	RU	Не нравится
+
+PLUGIN_ZVUK_UNLIKE_TRACK
+	EN	Dislike
+	RU	Не нравится
 
 PLUGIN_ZVUK_DONE
 	EN	Done

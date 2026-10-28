@@ -35,6 +35,12 @@ sub pluginData {
     }
     return $self->{_pluginData};
 }
+sub showBriefly {
+    my ($self, $params) = @_;
+    $self->{last_show_briefly} = $params;
+    push @{ $self->{show_briefly_log} ||= [] }, $params;
+    return $params;
+}
 
 package Test::FakeURI;
 sub new { my ($class, %params) = @_; return bless { params => { %params } }, $class; }

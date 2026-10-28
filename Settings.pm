@@ -122,15 +122,21 @@ sub beforeRender {
 	# Build accounts list for template
 	my $accounts = $prefs->get('accounts') || {};
 	my @accounts_list;
+	my @stale_accounts;
 	foreach my $userId (sort keys %$accounts) {
 		my $acc = $accounts->{$userId};
-		push @accounts_list, {
+		my $is_stale = $acc->{stale} ? 1 : 0;
+		my $entry = {
 			userId => $userId,
 			name   => $acc->{name} || $userId,
-			stale  => $acc->{stale} ? 1 : 0,
+			stale  => $is_stale,
 		};
+		push @accounts_list, $entry;
+		push @stale_accounts, $entry if $is_stale;
 	}
 	$params->{accounts} = \@accounts_list;
+	$params->{has_stale_accounts} = scalar(@stale_accounts) > 0 ? 1 : 0;
+	$params->{stale_accounts} = \@stale_accounts;
 
 	# Add wave settings for modal sliders
 	require Plugins::Zvuk::WaveSettings;

@@ -72,6 +72,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
 # HTTP 503 (retryable server error) must actually retry and can succeed.
 # ---------------------------------------------------------------------
 {
+    $Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts}{acctA}{stale} = 0;
     @Slim::Utils::Timers::SCHEDULED = ();
     @Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
     @Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
@@ -94,6 +95,7 @@ my $api = Plugins::Zvuk::API::Async->new({ userId => 'acctA' });
 # treated as retryable, same as before this fix.
 # ---------------------------------------------------------------------
 {
+    $Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts}{acctA}{stale} = 0;
     @Slim::Utils::Timers::SCHEDULED = ();
     @Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
     @Slim::Networking::SimpleAsyncHTTP::RESPONSES = (

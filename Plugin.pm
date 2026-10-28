@@ -99,16 +99,6 @@ sub initPlugin {
 				\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
 			);
 
-			Slim::Web::Pages->addRawFunction(
-				'plugins/zvuk/requestSmsCode',
-				\&Plugins::Zvuk::WebHandlers::handleRequestSmsCode
-			);
-
-			Slim::Web::Pages->addRawFunction(
-				'plugins/zvuk/verifySmsCode',
-				\&Plugins::Zvuk::WebHandlers::handleVerifySmsCode
-			);
-
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/imageproxy',
 			\&Plugins::Zvuk::WebHandlers::handleImageProxy
@@ -127,6 +117,11 @@ sub initPlugin {
 		Slim::Web::Pages->addRawFunction(
 			'plugins/zvuk/getAtlasMap',
 			\&Plugins::Zvuk::WebHandlers::handleGetAtlasMapWeb
+		);
+
+		Slim::Web::Pages->addRawFunction(
+			'plugins/zvuk/simulateStale',
+			\&Plugins::Zvuk::WebHandlers::handleSimulateStale
 		);
 	}
 
@@ -223,8 +218,75 @@ sub _get_api_client {
 	return _init_api_client($userId);
 }
 
+my %last_auth_notified;
+sub notifyAuthExpired {
+	my ($class, $userId, $client) = @_;
+
+	my @clients;
+	if ($client && ref $client) {
+		push @clients, $client;
+	} elsif (defined $userId && length($userId)) {
+		if (UNIVERSAL::can('Slim::Player::Client', 'clients')) {
+			for my $c (Slim::Player::Client->clients) {
+				my $cid = _getUserIdForClient($c);
+				if ($cid && $cid eq $userId) {
+					push @clients, $c;
+				}
+			}
+		}
+	}
+
+	for my $c (@clients) {
+		next unless ref $c;
+
+		# 1. Clear any continuous streaming mode (Wave, Radio, Atlas, GigaMix)
+		if (eval { require Plugins::Zvuk::StreamManager; 1 } && Plugins::Zvuk::StreamManager->can('stopStream')) {
+			Plugins::Zvuk::StreamManager->stopStream($c);
+		}
+
+		# 2. Halt playback immediately so LMS does not cycle through the remaining tracks
+		if ($c->can('execute')) {
+			$c->execute(['stop']);
+		} elsif (UNIVERSAL::can('Slim::Control::Request', 'executeRequest')) {
+			Slim::Control::Request::executeRequest($c, ['stop']);
+		}
+
+		# 3. De-bounce notification (at most once every 5s per player)
+		my $clientId = $c->id || "$c";
+		my $now = time();
+		if (!$last_auth_notified{$clientId} || $now - $last_auth_notified{$clientId} >= 5) {
+			$last_auth_notified{$clientId} = $now;
+			if ($c->can('showBriefly')) {
+				$c->showBriefly({
+					line => [
+						cstring($c, 'PLUGIN_ZVUK_AUTH_EXPIRED_TITLE'),
+						cstring($c, 'PLUGIN_ZVUK_AUTH_EXPIRED'),
+					],
+					duration => 5,
+				});
+			}
+		}
+	}
+}
+
 sub handleFeed {
 	my ($client, $cb, $args) = @_;
+
+	my $userId = _getUserIdForClient($client);
+	my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+	if ($userdata && $userdata->{stale}) {
+		$cb->([
+			{
+				name => cstring($client, 'PLUGIN_ZVUK_AUTH_EXPIRED_TITLE'),
+				type => 'text',
+			},
+			{
+				name => cstring($client, 'PLUGIN_ZVUK_AUTH_EXPIRED_DESC'),
+				type => 'text',
+			},
+		]);
+		return;
+	}
 
 	unless (_get_api_client($client)) {
 		$cb->([{ name => cstring($client, 'PLUGIN_ZVUK_ERROR_NOT_LOGGED_IN'), type => 'text' }]);
@@ -469,11 +531,29 @@ sub handleArtist {
 				$cb->({ items => [] });
 			},
 			itemActions => {
+				items => {
+					command     => ['playlist', 'play', $radioUrl, '', 0],
+					fixedParams => { url => $radioUrl },
+				},
+				play => {
+					command     => ['playlist', 'play', $radioUrl, '', 0],
+					fixedParams => { url => $radioUrl },
+				},
 				go => {
 					player     => 0,
-					cmd        => ['playlist', 'play'],
+					cmd        => ['playlist', 'play', $radioUrl, '', 0],
 					params     => { url => $radioUrl },
 					nextWindow => 'nowPlaying',
+				},
+			},
+			jive => {
+				actions => {
+					go => {
+						player     => 0,
+						cmd        => ['playlist', 'play', $radioUrl, '', 0],
+						params     => { url => $radioUrl },
+						nextWindow => 'nowPlaying',
+					},
 				},
 			},
 		},
@@ -940,6 +1020,18 @@ sub _renderRelease {
 			info => {
 				command     => ['zvuk_info', 'items'],
 				fixedParams => { type => 'album', id => $releaseId, url => $url, album => $title, artist => $artist },
+			},
+			play => {
+				command     => ['playlist', 'play', $url, '', 0],
+				fixedParams => { url => $url },
+			},
+			add => {
+				command     => ['playlist', 'add', $url, ''],
+				fixedParams => { url => $url },
+			},
+			insert => {
+				command     => ['playlist', 'insert', $url, ''],
+				fixedParams => { url => $url },
 			},
 		},
 	};

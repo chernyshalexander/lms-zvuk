@@ -218,37 +218,45 @@ if ($wave_json_content) {
 	like($url, qr{/api/v1/map/islands/$island_id/wave\?limit=3}, 'T1.5b: Default limit is 3 when omitted');
 }
 
-# Test 1.6: Automatic Token Refresh on HTTP 401
+# Test 1.6: HTTP 401 marks account as stale in prefs and returns error
 {
 	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
 	Plugins::Zvuk::API->cache->clear();
 	Plugins::Zvuk::API::Atlas->_resetThrottlerForTesting();
 	Plugins::Zvuk::API::Async::_resetThrottlerForTesting();
 
-	# Scenario: 401 on map request -> refreshToken succeeds -> retry with new token succeeds
+	my $stale_user = 'user_atlas_401';
+	$Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts}{$stale_user} = {
+		token => 'testtoken401',
+		name  => 'Atlas 401 User',
+		stale => 0,
+	};
+
+	# Scenario: 401 on map request -> marks account as stale -> returns error
 	@Slim::Networking::SimpleAsyncHTTP::RESPONSES = (
 		{ code => 401, message => 'Unauthorized' },
-		{ code => 200, content => '{"token":"refreshed_token_xyz987"}' }, # refresh POST
-		{ code => 200, content => $map_json_content },                   # retried map GET
 	);
 
-	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $stale_user });
 	my ($auth_res, $auth_err);
 	$atlas->getMap(sub {
 		($auth_res, $auth_err) = @_;
 	});
 
-	is($auth_err, undef, 'T1.6: getMap succeeded after automatic 401 refresh');
-	is(scalar(@{ $auth_res->{islands} }), 79, 'T1.6: retrieved map data after refresh');
+	is($auth_res, undef, 'T1.6: getMap result is undef on 401');
+	ok(defined $auth_err, 'T1.6: getMap reported error on 401');
 
-	# Check that prefs were updated with new token
-	my $updated_tok = Plugins::Zvuk::API->getToken('user_atlas');
-	is($updated_tok, 'refreshed_token_xyz987', 'T1.6: User token in prefs updated to refreshed token');
+	my $accounts = $Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts};
+	is($accounts->{$stale_user}{stale}, 1, 'T1.6: Account marked as stale in prefs on 401');
 
-	# Verify retried request sent the new token in Cookie header
-	my $retry_req = $Slim::Networking::SimpleAsyncHTTP::POST_LOG[-1];
-	my ($retry_url, %retry_headers) = @{ $retry_req->{args} };
-	is($retry_headers{'cookie'}, 'auth=refreshed_token_xyz987; in_webkit=true', 'T1.6: Retried request sent updated Cookie');
+	# Verify fast-path: subsequent call aborts immediately without HTTP call
+	@Slim::Networking::SimpleAsyncHTTP::POST_LOG = ();
+	my ($second_res, $second_err);
+	$atlas->getMap(sub {
+		($second_res, $second_err) = @_;
+	});
+	is($second_res, undef, 'T1.6: subsequent call on stale account returns undef');
+	is(scalar @Slim::Networking::SimpleAsyncHTTP::POST_LOG, 0, 'T1.6: no HTTP call sent for stale account');
 }
 
 # Test 1.7: Cursor with base64 special characters (+, /, =) is properly URL-escaped
@@ -282,7 +290,14 @@ if ($wave_json_content) {
 		{ code => 403, content => '{"message":"Access denied"}' }
 	);
 
-	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => 'user_atlas' });
+	my $u403 = 'user_atlas_403';
+	$Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts}{$u403} = {
+		token => 'testtoken403',
+		name  => 'Atlas 403 User',
+		stale => 0,
+	};
+
+	my $atlas = Plugins::Zvuk::API::Atlas->new({ userId => $u403 });
 	my ($err_res, $err_msg, $err_code);
 	$atlas->getMap(sub {
 		($err_res, $err_msg, $err_code) = @_;
@@ -291,6 +306,7 @@ if ($wave_json_content) {
 	is($err_res, undef, 'T1.8: HTTP 403 without error key returns undef data');
 	like($err_msg, qr{Access denied|403}, 'T1.8: HTTP 403 correctly recognized as error');
 	is($err_code, 403, 'T1.8: HTTP 403 status code returned');
+	is($Slim::Utils::Prefs::STORE{'plugin.zvuk'}{accounts}{$u403}{stale}, 1, 'T1.8: Account marked as stale on 403');
 }
 
 # Test 1.9: JSON parse error retains real HTTP status code (e.g. 502 HTML) and triggers retries

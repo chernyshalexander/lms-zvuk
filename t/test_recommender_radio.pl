@@ -257,6 +257,9 @@ Plugins::Zvuk::Plugin::handleArtist($client, sub { $artist_page = shift; }, {}, 
 ok($artist_page, 'T7: handleArtist returned page');
 is($artist_page->{items}[0]{name}, 'PLUGIN_ZVUK_ARTIST_RADIO', 'T7: first item in Artist page is Artist Radio');
 is($artist_page->{items}[0]{itemActions}{go}{params}{url}, 'zvuk://radio:artist:201', 'T7: launches zvuk://radio:artist:201');
+is_deeply($artist_page->{items}[0]{itemActions}{go}{cmd}, ['playlist', 'play', 'zvuk://radio:artist:201', '', 0], 'T7: Artist Radio cmd has radioUrl in positional slot 2');
+is_deeply($artist_page->{items}[0]{itemActions}{items}{command}, ['playlist', 'play', 'zvuk://radio:artist:201', '', 0], 'T7: Artist Radio has items command');
+is_deeply($artist_page->{items}[0]{jive}{actions}{go}{cmd}, ['playlist', 'play', 'zvuk://radio:artist:201', '', 0], 'T7: Artist Radio has jive.actions.go');
 is($artist_page->{items}[1]{name}, 'SONGS', 'T7: second item is Songs');
 is($artist_page->{items}[2]{name}, 'ALBUMS', 'T7: third item is Albums');
 

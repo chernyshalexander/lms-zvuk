@@ -75,6 +75,14 @@ sub _request {
 	$opts ||= {};
 	$method = uc($method || 'GET');
 
+	my $userId = $self->{userId} || Plugins::Zvuk::API->getSomeUserId();
+	my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+	if ($userdata && $userdata->{stale}) {
+		$log->warn("Atlas $method: User " . ($userId || 'default') . " is stale, skipping $path");
+		$cb->(undef, 'Account is stale', 401);
+		return;
+	}
+
 	my $url = Plugins::Zvuk::API::ATLAS_BASE_URL . $path;
 
 	# Build URL with deterministic query parameters
@@ -130,24 +138,17 @@ sub _request {
 					return;
 				}
 
-				# Automatic token refresh on HTTP 401
-				if (($result->{code} && $result->{code} == 401) && !$opts->{refreshed}) {
-					$log->warn("Atlas $method: Received HTTP 401 for $url, attempting token refresh");
-					require Plugins::Zvuk::API::Async;
-					my $async = Plugins::Zvuk::API::Async->new({ userId => $self->{userId} });
-					if ($async && $async->can('refreshToken')) {
-						$async->refreshToken(sub {
-							my ($newToken, $refreshErr) = @_;
-							if ($newToken) {
-								$log->info("Atlas $method: Token refreshed successfully, retrying $url");
-								my $newOpts = { %$opts, refreshed => 1 };
-								$self->_request($method, $path, $params, $body, $cb, $newOpts);
-							} else {
-								$log->error("Atlas $method: Token refresh failed: " . ($refreshErr || 'unknown'));
-								$cb->(undef, $result->{error}, $result->{code});
-							}
-						});
-						return;
+				# On client 4xx errors, mark account as stale
+				my $code = $result->{code} || 0;
+				if ($code >= 400 && $code < 500 && $code != 429) {
+					my $accounts = $prefs->get('accounts') || {};
+					if ($userId && $accounts->{$userId} && !$accounts->{$userId}{stale}) {
+						$accounts->{$userId}{stale} = 1;
+						$prefs->set('accounts', $accounts);
+						$log->warn("Atlas $method: Marked user $userId as stale after HTTP $code ($url)");
+						if (eval { require Plugins::Zvuk::Plugin; 1 } && Plugins::Zvuk::Plugin->can('notifyAuthExpired')) {
+							Plugins::Zvuk::Plugin->notifyAuthExpired($userId);
+						}
 					}
 				}
 

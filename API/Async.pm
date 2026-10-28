@@ -61,121 +61,8 @@ sub clearClient {
 	}
 }
 
-my %refreshInFlight;
-
 sub _resetThrottlerForTesting {
 	$throttler->{_task_logs} = [];
-	%refreshInFlight = ();
-}
-
-# Refresh access token via POST https://zvuk.com/api/tiny/refresh
-sub refreshToken {
-	my ($self, $cb, $explicitToken) = @_;
-	my $userId = ref($self) && $self->can('accountId') ? $self->accountId : Plugins::Zvuk::API->getSomeUserId();
-	my $token = $explicitToken || ($userId ? Plugins::Zvuk::API->getToken($userId) : Plugins::Zvuk::API->getToken());
-
-	if (!$token) {
-		$log->error("refreshToken: No token available for user: " . ($userId || 'unknown'));
-		$cb->(undef, 'No token available') if $cb;
-		return;
-	}
-
-	# Coalesce multiple concurrent refresh calls for the same user
-	if ($userId && $refreshInFlight{$userId}) {
-		$log->debug("refreshToken: Refresh already in flight for user $userId, queuing callback");
-		push @{ $refreshInFlight{$userId} }, $cb if $cb;
-		return;
-	}
-
-	if ($userId) {
-		$refreshInFlight{$userId} = [ $cb ? ($cb) : () ];
-	}
-
-	my $finish = sub {
-		my ($newToken, $error) = @_;
-		my $waiters = $userId ? delete $refreshInFlight{$userId} : [ $cb ? ($cb) : () ];
-		$waiters ||= [ $cb ? ($cb) : () ];
-		for my $waiter_cb (@$waiters) {
-			eval { $waiter_cb->($newToken, $error) if $waiter_cb; };
-			$log->error("refreshToken callback error: $@") if $@;
-		}
-	};
-
-	$log->info("refreshToken: Requesting POST " . Plugins::Zvuk::API::REFRESH_URL . " for user " . ($userId || 'default'));
-
-	$throttler->acquire(sub {
-		my $http = Slim::Networking::SimpleAsyncHTTP->new(
-			sub {
-				my $response = shift;
-				my $content = $response->content;
-				my $code = $response->code;
-
-				my $data = eval { decode_json($content) };
-				my $newToken = $data && ($data->{result} && $data->{result}{token} || $data->{token});
-
-				if ($newToken) {
-					$log->info("refreshToken: Successfully refreshed token for user " . ($userId || 'default'));
-
-					# Save refreshed token into prefs
-					my $accounts = $prefs->get('accounts') || {};
-					if ($userId && $accounts->{$userId}) {
-						$accounts->{$userId}{token} = $newToken;
-						$accounts->{$userId}{stale} = 0;
-						$prefs->set('accounts', $accounts);
-					}
-
-					$finish->($newToken, undef);
-				}
-				else {
-					my $err = $data && $data->{error} ? $data->{error} : "No token in refresh response (HTTP $code)";
-					$log->error("refreshToken: Failed: $err");
-
-					# Mark account as stale
-					my $accounts = $prefs->get('accounts') || {};
-					if ($userId && $accounts->{$userId}) {
-						$accounts->{$userId}{stale} = 1;
-						$prefs->set('accounts', $accounts);
-						$log->warn("refreshToken: Marked user $userId as stale (needs relogin)");
-					}
-
-					$finish->(undef, $err);
-				}
-			},
-			sub {
-				my ($http, $error, $response) = @_;
-				my $code = $response ? $response->code : 0;
-				$log->error("refreshToken: HTTP/network error (code $code): $error");
-
-				# On 401 or permanent failure during refresh, mark account as stale
-				if ($code == 401 || $code == 403) {
-					my $accounts = $prefs->get('accounts') || {};
-					if ($userId && $accounts->{$userId}) {
-						$accounts->{$userId}{stale} = 1;
-						$prefs->set('accounts', $accounts);
-						$log->warn("refreshToken: Marked user $userId as stale after HTTP $code");
-					}
-				}
-
-				$finish->(undef, $error);
-			},
-			{ timeout => 15 }
-		);
-
-		my %headers = (
-			'x-auth-token' => $token,
-			'x-c-p'        => 'Q',
-			'x-app-name'   => Plugins::Zvuk::API::APP_NAME,
-			'user-agent'   => Plugins::Zvuk::API::USER_AGENT,
-			'content-type' => 'application/json',
-			'accept'       => 'application/json',
-		);
-
-		$http->post(
-			Plugins::Zvuk::API::REFRESH_URL,
-			%headers,
-			'{}'
-		);
-	});
 }
 
 =head2 _graphql($cb, $operationName, $query, $variables, $opts)
@@ -233,6 +120,15 @@ sub _graphql {
 	$opts ||= {};
 
 	my $userId = $self->{userId};
+
+	# Check if account is marked stale
+	my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+	if ($userdata && $userdata->{stale}) {
+		$log->warn("GraphQL: User " . ($userId || 'default') . " is stale, skipping $operationName");
+		$cb->({ error => 'Account is stale', code => 401, stale => 1 });
+		return;
+	}
+
 	my $ttl    = $opts->{ttl} // _getCacheTTL($operationName);
 
 	# Create a unique cache key based on user, operation and variables
@@ -312,21 +208,19 @@ sub _graphql {
 				# Error case: all retries exhausted OR permanent error detected
 				# Log error for debugging and pass to original callback
 				if ($result->{error}) {
-					# INTERCEPTOR: Check if error is HTTP 401 (Unauthorized) and not already refreshed
-					if (($result->{code} && $result->{code} == 401) && !$opts->{refreshed}) {
-						$log->warn("GraphQL: Received HTTP 401 for $operationName (user $userId), attempting token refresh");
-						$self->refreshToken(sub {
-							my ($newToken, $refreshErr) = @_;
-							if ($newToken) {
-								$log->info("GraphQL: Token refreshed successfully for user $userId, retrying $operationName");
-								my $newOpts = { %$opts, refreshed => 1 };
-								$self->_graphql($cb, $operationName, $query, $variables, $newOpts);
-							} else {
-								$log->error("GraphQL: Token refresh failed for user $userId: " . ($refreshErr || 'unknown error'));
-								$cb->($result);
+					my $code = $result->{code} || 0;
+					# On client 4xx errors (400, 401, 403, 404, 422, etc.), mark account as stale
+					# 429 is rate-limiting, which is transient and not a credential failure
+					if ($code >= 400 && $code < 500 && $code != 429) {
+						my $accounts = $prefs->get('accounts') || {};
+						if ($userId && $accounts->{$userId} && !$accounts->{$userId}{stale}) {
+							$accounts->{$userId}{stale} = 1;
+							$prefs->set('accounts', $accounts);
+							$log->warn("GraphQL: Marked user $userId as stale after HTTP $code ($operationName)");
+							if (eval { require Plugins::Zvuk::Plugin; 1 } && Plugins::Zvuk::Plugin->can('notifyAuthExpired')) {
+								Plugins::Zvuk::Plugin->notifyAuthExpired($userId);
 							}
-						});
-						return;
+						}
 					}
 
 					if ($result->{details}) {
@@ -471,6 +365,18 @@ sub _getCacheTTL {
 		my ($self, $url, $params, $cb, $opts) = @_;
 		$opts ||= {};
 
+		my $hasCustomToken = ($opts->{headers} && ref $opts->{headers} eq 'HASH' && $opts->{headers}{'x-auth-token'});
+		my $userId;
+		if (!$hasCustomToken) {
+			$userId = ref($self) && $self->can('accountId') ? $self->accountId : (ref($self) && $self->{userId} ? $self->{userId} : Plugins::Zvuk::API->getSomeUserId());
+			my $userdata = $userId ? Plugins::Zvuk::API->getUserdata($userId) : Plugins::Zvuk::API->getUserdata();
+			if ($userdata && $userdata->{stale}) {
+				$log->warn("REST GET: User " . ($userId || 'default') . " is stale, skipping $url");
+				$cb->(undef, 'Account is stale', 401);
+				return;
+			}
+		}
+
 		# Build URL with query parameters using deterministic sort order
 		if ($params && %$params) {
 			my @param_pairs;
@@ -515,24 +421,18 @@ sub _getCacheTTL {
 						return;
 					}
 
-					# INTERCEPTOR: Check if error is HTTP 401 (Unauthorized) and not already refreshed
-					if (($result->{code} && $result->{code} == 401) && !$opts->{refreshed}) {
-						$log->warn("REST GET: Received HTTP 401 for $url, attempting token refresh");
-						$self->refreshToken(sub {
-							my ($newToken, $refreshErr) = @_;
-							if ($newToken) {
-								$log->info("REST GET: Token refreshed successfully, retrying $url");
-								my $newOpts = { %$opts, refreshed => 1 };
-								if ($newOpts->{headers} && $newOpts->{headers}{'x-auth-token'}) {
-									$newOpts->{headers}{'x-auth-token'} = $newToken;
-								}
-								$self->_http_get($url, $params, $cb, $newOpts);
-							} else {
-								$log->error("REST GET: Token refresh failed: " . ($refreshErr || 'unknown error'));
-								$cb->(undef, $result->{error}, $result->{code});
+					# Client error 4xx: mark account as stale
+					my $code = $result->{code} || 0;
+					if ($code >= 400 && $code < 500 && $code != 429) {
+						my $accounts = $prefs->get('accounts') || {};
+						if ($userId && !$hasCustomToken && $accounts->{$userId} && !$accounts->{$userId}{stale}) {
+							$accounts->{$userId}{stale} = 1;
+							$prefs->set('accounts', $accounts);
+							$log->warn("REST GET: Marked user $userId as stale after HTTP $code ($url)");
+							if (eval { require Plugins::Zvuk::Plugin; 1 } && Plugins::Zvuk::Plugin->can('notifyAuthExpired')) {
+								Plugins::Zvuk::Plugin->notifyAuthExpired($userId);
 							}
-						});
-						return;
+						}
 					}
 
 					$log->error("REST GET $url failed after retries: " . ($result->{error} || 'unknown'));
@@ -1631,6 +1531,22 @@ sub addToCollection {
 
 	$self->_graphql(sub {
 		my $res = shift;
+		if ($res && !$res->{error}) {
+			my $userId = $self->{userId} || '';
+			if ($type eq 'track') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userTracks:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'release') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userCollectionReleases:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'episode') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userPaginatedEpisodes:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'artist') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userCollectionArtists:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'podcast') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userPaginatedPodcasts:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'playlist') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:getUserPlaylists:" . md5_hex('{}'), undef, 0);
+			}
+		}
 		$cb->($res);
 	}, 'addItemToCollection', $gql, { id => "$id", type => "$type" }, { ttl => 0 });
 }
@@ -1648,6 +1564,22 @@ sub removeFromCollection {
 
 	$self->_graphql(sub {
 		my $res = shift;
+		if ($res && !$res->{error}) {
+			my $userId = $self->{userId} || '';
+			if ($type eq 'track') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userTracks:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'release') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userCollectionReleases:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'episode') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userPaginatedEpisodes:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'artist') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userCollectionArtists:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'podcast') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:userPaginatedPodcasts:" . md5_hex('{}'), undef, 0);
+			} elsif ($type eq 'playlist') {
+				Plugins::Zvuk::API->cache->set("zvuk_gql:${userId}:getUserPlaylists:" . md5_hex('{}'), undef, 0);
+			}
+		}
 		$cb->($res);
 	}, 'removeItemFromCollection', $gql, { id => "$id", type => "$type" }, { ttl => 0 });
 }
@@ -1670,6 +1602,16 @@ sub likeTrack {
 sub unlikeTrack {
 	my ($self, $cb, $trackId) = @_;
 	$self->removeFromCollection($cb, $trackId, 'track');
+}
+
+sub likeEpisode {
+	my ($self, $cb, $episodeId) = @_;
+	$self->addToCollection($cb, $episodeId, 'episode');
+}
+
+sub unlikeEpisode {
+	my ($self, $cb, $episodeId) = @_;
+	$self->removeFromCollection($cb, $episodeId, 'episode');
 }
 
 sub likeArtist {

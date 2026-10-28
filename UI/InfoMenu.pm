@@ -46,7 +46,7 @@ sub menuInfoCLI {
 		$feed = albumInfoMenu($client, $url, undef, $remoteMeta);
 	} elsif ($type eq 'artist' || $url =~ m{^zvuk://artist[:/](\d+)}) {
 		$feed = artistInfoMenu($client, $url, undef, $remoteMeta);
-	} elsif ($type eq 'track' || $url =~ m{^zvuk://(?:track[:/])?(\d+)}) {
+	} elsif ($type eq 'track' || $type eq 'episode' || $url =~ m{^zvuk://(?:(?:track|episode)[:/])?(\d+)}) {
 		$feed = trackInfoMenu($client, $url, undef, $remoteMeta);
 	}
 
@@ -99,11 +99,29 @@ sub albumInfoMenu {
 				$cb->({ items => [] });
 			},
 			itemActions => {
+				items => {
+					command     => ['playlist', 'add', $targetUrl, ''],
+					fixedParams => { url => $targetUrl },
+				},
+				add => {
+					command     => ['playlist', 'add', $targetUrl, ''],
+					fixedParams => { url => $targetUrl },
+				},
 				go => {
 					player     => 0,
-					cmd        => ['playlist', 'add'],
+					cmd        => ['playlist', 'add', $targetUrl, ''],
 					params     => { url => $targetUrl },
 					nextWindow => 'parent',
+				},
+			},
+			jive => {
+				actions => {
+					go => {
+						player     => 0,
+						cmd        => ['playlist', 'add', $targetUrl, ''],
+						params     => { url => $targetUrl },
+						nextWindow => 'parent',
+					},
 				},
 			},
 		},
@@ -118,11 +136,29 @@ sub albumInfoMenu {
 				$cb->({ items => [] });
 			},
 			itemActions => {
+				items => {
+					command     => ['playlist', 'insert', $targetUrl, ''],
+					fixedParams => { url => $targetUrl },
+				},
+				insert => {
+					command     => ['playlist', 'insert', $targetUrl, ''],
+					fixedParams => { url => $targetUrl },
+				},
 				go => {
 					player     => 0,
-					cmd        => ['playlist', 'insert'],
+					cmd        => ['playlist', 'insert', $targetUrl, ''],
 					params     => { url => $targetUrl },
 					nextWindow => 'parent',
+				},
+			},
+			jive => {
+				actions => {
+					go => {
+						player     => 0,
+						cmd        => ['playlist', 'insert', $targetUrl, ''],
+						params     => { url => $targetUrl },
+						nextWindow => 'parent',
+					},
 				},
 			},
 		},
@@ -137,11 +173,29 @@ sub albumInfoMenu {
 				$cb->({ items => [] });
 			},
 			itemActions => {
+				items => {
+					command     => ['playlist', 'play', $targetUrl, '', 0],
+					fixedParams => { url => $targetUrl },
+				},
+				play => {
+					command     => ['playlist', 'play', $targetUrl, '', 0],
+					fixedParams => { url => $targetUrl },
+				},
 				go => {
 					player     => 0,
-					cmd        => ['playlist', 'play'],
+					cmd        => ['playlist', 'play', $targetUrl, '', 0],
 					params     => { url => $targetUrl },
 					nextWindow => 'nowPlaying',
+				},
+			},
+			jive => {
+				actions => {
+					go => {
+						player     => 0,
+						cmd        => ['playlist', 'play', $targetUrl, '', 0],
+						params     => { url => $targetUrl },
+						nextWindow => 'nowPlaying',
+					},
 				},
 			},
 		},
@@ -163,11 +217,25 @@ sub albumInfoMenu {
 				$cb->({ items => [] });
 			},
 			itemActions => {
+				items => {
+					command     => ['jivefavorites', $favCmd],
+					fixedParams => { url => $targetUrl, title => $favTitle, type => 'playlist' },
+				},
 				go => {
 					player     => 0,
 					cmd        => ['jivefavorites', $favCmd],
 					params     => { url => $targetUrl, title => $favTitle, type => 'playlist' },
 					nextWindow => 'parent',
+				},
+			},
+			jive => {
+				actions => {
+					go => {
+						player     => 0,
+						cmd        => ['jivefavorites', $favCmd],
+						params     => { url => $targetUrl, title => $favTitle, type => 'playlist' },
+						nextWindow => 'parent',
+					},
 				},
 			},
 		},
@@ -233,47 +301,67 @@ sub trackInfoMenu {
 
 	# If playing a Zvuk track, offer Radio actions
 	if ($trackId) {
-		my $radioTrackUrl  = 'zvuk://radio:track:' . $trackId;
-		my $radioArtistUrl = $artistId ? ('zvuk://radio:artist:' . $artistId) : undef;
-		my $radioAlbumUrl  = $releaseId ? ('zvuk://radio:release:' . $releaseId) : undef;
+		my $isEpisode = ($trackUrl =~ m{zvuk://episode[:/]} || ($remoteMeta && $remoteMeta->{type} && $remoteMeta->{type} eq 'episode')) ? 1 : 0;
 
-		# 1. Track Radio
-		push @items, {
-			name      => cstring($client, 'PLUGIN_ZVUK_TRACK_RADIO'),
-			type      => 'audio',
-			url       => $radioTrackUrl,
-			play      => $radioTrackUrl,
-			on_select => 'play',
-			image     => 'html/images/radio.png',
-		};
+		unless ($isEpisode) {
+			my $radioTrackUrl  = 'zvuk://radio:track:' . $trackId;
+			my $radioArtistUrl = $artistId ? ('zvuk://radio:artist:' . $artistId) : undef;
+			my $radioAlbumUrl  = $releaseId ? ('zvuk://radio:release:' . $releaseId) : undef;
 
-		# 2. Artist Radio (if artist is known)
-		if ($radioArtistUrl) {
-			my $name = cstring($client, 'PLUGIN_ZVUK_ARTIST_RADIO');
-			$name .= " ($artistTitle)" if $artistTitle;
+			# 1. Track Radio
 			push @items, {
-				name      => $name,
+				name      => cstring($client, 'PLUGIN_ZVUK_TRACK_RADIO'),
 				type      => 'audio',
-				url       => $radioArtistUrl,
-				play      => $radioArtistUrl,
+				url       => $radioTrackUrl,
+				play      => $radioTrackUrl,
 				on_select => 'play',
 				image     => 'html/images/radio.png',
 			};
+
+			# 2. Artist Radio (if artist is known)
+			if ($radioArtistUrl) {
+				my $name = cstring($client, 'PLUGIN_ZVUK_ARTIST_RADIO');
+				$name .= " ($artistTitle)" if $artistTitle;
+				push @items, {
+					name      => $name,
+					type      => 'audio',
+					url       => $radioArtistUrl,
+					play      => $radioArtistUrl,
+					on_select => 'play',
+					image     => 'html/images/radio.png',
+				};
+			}
+
+			# 3. Album Radio (if album is known)
+			if ($radioAlbumUrl) {
+				my $name = cstring($client, 'PLUGIN_ZVUK_ALBUM_RADIO');
+				$name .= " ($albumTitle)" if $albumTitle;
+				push @items, {
+					name      => $name,
+					type      => 'audio',
+					url       => $radioAlbumUrl,
+					play      => $radioAlbumUrl,
+					on_select => 'play',
+					image     => 'html/images/radio.png',
+				};
+			}
 		}
 
-		# 3. Album Radio (if album is known)
-		if ($radioAlbumUrl) {
-			my $name = cstring($client, 'PLUGIN_ZVUK_ALBUM_RADIO');
-			$name .= " ($albumTitle)" if $albumTitle;
-			push @items, {
-				name      => $name,
-				type      => 'audio',
-				url       => $radioAlbumUrl,
-				play      => $radioAlbumUrl,
-				on_select => 'play',
-				image     => 'html/images/radio.png',
-			};
-		}
+		# Like / Dislike (Favorite tracks)
+		push @items, (
+			{
+				name        => cstring($client, 'PLUGIN_ZVUK_LIKE_TRACK'),
+				type        => 'link',
+				url         => \&_doLikeTrack,
+				passthrough => [$api, $trackId, $isEpisode],
+			},
+			{
+				name        => cstring($client, 'PLUGIN_ZVUK_DISLIKE_TRACK'),
+				type        => 'link',
+				url         => \&_doUnlikeTrack,
+				passthrough => [$api, $trackId, $isEpisode],
+			},
+		);
 	}
 
 	# Search on Zvuk (for any track)
@@ -372,6 +460,15 @@ sub artistInfoMenu {
 
 sub _doLikeRelease {
 	my ($client, $cb, $args, $api, $releaseId) = @_;
+	$api ||= Plugins::Zvuk::Plugin::_get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$cb->({ items => [{ name => "Error: No API client", type => 'text' }] });
+		return;
+	}
+	unless ($releaseId) {
+		$cb->({ items => [{ name => "Error: Missing album ID", type => 'text' }] });
+		return;
+	}
 	$api->likeRelease(sub {
 		my $res = shift;
 		my $msg = ($res && !$res->{error}) ? cstring($client, 'PLUGIN_ZVUK_DONE') : ("Error: " . ($res->{error} || 'failed'));
@@ -381,11 +478,62 @@ sub _doLikeRelease {
 
 sub _doUnlikeRelease {
 	my ($client, $cb, $args, $api, $releaseId) = @_;
+	$api ||= Plugins::Zvuk::Plugin::_get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$cb->({ items => [{ name => "Error: No API client", type => 'text' }] });
+		return;
+	}
+	unless ($releaseId) {
+		$cb->({ items => [{ name => "Error: Missing album ID", type => 'text' }] });
+		return;
+	}
 	$api->unlikeRelease(sub {
 		my $res = shift;
 		my $msg = ($res && !$res->{error}) ? cstring($client, 'PLUGIN_ZVUK_DONE') : ("Error: " . ($res->{error} || 'failed'));
 		$cb->({ items => [{ name => $msg, type => 'text' }] });
 	}, $releaseId);
+}
+
+sub _doLikeTrack {
+	my ($client, $cb, $args, $api, $trackId, $isEpisode) = @_;
+	$api ||= Plugins::Zvuk::Plugin::_get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$cb->({ items => [{ name => "Error: No API client", type => 'text' }] });
+		return;
+	}
+	unless ($trackId) {
+		$cb->({ items => [{ name => "Error: Missing track ID", type => 'text' }] });
+		return;
+	}
+	my $method = $isEpisode ? 'likeEpisode' : 'likeTrack';
+	$api->$method(sub {
+		my $res = shift;
+		my $msg = ($res && !$res->{error}) ? cstring($client, 'PLUGIN_ZVUK_DONE') : ("Error: " . ($res->{error} || 'failed'));
+		$cb->({ items => [{ name => $msg, type => 'text' }] });
+	}, $trackId);
+}
+
+sub _doUnlikeTrack {
+	my ($client, $cb, $args, $api, $trackId, $isEpisode) = @_;
+	$api ||= Plugins::Zvuk::Plugin::_get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$cb->({ items => [{ name => "Error: No API client", type => 'text' }] });
+		return;
+	}
+	unless ($trackId) {
+		$cb->({ items => [{ name => "Error: Missing track ID", type => 'text' }] });
+		return;
+	}
+	my $method = $isEpisode ? 'unlikeEpisode' : 'unlikeTrack';
+	$api->$method(sub {
+		my $res = shift;
+		my $msg = ($res && !$res->{error}) ? cstring($client, 'PLUGIN_ZVUK_DONE') : ("Error: " . ($res->{error} || 'failed'));
+		$cb->({ items => [{ name => $msg, type => 'text' }] });
+	}, $trackId);
+}
+
+sub _doDislikeTrack {
+	goto &_doUnlikeTrack;
 }
 
 1;
