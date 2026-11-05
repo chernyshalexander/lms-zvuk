@@ -441,24 +441,34 @@ sub _switchAccount {
 
 # --- Search Handlers ---
 
+# LMS XMLBrowser invokes coderef feeds as ->($client, $cb, $args, @passthrough),
+# and menu items pass the search term as passthrough => [{ search => ..., cursor? }].
+# The top-level type=search menu instead puts the term into $args->{search}.
+# Merge both sources so context-menu search and NEXT_PAGE work.
+sub _mergeSearchArgs {
+	my ($args, $pt) = @_;
+	return $args unless $pt && ref $pt eq 'HASH';
+	return { %{ $args || {} }, %$pt };
+}
+
 sub searchTracks {
-	my ($client, $cb, $args) = @_;
-	_searchGeneric($client, $cb, $args, 'tracks', \&_renderTrack, \&searchTracks, 1);
+	my ($client, $cb, $args, $pt) = @_;
+	_searchGeneric($client, $cb, _mergeSearchArgs($args, $pt), 'tracks', \&_renderTrack, \&searchTracks, 1);
 }
 
 sub searchArtists {
-	my ($client, $cb, $args) = @_;
-	_searchGeneric($client, $cb, $args, 'artists', \&_renderArtist, \&searchArtists);
+	my ($client, $cb, $args, $pt) = @_;
+	_searchGeneric($client, $cb, _mergeSearchArgs($args, $pt), 'artists', \&_renderArtist, \&searchArtists);
 }
 
 sub searchAlbums {
-	my ($client, $cb, $args) = @_;
-	_searchGeneric($client, $cb, $args, 'releases', \&_renderRelease, \&searchAlbums);
+	my ($client, $cb, $args, $pt) = @_;
+	_searchGeneric($client, $cb, _mergeSearchArgs($args, $pt), 'releases', \&_renderRelease, \&searchAlbums);
 }
 
 sub searchPlaylists {
-	my ($client, $cb, $args) = @_;
-	_searchGeneric($client, $cb, $args, 'playlists', \&_renderPlaylist, \&searchPlaylists);
+	my ($client, $cb, $args, $pt) = @_;
+	_searchGeneric($client, $cb, _mergeSearchArgs($args, $pt), 'playlists', \&_renderPlaylist, \&searchPlaylists);
 }
 
 sub _searchGeneric {
