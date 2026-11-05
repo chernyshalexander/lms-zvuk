@@ -142,43 +142,35 @@ sub beforeRender {
 	require Plugins::Zvuk::WaveSettings;
 
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
-	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+
+	# One catalog payload for every surface (family + level included)
+	my $catalog = Plugins::Zvuk::WaveSettings::getCatalog();
 	my @genre_list;
-	my %genre_labels;
-	foreach my $genre (@$genres) {
-		push @genre_list, { name => $genre->{name} };
-		my $label = Slim::Utils::Strings::string($genre->{label});
+	foreach my $genre (@$catalog) {
+		my $label = $genre->{label};
 		# Ensure UTF-8 encoded string for JSON
 		$label = decode_utf8($label) unless Encode::is_utf8($label);
-		$genre_labels{$genre->{name}} = $label;
+		push @genre_list, {
+			name         => $genre->{name},
+			label        => $label,
+			family       => $genre->{family},
+			family_label => $genre->{family_label},
+			level        => $genre->{level},
+		};
 	}
 
-	# Cleanup invalid genres from old preferences - filter out template variables
-	my @valid_genres;
-	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
-		foreach my $g (@{$wave_settings->{genres}}) {
-			# Only keep valid genre names (not template variables like '${genre.name}')
-			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
-				push @valid_genres, $g;
-			}
-		}
-	}
-
-	# Use valid genres if we have any, otherwise empty array (will use defaults later)
-	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
+	# loadSettings already drops anything outside the catalog
+	my $selected_genres = $wave_settings->{genres} || [];
 
 	# Use Unicode escape sequences for proper browser rendering
 	my $json = JSON::XS->new->utf8(0)->canonical(1);
 	my $genres_json = $json->encode(\@genre_list);
-	my $genres_labels_json = $json->encode(\%genre_labels);
 	my $selected_genres_json = $json->encode($selected_genres);
 
 	$log->debug("Wave Settings - Loaded genres: " . join(',', @{$selected_genres || []}));
-	$log->debug("Wave Settings - Genre Labels JSON: $genres_labels_json");
 
 	$params->{wave_settings} = $wave_settings;
 	$params->{genres_json} = $genres_json;
-	$params->{genres_labels_json} = $genres_labels_json;
 	$params->{selected_genres_json} = $selected_genres_json;
 }
 

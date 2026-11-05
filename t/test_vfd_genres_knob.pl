@@ -29,11 +29,20 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
 
     ok(ref $menu eq 'HASH' && ref $menu->{items} eq 'ARRAY', "handleGenresMenu returns menu hash for button player");
 
-    my @genreItems = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} } @{ $menu->{items} };
-    ok(scalar(@genreItems) > 0, "genre items exist in menu");
+    my @familyItems = grep { $_->{passthrough} && $_->{passthrough}[0]{family} } @{ $menu->{items} };
+    ok(scalar(@familyItems) > 0, "family items exist in the first menu level");
 
-    my $hasNextWindowRefresh = grep { ($_->{nextWindow} // '') eq 'refresh' } @genreItems;
-    ok(!$hasNextWindowRefresh, "genre items for button player (isButton=1) do NOT contain nextWindow => 'refresh' (prevents Slim::Buttons mode pop crash)");
+    my $hasNextWindowRefresh = grep { ($_->{nextWindow} // '') eq 'refresh' } @familyItems;
+    ok(!$hasNextWindowRefresh, "family items for button player (isButton=1) do NOT contain nextWindow => 'refresh' (prevents Slim::Buttons mode pop crash)");
+
+    # second level (genres of one family) must follow the same rule
+    my $familyMenu;
+    Plugins::Zvuk::UI::Wave::handleGenreFamily($client, sub { $familyMenu = shift }, { isButton => 1 },
+        { family => $familyItems[0]{passthrough}[0]{family} });
+    my @genreItems = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} } @{ $familyMenu->{items} };
+    ok(scalar(@genreItems) > 0, "genre items exist in the second menu level");
+    ok(!(grep { ($_->{nextWindow} // '') eq 'refresh' } @genreItems),
+        "genre items for button player also omit nextWindow => 'refresh'");
 }
 
 # Test 2: Standard/Web/Jive client (isButton is false)
@@ -41,20 +50,34 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
     my $menu;
     Plugins::Zvuk::UI::Wave::handleGenresMenu($client, sub { $menu = shift }, {});
 
-    my @genreItems = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} } @{ $menu->{items} };
-    my $allHaveNextWindowRefresh = (grep { ($_->{nextWindow} // '') eq 'refresh' } @genreItems) == scalar(@genreItems);
-    ok($allHaveNextWindowRefresh, "genre items for non-button UI retain nextWindow => 'refresh' for in-place refresh");
+    my @familyItems = grep { $_->{passthrough} && $_->{passthrough}[0]{family} } @{ $menu->{items} };
+    my $allHaveNextWindowRefresh = (grep { ($_->{nextWindow} // '') eq 'refresh' } @familyItems) == scalar(@familyItems);
+    ok($allHaveNextWindowRefresh, "family items for non-button UI retain nextWindow => 'refresh' for in-place refresh");
+
+    my $familyMenu;
+    Plugins::Zvuk::UI::Wave::handleGenreFamily($client, sub { $familyMenu = shift }, {},
+        { family => $familyItems[0]{passthrough}[0]{family} });
+    my @genreItems = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} } @{ $familyMenu->{items} };
+    my $allGenresRefresh = (grep { ($_->{nextWindow} // '') eq 'refresh' } @genreItems) == scalar(@genreItems);
+    ok($allGenresRefresh, "genre items for non-button UI retain nextWindow => 'refresh'");
 }
 
 # Test 3: Toggle genre on button player via handleGenreToggle
 {
+    my $familiesMenu;
+    Plugins::Zvuk::UI::Wave::handleGenresMenu($client, sub { $familiesMenu = shift }, { isButton => 1 });
+    my ($firstFamily) = grep { $_->{passthrough} && $_->{passthrough}[0]{family} } @{ $familiesMenu->{items} };
+    my $familyId = $firstFamily->{passthrough}[0]{family};
+
     my $menuBefore;
-    Plugins::Zvuk::UI::Wave::handleGenresMenu($client, sub { $menuBefore = shift }, { isButton => 1 });
+    Plugins::Zvuk::UI::Wave::handleGenreFamily($client, sub { $menuBefore = shift }, { isButton => 1 },
+        { family => $familyId });
     my ($firstItem) = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} } @{ $menuBefore->{items} };
     my $genreName = $firstItem->{passthrough}[0]{genre};
 
     my $menuAfter;
-    Plugins::Zvuk::UI::Wave::handleGenreToggle($client, sub { $menuAfter = shift }, { isButton => 1 }, { genre => $genreName });
+    Plugins::Zvuk::UI::Wave::handleGenreToggle($client, sub { $menuAfter = shift }, { isButton => 1 },
+        { genre => $genreName, family => $familyId });
 
     ok(ref $menuAfter eq 'HASH', "handleGenreToggle callback returns updated menu");
     my ($toggledItem) = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} eq $genreName } @{ $menuAfter->{items} };
@@ -62,7 +85,8 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
     ok(!exists $toggledItem->{nextWindow} || $toggledItem->{nextWindow} ne 'refresh', "refreshed genre item for button player still omits nextWindow => 'refresh'");
 
     # Toggle back
-    Plugins::Zvuk::UI::Wave::handleGenreToggle($client, sub { $menuAfter = shift }, { isButton => 1 }, { genre => $genreName });
+    Plugins::Zvuk::UI::Wave::handleGenreToggle($client, sub { $menuAfter = shift }, { isButton => 1 },
+        { genre => $genreName, family => $familyId });
     ($toggledItem) = grep { $_->{passthrough} && $_->{passthrough}[0]{genre} eq $genreName } @{ $menuAfter->{items} };
     like($toggledItem->{name}, qr/\[ \]/, "toggled back genre item display updated to unchecked [ ]");
 }

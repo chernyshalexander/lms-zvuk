@@ -234,57 +234,614 @@ PLUGIN_ZVUK_SETTING_GENRES
 	EN	Genres
 	RU	Жанры
 
-PLUGIN_ZVUK_GENRE_EASY_LISTENING
-	EN	Easy Listening / Ambient
-	RU	Лёгкая музыка / Ambient
+PLUGIN_ZVUK_GENRE_SEARCH
+	EN	Find a genre
+	RU	Найти жанр
 
-PLUGIN_ZVUK_GENRE_ELECTRONIC
+PLUGIN_ZVUK_GENRE_FAMILY_ROCK
+	EN	Rock & Metal
+	RU	Рок и метал
+
+PLUGIN_ZVUK_GENRE_FAMILY_ELECTRONIC
 	EN	Electronic
 	RU	Электроника
 
-PLUGIN_ZVUK_GENRE_CLASSICAL
-	EN	Classical
-	RU	Классика
+PLUGIN_ZVUK_GENRE_FAMILY_POP
+	EN	Pop & Retro
+	RU	Поп и ретро
 
-PLUGIN_ZVUK_GENRE_FOLK
-	EN	Folk / World / Country
-	RU	Фольклор / Мир / Country
+PLUGIN_ZVUK_GENRE_FAMILY_URBAN
+	EN	Hip-Hop & R&B
+	RU	Хип-хоп и R&B
 
-PLUGIN_ZVUK_GENRE_HIP_HOP
-	EN	Hip-Hop
-	RU	Хип-Хоп
+PLUGIN_ZVUK_GENRE_FAMILY_JAZZ
+	EN	Jazz & Blues
+	RU	Джаз и блюз
 
-PLUGIN_ZVUK_GENRE_INDIE
-	EN	Indie
-	RU	Инди
+PLUGIN_ZVUK_GENRE_FAMILY_WORLD
+	EN	Folk & World
+	RU	Фолк и мир
 
-PLUGIN_ZVUK_GENRE_INSTRUMENTAL
-	EN	Instrumental / Acoustic
-	RU	Инструментальная / Акустика
-
-PLUGIN_ZVUK_GENRE_JAZZ
-	EN	Jazz
-	RU	Джаз
-
-PLUGIN_ZVUK_GENRE_LATIN
-	EN	Latin
-	RU	Латиноамериканская
-
-PLUGIN_ZVUK_GENRE_METAL
-	EN	Metal
-	RU	Метал
-
-PLUGIN_ZVUK_GENRE_POP
-	EN	Pop
-	RU	Поп
+PLUGIN_ZVUK_GENRE_FAMILY_CALM
+	EN	Classical & Ambient
+	RU	Классика и атмосфера
 
 PLUGIN_ZVUK_GENRE_ROCK
 	EN	Rock
 	RU	Рок
 
+PLUGIN_ZVUK_GENRE_METAL
+	EN	Metal
+	RU	Метал
+
+PLUGIN_ZVUK_GENRE_INDIE
+	EN	Indie
+	RU	Инди
+
+PLUGIN_ZVUK_GENRE_ALTERNATIVE_METAL
+	EN	Alternative Metal
+	RU	Альтернативный метал
+
+PLUGIN_ZVUK_GENRE_ANATOLIAN_ROCK
+	EN	Anatolian Rock
+	RU	Анатолийский рок
+
+PLUGIN_ZVUK_GENRE_ART_ROCK
+	EN	Art Rock
+	RU	Арт-рок
+
+PLUGIN_ZVUK_GENRE_CHRISTIAN_ROCK
+	EN	Christian Rock
+	RU	Христианский рок
+
+PLUGIN_ZVUK_GENRE_CLASSIC_ROCK
+	EN	Classic Rock
+	RU	Классический рок
+
+PLUGIN_ZVUK_GENRE_DEATH_METAL
+	EN	Death Metal
+	RU	Дэт-метал
+
+PLUGIN_ZVUK_GENRE_DEATHCORE
+	EN	Deathcore
+	RU	Дэскор
+
+PLUGIN_ZVUK_GENRE_DJENT
+	EN	Djent
+	RU	Джент
+
+PLUGIN_ZVUK_GENRE_DOOM_METAL
+	EN	Doom Metal
+	RU	Дум-метал
+
+PLUGIN_ZVUK_GENRE_FOLK_METAL
+	EN	Folk Metal
+	RU	Фолк-метал
+
+PLUGIN_ZVUK_GENRE_FOLK_ROCK
+	EN	Folk Rock
+	RU	Фолк-рок
+
+PLUGIN_ZVUK_GENRE_FUNK_ROCK
+	EN	Funk Rock
+	RU	Фанк-рок
+
+PLUGIN_ZVUK_GENRE_GARAGE_ROCK
+	EN	Garage Rock
+	RU	Гаражный рок
+
+PLUGIN_ZVUK_GENRE_GLAM_METAL
+	EN	Glam Metal
+	RU	Глэм-метал
+
+PLUGIN_ZVUK_GENRE_GOTHIC_METAL
+	EN	Gothic Metal
+	RU	Готик-метал
+
+PLUGIN_ZVUK_GENRE_GOTHIC_ROCK
+	EN	Gothic Rock
+	RU	Готик-рок
+
+PLUGIN_ZVUK_GENRE_GRUNGE
+	EN	Grunge
+	RU	Гранж
+
+PLUGIN_ZVUK_GENRE_HARD_ROCK
+	EN	Hard Rock
+	RU	Хард-рок
+
+PLUGIN_ZVUK_GENRE_HARDCORE_PUNK
+	EN	Hardcore Punk
+	RU	Хардкор-панк
+
+PLUGIN_ZVUK_GENRE_HEAVY_METAL
+	EN	Heavy Metal
+	RU	Хэви-метал
+
+PLUGIN_ZVUK_GENRE_INDIE_ROCK
+	EN	Indie Rock
+	RU	Инди-рок
+
+PLUGIN_ZVUK_GENRE_INDUSTRIAL_METAL
+	EN	Industrial Metal
+	RU	Индастриал-метал
+
+PLUGIN_ZVUK_GENRE_INDUSTRIAL_ROCK
+	EN	Industrial Rock
+	RU	Индастриал-рок
+
+PLUGIN_ZVUK_GENRE_J_ROCK
+	EN	J-Rock
+	RU	J-Rock
+
+PLUGIN_ZVUK_GENRE_MELODIC_METAL
+	EN	Melodic Metal
+	RU	Мелодик-метал
+
+PLUGIN_ZVUK_GENRE_METALCORE
+	EN	Metalcore
+	RU	Металкор
+
+PLUGIN_ZVUK_GENRE_POP_PUNK
+	EN	Pop Punk
+	RU	Поп-панк
+
+PLUGIN_ZVUK_GENRE_POP_ROCK
+	EN	Pop Rock
+	RU	Поп-рок
+
+PLUGIN_ZVUK_GENRE_POST_GRUNGE
+	EN	Post-Grunge
+	RU	Пост-гранж
+
+PLUGIN_ZVUK_GENRE_POST_HARDCORE
+	EN	Post-Hardcore
+	RU	Пост-хардкор
+
+PLUGIN_ZVUK_GENRE_POST_PUNK
+	EN	Post-Punk
+	RU	Пост-панк
+
+PLUGIN_ZVUK_GENRE_POST_ROCK
+	EN	Post-rock
+	RU	Пост-рок
+
+PLUGIN_ZVUK_GENRE_POWER_METAL
+	EN	Power Metal
+	RU	Пауэр-метал
+
+PLUGIN_ZVUK_GENRE_PROG_ROCK
+	EN	Prog Rock
+	RU	Прогрессивный рок
+
+PLUGIN_ZVUK_GENRE_PROGRESSIVE_METAL
+	EN	Progressive Metal
+	RU	Прогрессивный метал
+
+PLUGIN_ZVUK_GENRE_PSYCHEDELIC_ROCK
+	EN	Psychedelic Rock
+	RU	Психоделический рок
+
+PLUGIN_ZVUK_GENRE_PUNK_ROCK
+	EN	Punk Rock
+	RU	Панк-рок
+
+PLUGIN_ZVUK_GENRE_RUSSIAN_ROCK
+	EN	Russian Rock
+	RU	Русский рок
+
+PLUGIN_ZVUK_GENRE_SHOEGAZE
+	EN	Shoegaze
+	RU	Шугейз
+
+PLUGIN_ZVUK_GENRE_SKA
+	EN	Ska
+	RU	Ска
+
+PLUGIN_ZVUK_GENRE_SKA_PUNK
+	EN	Ska Punk
+	RU	Ска-панк
+
+PLUGIN_ZVUK_GENRE_SPACE_ROCK
+	EN	Space Rock
+	RU	Спейс-рок
+
+PLUGIN_ZVUK_GENRE_SURF_ROCK
+	EN	Surf Rock
+	RU	Сёрф-рок
+
+PLUGIN_ZVUK_GENRE_SYMPHONIC_METAL
+	EN	Symphonic Metal
+	RU	Симфоник-метал
+
+PLUGIN_ZVUK_GENRE_ELECTRONIC
+	EN	Electronic
+	RU	Электроника
+
+PLUGIN_ZVUK_GENRE_BREAKBEAT_BREAKS
+	EN	Breakbeat
+	RU	Брейкбит
+
+PLUGIN_ZVUK_GENRE_BREAKCORE
+	EN	Breakcore
+	RU	Брейккор
+
+PLUGIN_ZVUK_GENRE_CHILLWAVE
+	EN	Chillwave
+	RU	Чиллвейв
+
+PLUGIN_ZVUK_GENRE_DARKWAVE
+	EN	Darkwave
+	RU	Дарквейв
+
+PLUGIN_ZVUK_GENRE_DIGITAL_HARDCORE
+	EN	Digital Hardcore
+	RU	Диджитал-хардкор
+
+PLUGIN_ZVUK_GENRE_DOWNTEMPO
+	EN	Downtempo
+	RU	Даунтемпо
+
+PLUGIN_ZVUK_GENRE_DUBSTEP
+	EN	Dubstep
+	RU	Дабстеп
+
+PLUGIN_ZVUK_GENRE_EBM
+	EN	EBM
+	RU	EBM
+
+PLUGIN_ZVUK_GENRE_EDM
+	EN	EDM
+	RU	EDM
+
+PLUGIN_ZVUK_GENRE_ELECTRO
+	EN	Electro
+	RU	Электро
+
+PLUGIN_ZVUK_GENRE_FRENCH_HOUSE
+	EN	French House
+	RU	Французский хаус
+
+PLUGIN_ZVUK_GENRE_FUTURE_BASS
+	EN	Future Bass
+	RU	Фьючер-бэйс
+
+PLUGIN_ZVUK_GENRE_FUTURE_FUNK
+	EN	Future Funk
+	RU	Фьючер-фанк
+
+PLUGIN_ZVUK_GENRE_GLITCH
+	EN	Glitch
+	RU	Глитч
+
+PLUGIN_ZVUK_GENRE_HARDBASS
+	EN	Hardbass
+	RU	Хардбасс
+
+PLUGIN_ZVUK_GENRE_HOUSE
+	EN	House
+	RU	Хаус
+
+PLUGIN_ZVUK_GENRE_IDM
+	EN	IDM
+	RU	IDM
+
+PLUGIN_ZVUK_GENRE_INDUSTRIAL
+	EN	Industrial
+	RU	Индастриал
+
+PLUGIN_ZVUK_GENRE_LO_FI_HOUSE
+	EN	Lo-Fi House
+	RU	Lo-Fi хаус
+
+PLUGIN_ZVUK_GENRE_NEUROFUNK
+	EN	Neurofunk
+	RU	Нейрофанк
+
+PLUGIN_ZVUK_GENRE_PROGRESSIVE_HOUSE
+	EN	Progressive House
+	RU	Прогрессив-хаус
+
+PLUGIN_ZVUK_GENRE_SYNTHWAVE
+	EN	Synthwave
+	RU	Синтвейв
+
+PLUGIN_ZVUK_GENRE_TECH_HOUSE
+	EN	Tech House
+	RU	Тех-хаус
+
+PLUGIN_ZVUK_GENRE_TRANCE
+	EN	Trance
+	RU	Транс
+
+PLUGIN_ZVUK_GENRE_TRIP_HOP
+	EN	Trip-Hop
+	RU	Трип-хоп
+
+PLUGIN_ZVUK_GENRE_WITCH_HOUSE
+	EN	Witch House
+	RU	Вич-хаус
+
+PLUGIN_ZVUK_GENRE_POP
+	EN	Pop
+	RU	Поп
+
+PLUGIN_ZVUK_GENRE_ALTERNATIVE_POP
+	EN	Alternative Pop
+	RU	Альтернативный поп
+
+PLUGIN_ZVUK_GENRE_ART_POP
+	EN	Art Pop
+	RU	Арт-поп
+
+PLUGIN_ZVUK_GENRE_BEDROOM_POP
+	EN	Bedroom Pop
+	RU	Бедрум-поп
+
+PLUGIN_ZVUK_GENRE_C_POP
+	EN	C-Pop
+	RU	C-Pop
+
+PLUGIN_ZVUK_GENRE_CHILDREN
+	EN	Children's Music
+	RU	Детские песни
+
+PLUGIN_ZVUK_GENRE_CITY_POP
+	EN	City Pop
+	RU	Сити-поп
+
+PLUGIN_ZVUK_GENRE_DISCO
+	EN	Disco
+	RU	Диско
+
+PLUGIN_ZVUK_GENRE_ELECTRO_SWING
+	EN	Electro Swing
+	RU	Электро-свинг
+
+PLUGIN_ZVUK_GENRE_ESTRADA
+	EN	Estrada
+	RU	Эстрада
+
+PLUGIN_ZVUK_GENRE_EURODANCE
+	EN	Eurodance
+	RU	Евродэнс
+
+PLUGIN_ZVUK_GENRE_ITALO_DISCO
+	EN	Italo Disco
+	RU	Итало-диско
+
+PLUGIN_ZVUK_GENRE_J_POP
+	EN	J-Pop
+	RU	J-Pop
+
+PLUGIN_ZVUK_GENRE_NEW_WAVE
+	EN	New Wave
+	RU	Новая волна
+
+PLUGIN_ZVUK_GENRE_NU_DISCO
+	EN	Nu Disco
+	RU	Ну-диско
+
+PLUGIN_ZVUK_GENRE_SYNTHPOP
+	EN	Synthpop
+	RU	Синти-поп
+
+PLUGIN_ZVUK_GENRE_HIP_HOP
+	EN	Hip-Hop
+	RU	Хип-хоп
+
+PLUGIN_ZVUK_GENRE_BRAZILIAN_PHONK
+	EN	Brazilian Phonk
+	RU	Бразильский фонк
+
+PLUGIN_ZVUK_GENRE_EMO_RAP
+	EN	Emo Rap
+	RU	Эмо-рэп
+
+PLUGIN_ZVUK_GENRE_FUNK
+	EN	Funk
+	RU	Фанк
+
+PLUGIN_ZVUK_GENRE_GRIME
+	EN	Grime
+	RU	Грайм
+
+PLUGIN_ZVUK_GENRE_INSTRUMENTAL_HIP_HOP
+	EN	Instrumental Hip-Hop
+	RU	Инструментальный хип-хоп
+
+PLUGIN_ZVUK_GENRE_K_RAP
+	EN	K-Rap
+	RU	K-Rap
+
+PLUGIN_ZVUK_GENRE_LO_FI_HIP_HOP
+	EN	Lo-Fi Hip-Hop
+	RU	Lo-Fi хип-хоп
+
+PLUGIN_ZVUK_GENRE_NEO_SOUL
+	EN	Neo Soul
+	RU	Нео-соул
+
+PLUGIN_ZVUK_GENRE_POP_RAP
+	EN	Pop Rap
+	RU	Поп-рэп
+
+PLUGIN_ZVUK_GENRE_RAP_ROCK
+	EN	Rap Rock
+	RU	Рэп-рок
+
+PLUGIN_ZVUK_GENRE_REGGAETON
+	EN	Reggaeton
+	RU	Реггетон
+
+PLUGIN_ZVUK_GENRE_RNB
+	EN	R&B
+	RU	R&B
+
+PLUGIN_ZVUK_GENRE_SOUL
+	EN	Soul
+	RU	Соул
+
+PLUGIN_ZVUK_GENRE_TRAP
+	EN	Trap
+	RU	Трэп
+
+PLUGIN_ZVUK_GENRE_UNDERGROUND_HIP_HOP
+	EN	Underground Hip-Hop
+	RU	Андеграундный хип-хоп
+
+PLUGIN_ZVUK_GENRE_JAZZ
+	EN	Jazz
+	RU	Джаз
+
+PLUGIN_ZVUK_GENRE_BEBOP
+	EN	Bebop
+	RU	Бибоп
+
+PLUGIN_ZVUK_GENRE_GOSPEL
+	EN	Gospel
+	RU	Госпел
+
+PLUGIN_ZVUK_GENRE_JAZZ_FUSION
+	EN	Jazz Fusion
+	RU	Джаз-фьюжн
+
+PLUGIN_ZVUK_GENRE_SMOOTH_JAZZ
+	EN	Smooth Jazz
+	RU	Смус-джаз
+
+PLUGIN_ZVUK_GENRE_SWING
+	EN	Swing
+	RU	Свинг
+
+PLUGIN_ZVUK_GENRE_LATIN
+	EN	Latin
+	RU	Латиноамериканская
+
+PLUGIN_ZVUK_GENRE_FOLK_WORLD_COUNTRY
+	EN	Folk / World / Country
+	RU	Фольклор / Мир / Country
+
+PLUGIN_ZVUK_GENRE_AFROBEAT
+	EN	Afrobeat
+	RU	Афробит
+
+PLUGIN_ZVUK_GENRE_BOLLYWOOD
+	EN	Bollywood
+	RU	Болливуд
+
+PLUGIN_ZVUK_GENRE_BOSSA_NOVA
+	EN	Bossa Nova
+	RU	Босса-нова
+
+PLUGIN_ZVUK_GENRE_CHANSON
+	EN	Chanson
+	RU	Шансон
+
+PLUGIN_ZVUK_GENRE_CHRISTIAN
+	EN	Christian
+	RU	Христианская
+
+PLUGIN_ZVUK_GENRE_DARK_FOLK
+	EN	Dark Folk
+	RU	Дарк-фолк
+
+PLUGIN_ZVUK_GENRE_FOLK
+	EN	Folk
+	RU	Фолк
+
+PLUGIN_ZVUK_GENRE_FOLK_POP
+	EN	Folk Pop
+	RU	Фолк-поп
+
+PLUGIN_ZVUK_GENRE_MAMBO
+	EN	Mambo
+	RU	Мамбо
+
+PLUGIN_ZVUK_GENRE_NON_MUSIC
+	EN	Non-Music
+	RU	Не музыка
+
+PLUGIN_ZVUK_GENRE_RELIGION
+	EN	Religion
+	RU	Религиозная
+
+PLUGIN_ZVUK_GENRE_ROMANCE
+	EN	Romance
+	RU	Романсы
+
+PLUGIN_ZVUK_GENRE_RUMBA
+	EN	Rumba
+	RU	Румба
+
+PLUGIN_ZVUK_GENRE_RUSSIAN_BARD
+	EN	Russian Bard
+	RU	Бардовская песня
+
+PLUGIN_ZVUK_GENRE_SALSA
+	EN	Salsa
+	RU	Сальса
+
+PLUGIN_ZVUK_GENRE_SAMBA
+	EN	Samba
+	RU	Самба
+
+PLUGIN_ZVUK_GENRE_SINGER_SONGWRITER
+	EN	Singer-Songwriter
+	RU	Авторская песня
+
+PLUGIN_ZVUK_GENRE_SOVIET_MUSIC
+	EN	Soviet Music
+	RU	Советская музыка
+
+PLUGIN_ZVUK_GENRE_WORLD
+	EN	World
+	RU	Мир
+
+PLUGIN_ZVUK_GENRE_CLASSICAL
+	EN	Classical
+	RU	Классика
+
+PLUGIN_ZVUK_GENRE_EASY_LISTENING_AMBIENT
+	EN	Easy Listening / Ambient
+	RU	Лёгкая музыка / Эмбиент
+
+PLUGIN_ZVUK_GENRE_INSTRUMENTAL_ACOUSTIC
+	EN	Instrumental / Acoustic
+	RU	Инструментальная / Акустика
+
 PLUGIN_ZVUK_GENRE_SOUNDTRACK
 	EN	Soundtrack
 	RU	Саундтрек
+
+PLUGIN_ZVUK_GENRE_AMBIENT
+	EN	Ambient
+	RU	Эмбиент
+
+PLUGIN_ZVUK_GENRE_EASY_LISTENING
+	EN	Easy Listening
+	RU	Лёгкая музыка
+
+PLUGIN_ZVUK_GENRE_LOUNGE
+	EN	Lounge
+	RU	Лаунж
+
+PLUGIN_ZVUK_GENRE_LULLABY
+	EN	Lullaby
+	RU	Колыбельные
+
+PLUGIN_ZVUK_GENRE_NEO_CLASSICAL
+	EN	Neo Classical
+	RU	Неоклассика
+
+PLUGIN_ZVUK_GENRE_NEW_AGE
+	EN	New Age
+	RU	Нью-эйдж
+
+PLUGIN_ZVUK_GENRE_SYMPHONY
+	EN	Symphony
+	RU	Симфоническая музыка
+
 
 PLUGIN_ZVUK_BACK
 	EN	Back

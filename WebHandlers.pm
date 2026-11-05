@@ -78,34 +78,30 @@ sub _renderWaveSettingsPage {
 	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 
-	# Build genres list for JavaScript
-	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
+	# Single catalog payload (family/level already resolved) shared with every
+	# other surface; see Plugins::Zvuk::WaveSettings::getCatalog.
+	my $catalog = Plugins::Zvuk::WaveSettings::getCatalog();
 	my @genre_list;
-	my %genre_labels;
-	foreach my $genre (@$genres) {
-		push @genre_list, { name => $genre->{name} };
-		my $label = Slim::Utils::Strings::string($genre->{label});
+	foreach my $genre (@$catalog) {
+		my $label = $genre->{label};
 		$label = decode_utf8($label) unless Encode::is_utf8($label);
-		$genre_labels{$genre->{name}} = $label;
+		push @genre_list, {
+			name         => $genre->{name},
+			label        => $label,
+			family       => $genre->{family},
+			family_label => $genre->{family_label},
+			level        => $genre->{level},
+		};
 	}
 
-	# Filter/sanitize genres list in selected genres too
-	my @valid_genres;
-	if ($wave_settings->{genres} && ref $wave_settings->{genres} eq 'ARRAY') {
-		foreach my $g (@{$wave_settings->{genres}}) {
-			if ($g && $g !~ /^\$\{/ && length($g) > 0) {
-				push @valid_genres, $g;
-			}
-		}
-	}
-	my $selected_genres = @valid_genres > 0 ? \@valid_genres : [];
+	# loadSettings already drops anything outside the catalog
+	my $selected_genres = $wave_settings->{genres} || [];
 
 	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
 
 	my $vars = {
 		wave_settings => $wave_settings,
 		genres_json => $json_encoder->encode(\@genre_list),
-		genres_labels_json => $json_encoder->encode(\%genre_labels),
 		selected_genres_json => $json_encoder->encode($selected_genres),
 		webroot => '/html/',
 		playerid => ($client ? $client->id : ''),
@@ -184,13 +180,21 @@ sub handleGetWaveSettingsWeb {
 	my $account_id = $client ? Plugins::Zvuk::Plugin::_getUserIdForClient($client) : 'default';
 	my $wave_settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 
-	# Build genres list for JavaScript
-	my $genres = Plugins::Zvuk::WaveSettings::getGenres();
-	my @genre_list;
-	my %genre_labels;
-	foreach my $genre (@$genres) {
-		push @genre_list, { name => $genre->{name} };
-		$genre_labels{$genre->{name}} = Slim::Utils::Strings::string($genre->{label});
+	# Same catalog payload as the modal and the native menu. `genres` keeps the
+	# old {name}-only shape for existing clients, `genre_labels` mirrors it for
+	# compatibility, and the new fields describe the family grouping.
+	my $catalog = Plugins::Zvuk::WaveSettings::getCatalog($client);
+	my (@genre_list, %genre_labels);
+	foreach my $genre (@$catalog) {
+		my $label = $genre->{label};
+		$label = decode_utf8($label) unless Encode::is_utf8($label);
+		push @genre_list, {
+			name         => $genre->{name},
+			family       => $genre->{family},
+			family_label => $genre->{family_label},
+			level        => $genre->{level},
+		};
+		$genre_labels{$genre->{name}} = $label;
 	}
 
 	my $response_data = {
@@ -198,6 +202,7 @@ sub handleGetWaveSettingsWeb {
 		settings => $wave_settings,
 		genres => \@genre_list,
 		genre_labels => \%genre_labels,
+		families => Plugins::Zvuk::WaveSettings::getCatalogByFamily($client, $wave_settings->{genres}),
 	};
 
 	_sendJsonResponse($httpClient, $response, $response_data);

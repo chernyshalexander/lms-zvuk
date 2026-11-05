@@ -124,46 +124,113 @@ sub handleGenresMenu {
 	$callback->({
 		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
 		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-		items => _getGenresMenu($client, $args),
+		items => _getFamilyMenu($client, $args),
 	});
 }
 
-sub _getGenresMenu {
+# First level: genre families, each with a count of selected genres inside so the
+# state is visible without opening it.
+sub _getFamilyMenu {
 	my ($client, $args) = @_;
-	my $api = _getAPIHandler($client);
-	my $account_id = $api ? $api->accountId() : 'default';
-
-	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
-	my $selected_genres = $settings->{genres} || [];
-	my %selected = map { $_ => 1 } @$selected_genres;
 
 	my $kind = _uiKind($client, $args);
 	my $is_buttons = ($kind eq 'player_buttons');
 
-	my @genre_items;
-	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
-		my $is_selected = $selected{$genre->{name}} ? 1 : 0;
-		my $checkbox_char = $is_selected ? '[x]' : '[ ]';
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings(_accountIdFor($client));
+	my $counts = Plugins::Zvuk::WaveSettings::countSelectedByFamily($settings->{genres});
+
+	my @items;
+	foreach my $family (@{ Plugins::Zvuk::WaveSettings::getFamilies() }) {
+		my $count = $counts->{ $family->{id} } || 0;
+		my $name = $count
+			? sprintf('[x] %s (%d)', cstring($client, $family->{label}), $count)
+			: sprintf('[ ] %s', cstring($client, $family->{label}));
+
 		my $item = {
-			name        => "$checkbox_char " . cstring($client, $genre->{label}),
+			name        => $name,
 			type        => 'link',
-			url         => \&handleGenreToggle,
-			passthrough => [{ genre => $genre->{name} }],
+			url         => \&handleGenreFamily,
+			passthrough => [{ family => $family->{id} }],
 		};
 		# Slim::Buttons::XMLBrowser crashes if nextWindow is 'refresh' (it pops all modes off stack).
 		# For Jive / WebUI we keep nextWindow => 'refresh'. For player_buttons, omit nextWindow.
 		$item->{nextWindow} = 'refresh' unless $is_buttons;
-		push @genre_items, $item;
+		push @items, $item;
 	}
 
-	push @genre_items, {
+	push @items, {
 		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
 		type       => 'link',
 		url        => \&handleWaveSettings,
 		nextWindow => 'parent',
 	};
 
-	return \@genre_items;
+	return \@items;
+}
+
+# Second level: genres of one family, as checkboxes.
+sub handleGenreFamily {
+	my ($client, $callback, $args, $params) = @_;
+	my $family_id = $params && $params->{family};
+
+	my $family;
+	foreach my $f (@{ Plugins::Zvuk::WaveSettings::getFamilies() }) {
+		$family = $f if $f->{id} eq ($family_id // '');
+	}
+
+	# Unknown family (stale menu) - fall back to the family list instead of an empty screen
+	if (!$family) {
+		$callback->({
+			name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+			title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+			items => _getFamilyMenu($client, $args),
+		});
+		return;
+	}
+
+	$callback->({
+		name  => cstring($client, $family->{label}),
+		title => cstring($client, $family->{label}),
+		items => _getFamilyGenresMenu($client, $args, $family_id),
+	});
+}
+
+sub _getFamilyGenresMenu {
+	my ($client, $args, $family_id) = @_;
+
+	my $kind = _uiKind($client, $args);
+	my $is_buttons = ($kind eq 'player_buttons');
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings(_accountIdFor($client));
+	my %selected = map { $_ => 1 } @{ $settings->{genres} || [] };
+
+	my @items;
+	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenresByFamily($family_id) }) {
+		my $checkbox_char = $selected{ $genre->{name} } ? '[x]' : '[ ]';
+		my $item = {
+			name        => "$checkbox_char " . cstring($client, $genre->{label}),
+			type        => 'link',
+			url         => \&handleGenreToggle,
+			passthrough => [{ genre => $genre->{name}, family => $family_id }],
+		};
+		$item->{nextWindow} = 'refresh' unless $is_buttons;
+		push @items, $item;
+	}
+
+	push @items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		url        => \&handleGenresMenu,
+		nextWindow => 'parent',
+	};
+
+	return \@items;
+}
+
+sub _accountIdFor {
+	my ($client) = @_;
+	my $api = _getAPIHandler($client);
+	return $api ? $api->accountId() : 'default';
 }
 
 sub handleGenreToggle {
@@ -171,9 +238,9 @@ sub handleGenreToggle {
 	return unless $params;
 
 	my $genre_name = $params->{genre};
+	my $family_id  = $params->{family};
 
-	my $api = _getAPIHandler($client);
-	my $account_id = $api ? $api->accountId() : 'default';
+	my $account_id = _accountIdFor($client);
 
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings($account_id);
 	my $genres = $settings->{genres} || [];
@@ -191,12 +258,59 @@ sub handleGenreToggle {
 
 	$log->info("Genre toggled: $genre_name, new genres: " . join(',', @{$settings->{genres}}));
 
-	# Вернуть в меню жанров
+	# Return into the same family the user came from, not to the family list.
+	my $items = defined $family_id
+		? _getFamilyGenresMenu($client, $args, $family_id)
+		: _getGenresMenu($client, $args);
+
+	my $title = defined $family_id ? _familyLabel($client, $family_id) : undef;
+
 	$callback->({
 		name  => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-		title => cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
-		items => _getGenresMenu($client, $args),
+		title => $title || cstring($client, 'PLUGIN_ZVUK_SETTING_GENRES'),
+		items => $items,
 	});
+}
+
+sub _familyLabel {
+	my ($client, $family_id) = @_;
+	foreach my $f (@{ Plugins::Zvuk::WaveSettings::getFamilies() }) {
+		return cstring($client, $f->{label}) if $f->{id} eq $family_id;
+	}
+	return undef;
+}
+
+# Legacy flat list, kept for callers that want every genre at once.
+sub _getGenresMenu {
+	my ($client, $args) = @_;
+
+	my $kind = _uiKind($client, $args);
+	my $is_buttons = ($kind eq 'player_buttons');
+
+	my $settings = Plugins::Zvuk::WaveSettings::loadSettings(_accountIdFor($client));
+	my %selected = map { $_ => 1 } @{ $settings->{genres} || [] };
+
+	my @genre_items;
+	foreach my $genre (@{ Plugins::Zvuk::WaveSettings::getGenres() }) {
+		my $checkbox_char = $selected{ $genre->{name} } ? '[x]' : '[ ]';
+		my $item = {
+			name        => "$checkbox_char " . cstring($client, $genre->{label}),
+			type        => 'link',
+			url         => \&handleGenreToggle,
+			passthrough => [{ genre => $genre->{name} }],
+		};
+		$item->{nextWindow} = 'refresh' unless $is_buttons;
+		push @genre_items, $item;
+	}
+
+	push @genre_items, {
+		name       => cstring($client, 'PLUGIN_ZVUK_BACK'),
+		type       => 'link',
+		url        => \&handleWaveSettings,
+		nextWindow => 'parent',
+	};
+
+	return \@genre_items;
 }
 
 sub _getAPIHandler {
