@@ -105,10 +105,15 @@
 		closeBtn.focus();
 	}
 
-	// Capture phase: the skin may also bind its own handler to the anchor
-	document.addEventListener('click', function (event) {
+	// Capture phase: the skin may also bind its own handler to the anchor.
+	// The classic skin renders its menu inside same-origin iframes (home.html in
+	// #leftcontent), and events from an iframe never reach the parent document,
+	// so the same listener has to be attached inside every frame and reattached
+	// whenever that frame navigates.
+	function handleClick(event) {
+		var doc = event.currentTarget;
 		var node = event.target;
-		while (node && node !== document) {
+		while (node && node !== doc) {
 			if (node.tagName === 'A' && node.getAttribute) {
 				var href = node.getAttribute('href') || '';
 				if (href.indexOf('/plugins/zvuk/waveStandalone') !== -1) {
@@ -120,5 +125,42 @@
 			}
 			node = node.parentNode;
 		}
-	}, true);
+	}
+
+	function bindDocument(doc) {
+		if (!doc || doc.__zvukWaveModalBound) {
+			return;
+		}
+		doc.__zvukWaveModalBound = true;
+		doc.addEventListener('click', handleClick, true);
+		doc.addEventListener('keydown', onKeydown, true);
+	}
+
+	function bindFrames() {
+		var frames = document.querySelectorAll('iframe');
+		for (var i = 0; i < frames.length; i++) {
+			var frameEl = frames[i];
+			try { bindDocument(frameEl.contentDocument); } catch (e) {}
+			if (!frameEl.__zvukWaveModalBound) {
+				frameEl.__zvukWaveModalBound = true;
+				// fires on every navigation inside the frame
+				frameEl.addEventListener('load', function () {
+					try { bindDocument(this.contentDocument); } catch (e) {}
+				});
+			}
+		}
+	}
+
+	bindDocument(document);
+	bindFrames();
+	if (window.addEventListener) {
+		window.addEventListener('load', bindFrames);
+	}
+	// the skin may create or replace the browsing frame after load
+	if (window.MutationObserver) {
+		new MutationObserver(bindFrames).observe(document.documentElement, {
+			childList: true,
+			subtree: true
+		});
+	}
 })();
