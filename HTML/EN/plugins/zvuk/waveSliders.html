@@ -841,6 +841,7 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 	// ==================================================================
 	var genreSearch = document.getElementById('genreSearch');
 	var genreCount = document.getElementById('genreCount');
+	var noMatchText = "[% \"PLUGIN_ZVUK_GENRE_NO_MATCH\" | string %]";
 
 	// Every family starts collapsed to keep the page short; the +/- control
 	// opens the members. Search expands whatever matches.
@@ -911,9 +912,11 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 			var toggle = document.createElement('button');
 			toggle.type = 'button';
 			toggle.className = 'family-toggle';
-			toggle.textContent = isOpen ? '−' : '+';
+			// ASCII only: a typographic minus (U+2212) in the template is not
+			// decoded as UTF-8 by the template loader and renders as garbage.
+			toggle.textContent = isOpen ? '-' : '+';
 			toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-			toggle.setAttribute('aria-label', (isOpen ? '− ' : '+ ') + family.label);
+			toggle.setAttribute('aria-label', (isOpen ? '-' : '+') + ' ' + family.label);
 			toggle.addEventListener('click', function() {
 				expandedFamilies[family.id] = !expandedFamilies[family.id];
 				buildGenreButtons();
@@ -991,7 +994,7 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 		if (rendered === 0) {
 			var empty = document.createElement('div');
 			empty.className = 'genre-family-empty';
-			empty.textContent = query === '' ? '' : '—';
+			empty.textContent = query === '' ? '' : noMatchText;
 			genreList.appendChild(empty);
 		}
 

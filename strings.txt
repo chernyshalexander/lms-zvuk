@@ -234,6 +234,10 @@ PLUGIN_ZVUK_SETTING_GENRES
 	EN	Genres
 	RU	Жанры
 
+PLUGIN_ZVUK_GENRE_NO_MATCH
+	EN	Nothing found
+	RU	Ничего не найдено
+
 PLUGIN_ZVUK_GENRE_SEARCH
 	EN	Find a genre
 	RU	Найти жанр
