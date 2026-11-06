@@ -41,6 +41,12 @@ sub showBriefly {
     push @{ $self->{show_briefly_log} ||= [] }, $params;
     return $params;
 }
+# ProtocolHandler sets this after caching metadata so the player redraws
+sub currentPlaylistUpdateTime {
+    my ($self, $when) = @_;
+    $self->{currentPlaylistUpdateTime} = $when if defined $when;
+    return $self->{currentPlaylistUpdateTime};
+}
 
 package Test::FakeURI;
 sub new { my ($class, %params) = @_; return bless { params => { %params } }, $class; }

@@ -19,7 +19,63 @@ use Plugins::Zvuk::StreamManager;
 
 my $log   = logger('plugin.zvuk');
 my $prefs = preferences('plugin.zvuk');
-my @pendingMeta;
+my @pendingMeta;          # [{ id, time, client }, ...] waiting for the next batch
+my $metaFlushTimer;       # timer that turns a burst of ids into one getTracks call
+
+# LMS asks for metadata one track at a time right after a queue is built, so a
+# wave or an album produced one getTracks request per track within milliseconds.
+# Collect the ids for a moment and fetch them in a single request instead.
+use constant META_BATCH_WINDOW  => 0.2;   # seconds
+use constant META_BATCH_MAX_IDS => 100;   # getTracks takes an array of ids
+
+sub _queueMetaRequest {
+	my ($client, $id) = @_;
+
+	my $now = time();
+	@pendingMeta = grep { $_->{time} + 60 > $now } @pendingMeta;
+	return if grep { $_->{id} == $id } @pendingMeta;
+	return if @pendingMeta >= META_BATCH_MAX_IDS;
+
+	push @pendingMeta, { id => $id, time => $now, client => $client };
+
+	$metaFlushTimer ||= Slim::Utils::Timers::setTimer(
+		undef, $now + META_BATCH_WINDOW, \&_flushMetaRequests
+	);
+}
+
+sub _flushMetaRequests {
+	$metaFlushTimer = undef;
+
+	my @batch = splice @pendingMeta;
+	return unless @batch;
+
+	my %seen;
+	my @ids = grep { !$seen{$_}++ } map { $_->{id} } @batch;
+
+	# Use the first client that actually resolves to an account
+	my $api;
+	for my $entry (@batch) {
+		$api = _getAPIHandler($entry->{client});
+		last if $api;
+	}
+	return unless $api;
+
+	$log->debug('Metadata batch request for ' . scalar(@ids) . ' track(s)');
+	$api->getTracks(sub {
+		my $tracks = shift;
+		return unless $tracks && @$tracks;
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		my %notified;
+		for my $entry (@batch) {
+			my $c = $entry->{client};
+			next unless $c && ref $c && $c->can('id');
+			next if $notified{ $c->id }++;
+			$c->currentPlaylistUpdateTime(time());
+			Slim::Control::Request::notifyFromArray($c, ['newmetadata']);
+		}
+	}, \@ids);
+}
 
 sub new {
 	my ($class, $args) = @_;
@@ -228,25 +284,8 @@ sub getMetadataFor {
 		return { type => $type, icon => $icon };
 	}
 
-	my $now = time();
-	@pendingMeta = grep { $_->{time} + 60 > $now } @pendingMeta;
-
-	if (!(grep { $_->{id} == $id } @pendingMeta) && scalar(@pendingMeta) < 10) {
-		push @pendingMeta, { id => $id, time => $now };
-		my $api = _getAPIHandler($client);
-		if ($api) {
-			$api->getTracks(sub {
-				my $tracks = shift;
-				@pendingMeta = grep { $_->{id} != $id } @pendingMeta;
-				return unless $tracks && @$tracks;
-				Plugins::Zvuk::API->cacheTrackMetadata($tracks);
-				$client->currentPlaylistUpdateTime(time()) if $client;
-				Slim::Control::Request::notifyFromArray($client, ['newmetadata']) if $client;
-			}, [$id]);
-		} else {
-			@pendingMeta = grep { $_->{id} != $id } @pendingMeta;
-		}
-	}
+	# One batched metadata request covers every track LMS asks about in this burst
+	_queueMetaRequest($client, $id);
 
 	return { type => $type, icon => $icon };
 }

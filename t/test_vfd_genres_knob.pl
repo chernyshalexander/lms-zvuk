@@ -51,8 +51,11 @@ my $client = Test::FakeClient->new(id => 'boom_player_1');
     Plugins::Zvuk::UI::Wave::handleGenresMenu($client, sub { $menu = shift }, {});
 
     my @familyItems = grep { $_->{passthrough} && $_->{passthrough}[0]{family} } @{ $menu->{items} };
-    my $allHaveNextWindowRefresh = (grep { ($_->{nextWindow} // '') eq 'refresh' } @familyItems) == scalar(@familyItems);
-    ok($allHaveNextWindowRefresh, "family items for non-button UI retain nextWindow => 'refresh' for in-place refresh");
+    # Navigation items must NOT carry nextWindow => 'refresh': on Jive/SqueezePlay
+    # that makes the client re-request the current window instead of opening the
+    # returned child feed, so tapping a family appeared to do nothing.
+    my $anyRefresh = grep { ($_->{nextWindow} // '') eq 'refresh' } @familyItems;
+    ok(!$anyRefresh, "family items never set nextWindow => 'refresh' (they navigate into the family)");
 
     my $familyMenu;
     Plugins::Zvuk::UI::Wave::handleGenreFamily($client, sub { $familyMenu = shift }, {},

@@ -133,9 +133,6 @@ sub handleGenresMenu {
 sub _getFamilyMenu {
 	my ($client, $args) = @_;
 
-	my $kind = _uiKind($client, $args);
-	my $is_buttons = ($kind eq 'player_buttons');
-
 	my $settings = Plugins::Zvuk::WaveSettings::loadSettings(_accountIdFor($client));
 	my $counts = Plugins::Zvuk::WaveSettings::countSelectedByFamily($settings->{genres});
 
@@ -152,9 +149,10 @@ sub _getFamilyMenu {
 			url         => \&handleGenreFamily,
 			passthrough => [{ family => $family->{id} }],
 		};
-		# Slim::Buttons::XMLBrowser crashes if nextWindow is 'refresh' (it pops all modes off stack).
-		# For Jive / WebUI we keep nextWindow => 'refresh'. For player_buttons, omit nextWindow.
-		$item->{nextWindow} = 'refresh' unless $is_buttons;
+		# No nextWindow here on purpose: this item NAVIGATES into the family.
+		# With nextWindow => 'refresh' Jive/SqueezePlay re-requested the current
+		# window instead of opening the returned child feed, so tapping a family
+		# appeared to do nothing. 'refresh' is only for in-place checkbox updates.
 		push @items, $item;
 	}
 
