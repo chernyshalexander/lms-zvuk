@@ -281,6 +281,9 @@ var zvukStrings = {
 	saved: '[% "PLUGIN_ZVUK_OAUTH_SAVED" | string %]',
 	invalidFormat: '[% "PLUGIN_ZVUK_OAUTH_INVALID_FORMAT" | string %]',
 	notFound: '[% "PLUGIN_ZVUK_OAUTH_NOT_FOUND" | string %]',
+	clipboardNotFound: '[% "PLUGIN_ZVUK_CLIPBOARD_NOT_FOUND" | string %]',
+	clipboardReadError: '[% "PLUGIN_ZVUK_CLIPBOARD_READ_ERROR" | string %]',
+	pasteHint: '[% "PLUGIN_ZVUK_PASTE_HINT" | string %]',
 	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string %]',
 	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string %]',
 	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]',
@@ -366,17 +369,17 @@ function pasteFromClipboard() {
 				setDivStatus(statusDiv, zvukStrings.tokenDetected, 'ok');
 				saveToken(token);
 			} else {
-				alert(zvukStrings.notFound || 'Токен не найден в буфере обмена');
+				alert(zvukStrings.clipboardNotFound || zvukStrings.notFound);
 			}
 		}).catch(function(err) {
-			alert('Не удалось прочитать буфер обмена: ' + err.message);
+			alert(zvukStrings.clipboardReadError + err.message);
 		});
 	} else {
 		var input = document.getElementById('new_account_token');
 		if (input) {
 			input.focus();
 			input.select();
-			alert('Нажмите Ctrl+V для вставки');
+			alert(zvukStrings.pasteHint);
 		}
 	}
 }

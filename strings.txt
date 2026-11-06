@@ -238,6 +238,22 @@ PLUGIN_ZVUK_GENRE_NO_MATCH
 	EN	Nothing found
 	RU	Ничего не найдено
 
+PLUGIN_ZVUK_MOOD_FUN_HIGH
+	EN	More fun
+	RU	Веселее
+
+PLUGIN_ZVUK_MOOD_FUN_LOW
+	EN	Less fun
+	RU	Грустнее
+
+PLUGIN_ZVUK_MOOD_ENERGY_LOW
+	EN	Calmer
+	RU	Спокойнее
+
+PLUGIN_ZVUK_MOOD_ENERGY_HIGH
+	EN	More energetic
+	RU	Энергичнее
+
 PLUGIN_ZVUK_GENRE_SEARCH
 	EN	Find a genre
 	RU	Найти жанр
@@ -1012,7 +1028,67 @@ PLUGIN_ZVUK_OAUTH_INVALID_FORMAT
 	EN	Invalid token format
 	RU	Токен имеет неправильный формат
 
+PLUGIN_ZVUK_OAUTH_TITLE
+	EN	Zvuk - Authorization
+	RU	Zvuk - Авторизация
+
+PLUGIN_ZVUK_OAUTH_GETTING_TOKEN
+	EN	Getting the authorization token...
+	RU	Получаем токен авторизации...
+
+PLUGIN_ZVUK_OAUTH_MANUAL_INTRO
+	EN	Automatic token retrieval is unavailable (CORS).
+	RU	Автоматическое получение токена недоступно (CORS).
+
+PLUGIN_ZVUK_OAUTH_OPEN_PROFILE
+	EN	Open the profile
+	RU	Откройте профиль
+
+PLUGIN_ZVUK_OAUTH_MANUAL_STEPS
+	EN	, copy the "token" field value and paste it below:
+	RU	, скопируйте значение поля "token" и вставьте ниже:
+
+PLUGIN_ZVUK_OAUTH_PASTE_TOKEN
+	EN	Paste token...
+	RU	Вставьте token...
+
+PLUGIN_ZVUK_OAUTH_SUCCESS_CLOSING
+	EN	Authorization successful! The window will close...
+	RU	Авторизация успешна! Окно закроется...
+
+PLUGIN_ZVUK_OAUTH_TOKEN_RECEIVED
+	EN	Token received, saving...
+	RU	Токен получен, сохраняем...
+
+PLUGIN_ZVUK_OAUTH_NOT_AUTHORIZED
+	EN	You are not signed in. Sign in at zvuk.com and retry.
+	RU	Вы не авторизованы. Войдите на zvuk.com и повторите.
+
+PLUGIN_ZVUK_OAUTH_AUTO_UNAVAILABLE
+	EN	Automatic retrieval is unavailable.
+	RU	Автоматическое получение недоступно.
+
+PLUGIN_ZVUK_OAUTH_ERROR_PREFIX
+	EN	Error: 
+	RU	Ошибка: 
+
+PLUGIN_ZVUK_OAUTH_SAVING_SHORT
+	EN	Saving...
+	RU	Сохраняем...
+
 PLUGIN_ZVUK_OAUTH_NOT_FOUND
+PLUGIN_ZVUK_CLIPBOARD_NOT_FOUND
+	EN	No token found in the clipboard
+	RU	Токен не найден в буфере обмена
+
+PLUGIN_ZVUK_CLIPBOARD_READ_ERROR
+	EN	Could not read the clipboard: 
+	RU	Не удалось прочитать буфер обмена: 
+
+PLUGIN_ZVUK_PASTE_HINT
+	EN	Press Ctrl+V to paste
+	RU	Нажмите Ctrl+V для вставки
+
 	EN	Token not found
 	RU	Токен не найден
 

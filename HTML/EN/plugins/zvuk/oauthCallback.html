@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="UTF-8">
-	<title>Zvuk — Авторизация</title>
+	<title>[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</title>
 	<style>
 		* { box-sizing: border-box; margin: 0; padding: 0; }
 		body {
@@ -67,24 +67,32 @@
 </head>
 <body>
 <div class="container">
-	<h2>Zvuk — Авторизация</h2>
+	<h2>[% "PLUGIN_ZVUK_OAUTH_TITLE" | string %]</h2>
 	<div id="autoSection">
 		<div class="spinner" id="spinner"></div>
-		<div class="status" id="statusText">Получаем токен авторизации...</div>
+		<div class="status" id="statusText">[% "PLUGIN_ZVUK_OAUTH_GETTING_TOKEN" | string %]</div>
 	</div>
 	<div id="manualSection">
 		<p>
-			Автоматическое получение токена недоступно (CORS).
+			[% "PLUGIN_ZVUK_OAUTH_MANUAL_INTRO" | string %]
 			<br>
-			<a href="https://zvuk.com/api/tiny/profile" target="_blank">Откройте профиль</a>,
-			скопируйте значение поля <code>"token"</code> и вставьте ниже:
+			<a href="https://zvuk.com/api/tiny/profile" target="_blank">[% "PLUGIN_ZVUK_OAUTH_OPEN_PROFILE" | string %]</a>[% "PLUGIN_ZVUK_OAUTH_MANUAL_STEPS" | string %]
 		</p>
-		<input type="text" id="tokenInput" placeholder="Вставьте token...">
-		<button onclick="saveManualToken()">Сохранить</button>
+		<input type="text" id="tokenInput" placeholder="[% "PLUGIN_ZVUK_OAUTH_PASTE_TOKEN" | string %]">
+		<button onclick="saveManualToken()">[% "PLUGIN_ZVUK_SAVE" | string %]</button>
 		<div class="status" id="manualStatus"></div>
 	</div>
 </div>
 <script>
+var oauthStrings = {
+	successClosing:  '[% "PLUGIN_ZVUK_OAUTH_SUCCESS_CLOSING" | string %]',
+	tokenReceived:   '[% "PLUGIN_ZVUK_OAUTH_TOKEN_RECEIVED" | string %]',
+	notAuthorized:   '[% "PLUGIN_ZVUK_OAUTH_NOT_AUTHORIZED" | string %]',
+	autoUnavailable: '[% "PLUGIN_ZVUK_OAUTH_AUTO_UNAVAILABLE" | string %]',
+	saving:          '[% "PLUGIN_ZVUK_OAUTH_SAVING_SHORT" | string %]',
+	errorPrefix:     '[% "PLUGIN_ZVUK_OAUTH_ERROR_PREFIX" | string %]'
+};
+
 function setStatus(text, cls) {
 	var el = document.getElementById('statusText');
 	el.textContent = text;
@@ -113,7 +121,7 @@ function saveToken(token) {
 	.then(function(data) {
 		if (data.success) {
 			document.getElementById('spinner').style.display = 'none';
-			setStatus('Авторизация успешна! Окно закроется...', 'ok');
+			setStatus(oauthStrings.successClosing, 'ok');
 			notifyAndClose(true);
 		} else {
 			throw new Error(data.error || 'Server error');
@@ -141,16 +149,16 @@ function tryAutoFetch() {
 		if (!token) throw new Error('no_token');
 		if (isAnon) throw new Error('anonymous');
 
-		setStatus('Токен получен, сохраняем...');
+		setStatus(oauthStrings.tokenReceived);
 		return saveToken(token);
 	})
 	.catch(function(e) {
 		document.getElementById('spinner').style.display = 'none';
 		if (e.message === 'anonymous') {
-			setStatus('Вы не авторизованы. Войдите на zvuk.com и повторите.', 'err');
+			setStatus(oauthStrings.notAuthorized, 'err');
 		} else {
-			// CORS or network error — show manual fallback
-			setStatus('Автоматическое получение недоступно.', 'err');
+			// CORS or network error - show manual fallback
+			setStatus(oauthStrings.autoUnavailable, 'err');
 			document.getElementById('manualSection').style.display = 'block';
 		}
 	});
@@ -160,10 +168,10 @@ function saveManualToken() {
 	var token = document.getElementById('tokenInput').value.trim();
 	if (!token) return;
 	var ms = document.getElementById('manualStatus');
-	ms.textContent = 'Сохраняем...';
+	ms.textContent = oauthStrings.saving;
 	ms.className = 'status';
 	saveToken(token).catch(function(e) {
-		ms.textContent = 'Ошибка: ' + e.message;
+		ms.textContent = oauthStrings.errorPrefix + e.message;
 		ms.className = 'status err';
 	});
 }

@@ -179,14 +179,17 @@ html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 					var buttons = dialog.querySelectorAll('button, a, [role="button"]');
 					for (var i = 0; i < buttons.length; i++) {
 						var btn = buttons[i];
+// Cyrillic and the multiplication sign are written as \u escapes on purpose:
+						// the template loader does not decode this file as UTF-8, so a literal
+						// would reach the browser as mojibake and never match the dialog text.
 						var txt = (btn.textContent || btn.innerText || '').toLowerCase().trim();
 						var title = (btn.getAttribute('title') || '').toLowerCase();
 						var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
 						var cls = (btn.className || '').toLowerCase();
 						if (txt.indexOf('close') !== -1 || txt.indexOf('clear') !== -1 || txt.indexOf('cancel') !== -1 || 
-						    txt.indexOf('закрыть') !== -1 || txt.indexOf('отмена') !== -1 || txt === 'x' || txt === '×' ||
-						    title.indexOf('close') !== -1 || title.indexOf('clear') !== -1 || title.indexOf('cancel') !== -1 || title.indexOf('закрыть') !== -1 ||
-						    aria.indexOf('close') !== -1 || aria.indexOf('clear') !== -1 || aria.indexOf('cancel') !== -1 || aria.indexOf('закрыть') !== -1 ||
+						    txt.indexOf('\u0437\u0430\u043a\u0440\u044b\u0442\u044c') !== -1 || txt.indexOf('\u043e\u0442\u043c\u0435\u043d\u0430') !== -1 || txt === 'x' || txt === '\u00d7' ||
+						    title.indexOf('close') !== -1 || title.indexOf('clear') !== -1 || title.indexOf('cancel') !== -1 || title.indexOf('\u0437\u0430\u043a\u0440\u044b\u0442\u044c') !== -1 ||
+						    aria.indexOf('close') !== -1 || aria.indexOf('clear') !== -1 || aria.indexOf('cancel') !== -1 || aria.indexOf('\u0437\u0430\u043a\u0440\u044b\u0442\u044c') !== -1 ||
 						    cls.indexOf('close') !== -1 || cls.indexOf('clear') !== -1 || cls.indexOf('cancel') !== -1 ||
 						    btn.querySelector('.v-icon') || btn.querySelector('i') || btn.querySelector('span')) {
 							triggerClickSequence(btn);
