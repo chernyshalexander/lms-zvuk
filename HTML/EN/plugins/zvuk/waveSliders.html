@@ -283,24 +283,32 @@
 	border-color: #43a047;
 }
 
+/* Family chips flow inline and wrap, so a collapsed list stays short.
+   An expanded family takes the whole line and shows its genres underneath. */
 .genre-families {
-	margin-top: 4px;
+	margin-top: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 10px;
+	align-items: flex-start;
 }
 
 .genre-family {
-	padding-top: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
 }
 
-.genre-family + .genre-family {
-	margin-top: 12px;
-	border-top: 1px solid #eee;
+.genre-family.expanded {
+	flex: 1 0 100%;
 }
 
 .genre-family-head {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	flex-wrap: wrap;
+	gap: 6px;
+	min-width: 0;
 }
 
 /* The family name is itself a pill: clicking it selects or clears the whole family */
@@ -308,6 +316,8 @@
 	font-weight: bold;
 	border-width: 2px;
 	border-style: dashed;
+	/* names carry meaning, so let them use the space instead of truncating */
+	max-width: none;
 }
 
 .family-pill.partial {
@@ -323,29 +333,44 @@
 .family-count {
 	font-size: 11px;
 	color: #777;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
 
+/* Disclosure control: a filled neutral chip with a soft edge so it reads as a
+   control against the card without competing with the green family pills. */
 .family-toggle {
-	width: 24px;
-	height: 24px;
-	flex: 0 0 24px;
+	width: 26px;
+	height: 26px;
+	flex: 0 0 26px;
 	padding: 0;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	border: 1px solid #d0d0d0;
-	border-radius: 6px;
-	background: #fff;
-	color: #333;
+	border: 1px solid #c9ced4;
+	border-radius: 7px;
+	background: #f4f5f7;
+	color: #3c4043;
 	font-size: 15px;
 	line-height: 1;
 	font-weight: bold;
 	cursor: pointer;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+	transition-property: background-color, border-color, color, box-shadow, scale;
+	transition-duration: 150ms;
+	transition-timing-function: ease-out;
 }
 
-.family-toggle:hover {
-	border-color: #43a047;
-	color: #2e7d32;
+@media (hover: hover) {
+	.family-toggle:hover {
+		border-color: #43a047;
+		background: #eef6ef;
+		color: #2e7d32;
+	}
+}
+
+.family-toggle:not(:disabled):active {
+	scale: 0.96;
 }
 
 .family-toggle:focus-visible {
@@ -354,7 +379,8 @@
 }
 
 .genre-family .pill-group {
-	margin-top: 8px;
+	/* spacing comes from the family's own gap, so no extra margin here */
+	margin-top: 0;
 }
 
 .genre-family-empty {
@@ -368,14 +394,18 @@ html.zvuk-dark-theme .family-count,
 html.zvuk-dark-theme .genre-family-empty { color: #9e9e9e; }
 
 html.zvuk-dark-theme .family-toggle {
-	background: #383838;
-	border-color: #555;
-	color: #ddd;
+	background: #3a3d42;
+	border-color: #565b62;
+	color: #dfe3e8;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-html.zvuk-dark-theme .family-toggle:hover {
-	border-color: #66bb6a;
-	color: #a5d6a7;
+@media (hover: hover) {
+	html.zvuk-dark-theme .family-toggle:hover {
+		border-color: #66bb6a;
+		background: #33402f;
+		color: #a5d6a7;
+	}
 }
 
 html.zvuk-dark-theme .genre-search input {
@@ -383,8 +413,6 @@ html.zvuk-dark-theme .genre-search input {
 	border-color: #555;
 	color: #ddd;
 }
-
-html.zvuk-dark-theme .genre-family + .genre-family { border-top-color: #3a3a3a; }
 
 html.zvuk-dark-theme .family-pill.partial {
 	background-color: rgba(67,160,71,0.2);
@@ -899,14 +927,15 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 			if (!visible.length) return;
 			rendered++;
 
+			var st = familyState(family.genres);
+			var isOpen = !!expandedFamilies[family.id] || query !== '';
+
 			var section = document.createElement('div');
-			section.className = 'genre-family';
+			// a collapsed family is a chip in the row; an expanded one owns the line
+			section.className = 'genre-family' + (isOpen ? ' expanded' : '');
 
 			var head = document.createElement('div');
 			head.className = 'genre-family-head';
-
-			var st = familyState(family.genres);
-			var isOpen = !!expandedFamilies[family.id] || query !== '';
 
 			// +/- disclosure control: collapsed by default, family choice stays visible
 			var toggle = document.createElement('button');
