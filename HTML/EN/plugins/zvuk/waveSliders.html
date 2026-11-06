@@ -833,7 +833,13 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 		buttons.forEach(function(btn) {
 			btn.classList.toggle('active', parseInt(btn.dataset.value, 10) === state.vocal);
 		});
-		languageGroup.style.display = state.vocal === 1 ? 'block' : 'none';
+		// Clearing the inline value lets the stylesheet decide how the card is
+		// laid out; the body class tells the embed layout that a third column
+		// is free again, so popularity and vocal can share the row between them.
+		languageGroup.style.display = state.vocal === 1 ? '' : 'none';
+		if (document.body) {
+			document.body.classList.toggle('zvuk-no-language', state.vocal !== 1);
+		}
 	}
 
 	vocalGroup.querySelectorAll('.pill-btn').forEach(function(btn) {

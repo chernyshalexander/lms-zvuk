@@ -100,6 +100,13 @@ html, body { background: transparent !important; margin: 0; }
 	/* a third of the row is tight for pill labels: trim the side padding so
 	   three language pills still share one line */
 	body.zvuk-embed .pill-btn { padding: 6px 10px; }
+
+	/* instrumental mode hides the language card: the two remaining cards take
+	   the free space instead of leaving a hole */
+	body.zvuk-embed.zvuk-no-language .wave-setting-group.popularity-group,
+	body.zvuk-embed.zvuk-no-language .wave-setting-group.vocal-group {
+		grid-column: span 3;
+	}
 }
 .wave-modal-overlay {
 	display: block !important;
