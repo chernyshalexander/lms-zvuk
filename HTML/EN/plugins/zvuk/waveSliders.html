@@ -216,7 +216,7 @@
 .pill-btn {
 	padding: 6px 14px;
 	border-radius: 999px;
-	border: 1px solid #d0d0d0;
+	border: 1px solid #e2e5e9;
 	background: white;
 	color: #333;
 	font-size: 12px;
@@ -272,7 +272,7 @@
 	width: 100%;
 	padding: 7px 12px;
 	font-size: 13px;
-	border: 1px solid #d0d0d0;
+	border: 1px solid #e2e5e9;
 	border-radius: 8px;
 	background: #fff;
 	color: #333;
@@ -314,7 +314,7 @@
 /* The family name is itself a pill: clicking it selects or clears the whole family */
 .family-pill {
 	font-weight: bold;
-	border-width: 2px;
+	border-width: 1px;
 	border-style: dashed;
 	/* names carry meaning, so let them use the space instead of truncating */
 	max-width: none;
@@ -510,7 +510,7 @@ html.zvuk-dark-theme .mood-pad-readout { color: #aaa; }
 html.zvuk-dark-theme .step-input-track { background-color: #4a4a4a; }
 html.zvuk-dark-theme .step-input-dot { background-color: #5a5a5a; }
 
-html.zvuk-dark-theme .pill-btn { background: #383838; color: #ddd; border-color: #555; }
+html.zvuk-dark-theme .pill-btn { background: #383838; color: #ddd; border-color: #4b4f55; }
 html.zvuk-dark-theme .pill-btn:hover { border-color: #90a4ae; background-color: #454545; }
 
 html.zvuk-dark-theme #vocalGroup .pill-btn:hover { border-color: #00acc1; background-color: rgba(0,172,193,0.15); }
@@ -1189,6 +1189,12 @@ html.zvuk-dark-theme .status-message.error { background-color: rgba(244,67,54,0.
 	function closeWaveSliderModal() {
 		// Check if we're in an iframe (Material modal mode)
 		if (window.parent && window.parent !== window) {
+			// Classic web modal host: it knows how to close itself, so ask it
+			// directly instead of hunting for a dialog button.
+			if (typeof window.parent.zvukCloseWaveModal === 'function') {
+				window.parent.zvukCloseWaveModal();
+				return;
+			}
 			console.log('[zvuk] closeWaveSliderModal called in iframe mode');
 			try {
 				var parentDoc = window.parent.document;

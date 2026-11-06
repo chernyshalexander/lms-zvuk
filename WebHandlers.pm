@@ -68,8 +68,16 @@ sub _sendJsonError {
 	return _sendJsonResponse($httpClient, $response, $payload, $code);
 }
 
+# True when the page is being opened inside the classic-web modal host, which
+# supplies its own backdrop and close control.
+sub _embedRequested {
+	my ($request) = @_;
+	return 0 unless $request && $request->uri;
+	return ($request->uri->query_param('embed') || '') eq '1' ? 1 : 0;
+}
+
 sub _renderWaveSettingsPage {
-	my ($httpClient, $response, $template) = @_;
+	my ($httpClient, $response, $template, $canEmbed) = @_;
 
 	require Plugins::Zvuk::WaveSettings;
 	require Slim::Web::HTTP;
@@ -99,10 +107,15 @@ sub _renderWaveSettingsPage {
 
 	my $json_encoder = JSON::XS->new->utf8(0)->canonical(1);
 
+	# ?embed=1 is set by the classic-web modal host, which already draws the
+	# backdrop and the close button around this page.
+	my $embed = $canEmbed && _embedRequested($request) ? 1 : 0;
+
 	my $vars = {
 		wave_settings => $wave_settings,
 		genres_json => $json_encoder->encode(\@genre_list),
 		selected_genres_json => $json_encoder->encode($selected_genres),
+		embed => $embed,
 		webroot => '/html/',
 		playerid => ($client ? $client->id : ''),
 	};
@@ -125,7 +138,7 @@ sub handleWaveSettingsWebUI {
 # Web UI handler for standalone wave settings page (from menu)
 sub handleWaveSettingsStandalone {
 	my ($httpClient, $response) = @_;
-	_renderWaveSettingsPage($httpClient, $response, 'plugins/zvuk/waveStandalone.html');
+	_renderWaveSettingsPage($httpClient, $response, 'plugins/zvuk/waveStandalone.html', 1);
 }
 
 # Web AJAX handler for saving wave settings from web interface

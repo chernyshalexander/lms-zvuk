@@ -35,6 +35,7 @@ my $parser = Template::Parser->new({
 });
 
 my @templates = sort glob("$repo_root/HTML/EN/plugins/zvuk/*.html"),
+	sort glob("$repo_root/HTML/EN/plugins/zvuk/*.js"),
 	sort glob("$repo_root/HTML/EN/plugins/zvuk/settings/*.html");
 
 ok(@templates > 0, 'found templates to check');

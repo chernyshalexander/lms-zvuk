@@ -216,4 +216,20 @@ subtest 'web JSON contract' => sub {
 	like($body, qr/"family_label"/, 'family labels are resolved');
 };
 
+# --- classic-web modal host --------------------------------------------
+subtest 'embed flag' => sub {
+	require Plugins::Zvuk::WebHandlers;
+
+	my $plain = Test::FakeRequest->new();
+	ok(!Plugins::Zvuk::WebHandlers::_embedRequested($plain), 'no embed param means a normal page');
+
+	my $embedded = Test::FakeRequest->new(query => { embed => '1' });
+	ok(Plugins::Zvuk::WebHandlers::_embedRequested($embedded), 'embed=1 is recognised');
+
+	my $other = Test::FakeRequest->new(query => { embed => '0' });
+	ok(!Plugins::Zvuk::WebHandlers::_embedRequested($other), 'embed=0 is not embed');
+
+	ok(!Plugins::Zvuk::WebHandlers::_embedRequested(undef), 'no request means no embed');
+};
+
 done_testing();
