@@ -72,17 +72,34 @@ html, body { background: transparent !important; margin: 0; }
 @media (min-width: 900px) {
 	body.zvuk-embed .wave-settings-container {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(6, minmax(0, 1fr));
 		gap: 16px;
-		align-items: start;
 	}
 	body.zvuk-embed .wave-settings-container .wave-setting-group { margin-bottom: 0; }
-	/* the pad and the two wide controls take a full row; vocal and language
-	   sit next to each other, which keeps the grid balanced */
+
+	/* the pad and the genre list need the full width */
 	body.zvuk-embed .wave-setting-group.mood-group,
-	body.zvuk-embed .wave-setting-group.popularity-group,
 	body.zvuk-embed .wave-setting-group.genres-group { grid-column: 1 / -1; }
 	body.zvuk-embed .button-group { grid-column: 1 / -1; }
+
+	/* popularity, vocal and language each take a third of one row: the slider
+	   simply gets a tighter step, and the two pill rows already leave room */
+	body.zvuk-embed .wave-setting-group.popularity-group,
+	body.zvuk-embed .wave-setting-group.vocal-group,
+	body.zvuk-embed .wave-setting-group.language-group {
+		grid-column: span 2;
+		/* equal heights across the row, content pinned to the edges */
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+	}
+
+	/* keep eleven steps legible in the narrower track */
+	body.zvuk-embed .step-input-dot { width: 9px; height: 9px; }
+
+	/* a third of the row is tight for pill labels: trim the side padding so
+	   three language pills still share one line */
+	body.zvuk-embed .pill-btn { padding: 6px 10px; }
 }
 .wave-modal-overlay {
 	display: block !important;
