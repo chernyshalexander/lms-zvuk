@@ -5,8 +5,12 @@
    The skin renders a weblink item as <a target="_blank">, which opens a stray
    tab; here the click is turned into an overlay on the current page. */
 (function () {
-	// Always active in the classic web UI. The material_settings_mode preference
-	// is scoped to Material by its own label, so it does not gate this behaviour.
+	// Governed by the "how wave settings open" preference, the same one Material
+	// uses: 'iframe' turns the link into an overlay, 'tab' leaves the new tab.
+	var ENABLED = [% IF waveModalEnabled %]true[% ELSE %]false[% END %];
+	if (!ENABLED) {
+		return;
+	}
 	var CLOSE_LABEL = '[% "PLUGIN_ZVUK_CANCEL" | string %]';
 	var DIALOG_LABEL = '[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]';
 	var overlay = null;

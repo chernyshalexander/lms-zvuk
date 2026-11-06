@@ -1241,19 +1241,19 @@ PLUGIN_ZVUK_EDITORIAL_PLAYLISTS_EMPTY
 	RU	Нет доступных подборок
 
 PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE
-	EN	Wave Settings Mode in Material UI
-	RU	Режим открытия настроек волны в Material UI
+	EN	How wave settings open
+	RU	Как открывать настройки волны
 
 PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_DESC
-	EN	Choose whether the settings slider panel should open in a modal overlay dialog or in a new browser tab.
-	RU	Выберите, открывать ли панель настроек волны в модальном окне поверх страницы или во вкладке браузера.
+	EN	Overlay on the current page, or a separate browser tab. Applies to the classic web interface and to the Material skin.
+	RU	Всплывающее окно поверх текущей страницы или отдельная вкладка браузера. Действует в классическом веб-интерфейсе и в Material.
 
 PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_IFRAME
-	EN	Modal Dialog (Iframe)
-	RU	Модальное окно (Iframe)
+	EN	Overlay window
+	RU	Всплывающее окно
 
 PLUGIN_ZVUK_MATERIAL_SETTINGS_MODE_TAB
-	EN	New Browser Tab
+	EN	New browser tab
 	RU	Новая вкладка браузера
 
 PLUGIN_ZVUK_ON_ZVUK

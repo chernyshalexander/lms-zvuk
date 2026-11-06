@@ -59,9 +59,12 @@ sub initPlugin {
 		Plugins::Zvuk::Settings->new();
 
 			# Classic web: open the wave settings as an overlay on the current page
-			# instead of the new tab a weblink item gets from the skin.
+			# instead of the new tab a weblink item gets from the skin. The
+			# preference governs both surfaces, so it decides the behaviour here too.
 			Slim::Web::Pages->addPageFunction('plugins/zvuk/waveModalHost.js', sub {
 				my $params = $_[1] || {};
+				my $mode = preferences('plugin.zvuk')->get('material_settings_mode') || 'iframe';
+				$params->{waveModalEnabled} = ($mode eq 'iframe') ? 1 : 0;
 				Slim::Web::HTTP::filltemplatefile('plugins/zvuk/waveModalHost.js', $params);
 			});
 			require Slim::Web::Pages::JS;
