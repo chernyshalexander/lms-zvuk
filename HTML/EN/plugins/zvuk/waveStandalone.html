@@ -67,6 +67,23 @@ html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
    close button, so this page only contributes the card itself. */
 [% IF embed %]
 html, body { background: transparent !important; margin: 0; }
+/* Wide host window: use the extra width instead of one long column.
+   Only in embed mode, so the settings page and Material keep their layout. */
+@media (min-width: 900px) {
+	body.zvuk-embed .wave-settings-container {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 16px;
+		align-items: start;
+	}
+	body.zvuk-embed .wave-settings-container .wave-setting-group { margin-bottom: 0; }
+	/* the pad and the two wide controls take a full row; vocal and language
+	   sit next to each other, which keeps the grid balanced */
+	body.zvuk-embed .wave-setting-group.mood-group,
+	body.zvuk-embed .wave-setting-group.popularity-group,
+	body.zvuk-embed .wave-setting-group.genres-group { grid-column: 1 / -1; }
+	body.zvuk-embed .button-group { grid-column: 1 / -1; }
+}
 .wave-modal-overlay {
 	display: block !important;
 	position: static;
@@ -91,7 +108,7 @@ html, body { background: transparent !important; margin: 0; }
 [% END %]
 </style>
 </head>
-<body>
+<body[% IF embed %] class="zvuk-embed"[% END %]>
 <!-- Wave Sliders Modal -->
 <div id="waveSliderModal" class="wave-modal-overlay">
 	<div id="waveSliderBox" class="wave-modal-box">
