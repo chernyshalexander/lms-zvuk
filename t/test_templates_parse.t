@@ -1,1 +1,0 @@
-test_templates_parse.pl
