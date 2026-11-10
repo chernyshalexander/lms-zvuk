@@ -412,8 +412,7 @@ sub _flattenTracksWithNumbers {
 	foreach my $track (@{ $album->{tracks} }) {
 		next unless $track && ref $track eq 'HASH';
 		my $t = { %$track };
-		$t->{_track_number} = $track->{position} || $idx;
-		$idx++;
+		$t->{_track_number} = $track->{position} || $idx++;
 		push @tracks, $t;
 	}
 	return @tracks;
