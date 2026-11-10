@@ -1702,4 +1702,36 @@ sub getAtlasIslandWave {
 	$atlas->getIslandWave($cb, $islandId, $limit, $cursor, $opts);
 }
 
+# Compute MD5 library fingerprint for change detection in Importer needsUpdate
+sub getLibraryFingerprint {
+	my ($self, $cb) = @_;
+
+	my $gql = q{
+		query checkCollection {
+			collection {
+				releases { id }
+				artists { id }
+				playlists { id }
+				tracks { id }
+			}
+		}
+	};
+
+	$self->_graphql(sub {
+		my $data = shift;
+		if (!$data || $data->{error}) {
+			$cb->(undef);
+			return;
+		}
+		my $col = $data->{collection} || {};
+		my $rel = join(',', sort map { $_->{id} } @{ $col->{releases} || [] });
+		my $art = join(',', sort map { $_->{id} } @{ $col->{artists} || [] });
+		my $pl  = join(',', sort map { $_->{id} } @{ $col->{playlists} || [] });
+		my $tr  = join(',', sort map { $_->{id} } @{ $col->{tracks} || [] });
+
+		my $fingerprint = md5_hex("rel:$rel|art:$art|pl:$pl|tr:$tr");
+		$cb->($fingerprint);
+	}, 'checkCollection', $gql, {}, { ttl => 0 });
+}
+
 1;

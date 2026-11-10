@@ -365,7 +365,7 @@ sub explodePlaylist {
 		return _explodeGigaMix($client, $prompt, $cb);
 	}
 
-	my ($type, $id) = $url =~ m{zvuk://(\w+)(?::(\d+))?};
+	my ($type, $id) = $url =~ m{zvuk://(\w+)(?::([^/]+))?};
 	return $cb->([$url]) unless $type;
 
 	# Handle Personal Wave radio
@@ -387,6 +387,10 @@ sub explodePlaylist {
 	return $cb->([$url]) unless $dispatch{$type};
 
 	my $handler = $dispatch{$type};
+	if ($type eq 'playlist' && $id =~ /^favorites/) {
+		$handler = 'Plugins::Zvuk::Plugin::handleCollection';
+	}
+
 	no strict 'refs';
 	$handler->($client, sub {
 		my $result = shift;

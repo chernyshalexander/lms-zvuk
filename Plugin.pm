@@ -14,6 +14,9 @@ use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::PluginManager;
 use Slim::Utils::Strings qw(string cstring);
+use Slim::Utils::Versions;
+
+use constant CAN_IMPORTER => (Slim::Utils::Versions->compareVersions($::VERSION, '8.0.0') >= 0);
 
 use Plugins::Zvuk::API;
 use Plugins::Zvuk::API::Async;
@@ -50,7 +53,48 @@ sub initPlugin {
 		quality                => 'high',
 		gigamix_autoplay       => 0,
 		material_settings_mode => 'iframe',
+		dontImportAccounts     => {},
 	});
+
+	# Register Importer for OnlineLibrary
+	$log->info("ZVUK: Registering Importer... (CAN_IMPORTER=" . CAN_IMPORTER . ")");
+	Slim::Music::Import->addImporter('Plugins::Zvuk::Importer', { use => 1, onlineLibraryOnly => 1 });
+
+	# Register service icon and browse artist item for OnlineLibrary
+	if (Slim::Utils::PluginManager->isEnabled('Slim::Plugin::OnlineLibrary::Plugin')) {
+		my $icon_path = '/plugins/zvuk/html/images/zvuk.png';
+		my $ret = eval {
+			Slim::Plugin::OnlineLibrary::Plugin->addLibraryIconProvider(
+				'zvuk',
+				$icon_path
+			);
+		};
+		if ($@) {
+			$log->warn("ZVUK: Failed to register library icon: $@");
+		} else {
+			$log->info("ZVUK: Registered library icon at $icon_path");
+		}
+
+		eval {
+			require Slim::Plugin::OnlineLibrary::BrowseArtist;
+			Slim::Plugin::OnlineLibrary::BrowseArtist->registerBrowseArtistItem( 'zvuk' => sub {
+				my ($client) = @_;
+				return {
+					name => cstring($client, 'PLUGIN_ZVUK_ON_ZVUK'),
+					type => 'link',
+					icon => $class->_pluginDataFor('icon'),
+					url  => \&browseArtistMenu,
+				};
+			} );
+		};
+		if ($@) {
+			$log->warn("ZVUK: Failed to register browse artist item: $@");
+		} else {
+			$log->info("ZVUK: Registered browse artist item for OnlineLibrary");
+		}
+	} else {
+		$log->debug("ZVUK: OnlineLibrary plugin not enabled, skipping library icon registration");
+	}
 
 	Plugins::Zvuk::ProtocolHandler->register();
 	Plugins::Zvuk::UI::InfoMenu->init();
@@ -486,7 +530,12 @@ sub searchPlaylists {
 sub _searchGeneric {
 	my ($client, $cb, $args, $type, $renderSub, $pageSub, @renderArgs) = @_;
 
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for search");
+		return $cb->({ items => [] });
+	}
+
 	my $query = $args->{search};
 	my $cursor = $args->{cursor};
 
@@ -502,7 +551,7 @@ sub _searchGeneric {
 
 	$api->search(sub {
 		my $data = shift;
-		my $searchData = $data->{search};
+		my $searchData = ($data && ref $data eq 'HASH') ? $data->{search} : undef;
 		
 		if (!$searchData) {
 			$cb->({ items => [] });
@@ -534,6 +583,33 @@ sub _searchGeneric {
 }
 
 # --- Browse Handlers ---
+
+sub browseArtistMenu {
+	my ($client, $cb, $params, $args) = @_;
+
+	my $artistId = $params->{artist_id} || $args->{artist_id};
+	my $empty = [{ type => 'text', title => cstring($client, 'EMPTY') }];
+
+	if (defined($artistId) && $artistId =~ /^\d+$/ && (my $artistObj = Slim::Schema->resultset("Contributor")->find($artistId))) {
+		my @extIds = $artistObj->can('extIds') ? @{ $artistObj->extIds || [] } : ($artistObj->can('extid') ? split(',', $artistObj->extid || '') : ());
+		if (my ($extId) = grep /zvuk:artist:([^,]+)/, @extIds) {
+			my ($id) = $extId =~ /zvuk:artist:([^,]+)/;
+			return handleArtist($client, $cb, { %{ $args || {} }, id => $id }, { id => $id });
+		}
+		elsif (defined $artistObj->name && length $artistObj->name) {
+			return searchArtists($client, sub {
+				my $res = shift;
+				if ($res && $res->{items} && @{ $res->{items} }) {
+					$cb->($res);
+				} else {
+					$cb->($empty);
+				}
+			}, $args, { search => $artistObj->name });
+		}
+	}
+
+	$cb->($empty);
+}
 
 sub handleArtist {
 	my ($client, $cb, $args, $params) = @_;
@@ -599,7 +675,11 @@ sub handleArtist {
 sub handleArtistTracks {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for handleArtistTracks");
+		return $cb->({ items => [] });
+	}
 
 	$api->getArtistTracks(sub {
 		my $items = shift || [];
@@ -611,7 +691,11 @@ sub handleArtistTracks {
 sub handleArtistAlbums {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for handleArtistAlbums");
+		return $cb->({ items => [] });
+	}
 
 	$api->getArtistAlbums(sub {
 		my $items = shift || [];
@@ -622,7 +706,11 @@ sub handleArtistAlbums {
 sub handlePodcast {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for handlePodcast");
+		return $cb->({ items => [] });
+	}
 
 	$api->getPodcastEpisodes(sub {
 		my $items = shift || [];
@@ -633,7 +721,11 @@ sub handlePodcast {
 sub handleAlbum {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for handleAlbum");
+		return $cb->({ items => [] });
+	}
 
 	$api->getAlbumTracks(sub {
 		my $items = shift || [];
@@ -645,7 +737,11 @@ sub handleAlbum {
 sub handlePlaylist {
 	my ($client, $cb, $args, $params) = @_;
 	my $id = $params->{id} || $args->{id};
-	my $api = _get_api_client($client);
+	my $api = _get_api_client($client) || Plugins::Zvuk::API->getClient($client);
+	unless ($api) {
+		$log->error("No API client available for handlePlaylist");
+		return $cb->({ items => [] });
+	}
 
 	$api->getPlaylistTracks(sub {
 		my $items = shift || [];
@@ -655,8 +751,23 @@ sub handlePlaylist {
 }
 
 sub handleCollection {
-	my ($client, $cb) = @_;
-	my $api = _get_api_client($client);
+	my ($client, $cb, $args, $params) = @_;
+
+	my $userId;
+	if ($params && $params->{id} && $params->{id} =~ /^favorites:(.+)$/) {
+		$userId = $1;
+	} elsif ($args && $args->{id} && $args->{id} =~ /^favorites:(.+)$/) {
+		$userId = $1;
+	}
+
+	my $api = $userId
+		? Plugins::Zvuk::API->getClient($userId)
+		: (_get_api_client($client) || Plugins::Zvuk::API->getClient($client));
+
+	unless ($api) {
+		$log->error("No API client available to fetch collection");
+		return $cb->({ items => [] });
+	}
 
 	$api->getCollection(sub {
 		my $items = shift || [];
@@ -1126,5 +1237,15 @@ sub _renderEpisode {
 	};
 }
 
+sub onlineLibraryNeedsUpdate {
+	if (CAN_IMPORTER) {
+		my $class = shift;
+		require Plugins::Zvuk::Importer;
+		return Plugins::Zvuk::Importer->needsUpdate(@_);
+	}
+	else {
+		$log->warn('ZVUK: The library importer feature requires at least Lyrion Music Server 8.0.0');
+	}
+}
 
 1;

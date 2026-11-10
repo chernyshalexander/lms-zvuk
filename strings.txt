@@ -1364,3 +1364,26 @@ PLUGIN_ZVUK_ATLAS_LOADING
 	EN	Loading Taste Atlas...
 	RU	Загрузка данных карты...
 
+PLUGIN_ZVUK_PROGRESS_READ_ALBUMS
+	EN	Reading albums for %s
+	RU	Чтение альбомов для %s
+
+PLUGIN_ZVUK_PROGRESS_READ_ARTISTS
+	EN	Reading artists for %s
+	RU	Чтение исполнителей для %s
+
+PLUGIN_ZVUK_PROGRESS_READ_PLAYLISTS
+	EN	Reading playlists for %s
+	RU	Чтение плейлистов для %s
+
+PLUGIN_ZVUK_ALBUMS_PROGRESS
+	EN	Zvuk Albums
+	RU	Альбомы Звук
+
+PLUGIN_ZVUK_ARTISTS_PROGRESS
+	EN	Zvuk Artists
+	RU	Исполнители Звук
+
+PLUGIN_ZVUK_PLAYLISTS_PROGRESS
+	EN	Zvuk Playlists
+	RU	Плейлисты Звук

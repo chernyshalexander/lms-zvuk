@@ -536,4 +536,8 @@ sub _doDislikeTrack {
 	goto &_doUnlikeTrack;
 }
 
+sub browseArtistMenu {
+	goto &Plugins::Zvuk::Plugin::browseArtistMenu;
+}
+
 1;

@@ -18,6 +18,7 @@ use JSON::PP ();
 # LMS defines this as a compile-time constant in the server bootstrap;
 # Plugin.pm's initPlugin() guards web-route registration on it.
 sub main::WEBUI() { 0 }
+sub main::SCANNER() { return $main::SCANNER // 0; }
 
 # ---- logging ----
 package Slim::Utils::Log;
@@ -35,6 +36,7 @@ sub debug { }
 sub warn  { }
 sub error { }
 sub is_debug { 0 }
+sub is_info  { 0 }
 
 # ---- preferences ----
 package Slim::Utils::Prefs;
@@ -78,9 +80,173 @@ sub remove { my ($self, $k) = @_; delete $CACHE{$k}; }
 sub clear  { %CACHE = (); }
 $INC{'Slim/Utils/Cache.pm'} = 1;
 
-# ---- plugin manager (unused in the paths under test, just needs to exist) ----
+# ---- plugin manager ----
 package Slim::Utils::PluginManager;
+our %PLUGINS = (
+    'Plugins::Zvuk::Plugin' => { name => 'PLUGIN_ZVUK', onlineLibrary => 'true' },
+);
+sub isEnabled { return 1; }
+sub dataForPlugin {
+    my ($class, $mod) = @_;
+    return $PLUGINS{$mod};
+}
 $INC{'Slim/Utils/PluginManager.pm'} = 1;
+
+# ---- versions ----
+package Slim::Utils::Versions;
+sub compareVersions {
+    my ($class, $v1, $v2) = @_;
+    return 1;
+}
+$INC{'Slim/Utils/Versions.pm'} = 1;
+
+# ---- music import ----
+package Slim::Music::Import;
+our @IMPORTERS;
+sub addImporter {
+    my ($class, $importer, $args) = @_;
+    push @IMPORTERS, { importer => $importer, args => $args };
+}
+sub endImporter { }
+sub scanPlaylistsOnly { return 0; }
+sub isOnlineLibrarySupportEnabled { return 1; }
+$INC{'Slim/Music/Import.pm'} = 1;
+
+# ---- online library ----
+package Slim::Plugin::OnlineLibrary::Plugin;
+our %ICONS;
+sub isEnabled { return 1; }
+sub addLibraryIconProvider {
+    my ($class, $provider, $icon) = @_;
+    $ICONS{$provider} = $icon;
+    return 1;
+}
+$INC{'Slim/Plugin/OnlineLibrary/Plugin.pm'} = 1;
+
+package Slim::Plugin::OnlineLibrary::BrowseArtist;
+our %BROWSE_ARTIST_ITEMS;
+sub registerBrowseArtistItem {
+    my ($class, $name, $handler) = @_;
+    $BROWSE_ARTIST_ITEMS{$name} = $handler;
+    return 1;
+}
+$INC{'Slim/Plugin/OnlineLibrary/BrowseArtist.pm'} = 1;
+
+package Slim::Plugin::OnlineLibraryBase;
+our @STORED_TRACKS;
+sub initPlugin { 1 }
+sub initOnlineTracksTable { }
+sub deleteRemovedTracks { }
+sub trackUriPrefix { 'zvuk://' }
+sub isImportEnabled { 1 }
+sub ignorePlaylists { 0 }
+sub storeTracks {
+    my ($class, $tracks, $libId, $accId) = @_;
+    push @STORED_TRACKS, { tracks => $tracks, libraryId => $libId, accountId => $accId };
+}
+sub normalizeContributorName { return $_[1]; }
+$INC{'Slim/Plugin/OnlineLibraryBase.pm'} = 1;
+
+# ---- progress ----
+package Slim::Utils::Progress;
+sub new {
+    my ($class, $args) = @_;
+    return bless { %$args, count => 0 }, $class;
+}
+sub update { my ($self, $msg) = @_; $self->{last_msg} = $msg; $self->{count}++; }
+sub total { my ($self, $tot) = @_; $self->{total} = $tot if defined $tot; return $self->{total} || 0; }
+sub final { my $self = shift; $self->{final} = 1; }
+sub done { return $_[0]->{count}; }
+$INC{'Slim/Utils/Progress.pm'} = 1;
+
+# ---- schema ----
+package Slim::Schema;
+our $FORCE_COMMITS = 0;
+our %OBJECTS; # url => { attributes => ... }
+sub forceCommit { $FORCE_COMMITS++; }
+sub updateOrCreate {
+    my ($class, $args) = @_;
+    my $url = $args->{url};
+    my $obj = bless { %$args }, 'Test::FakeSchemaObject';
+    $OBJECTS{$url} = $obj;
+    return $obj;
+}
+sub dbh { return bless {}, 'Test::FakeDBH'; }
+sub resultset {
+    my ($class, $name) = @_;
+    return bless { name => $name }, 'Test::FakeResultSet';
+}
+
+package Test::FakeResultSet;
+our %ITEMS; # id => obj
+sub find {
+    my ($self, $id) = @_;
+    return $ITEMS{$id};
+}
+
+package Test::FakeSchemaObject;
+sub id { return 123; }
+sub setTracks {
+    my ($self, $tracks) = @_;
+    $self->{tracks} = $tracks;
+}
+
+package Test::FakeDBH;
+sub prepare_cached {
+    my ($self, $sql) = @_;
+    return bless { sql => $sql }, 'Test::FakeSTH';
+}
+sub selectrow_array { return (0); }
+sub do { return 1; }
+
+package Test::FakeSTH;
+sub execute { return 1; }
+sub fetchall_arrayref { return []; }
+sub fetchrow_array { return (0); }
+sub finish { return 1; }
+
+package Slim::Schema::Contributor;
+our @CONTRIBUTORS;
+sub add {
+    my ($class, $args) = @_;
+    push @CONTRIBUTORS, $args;
+    my $obj = bless { %$args }, __PACKAGE__;
+    my $id = scalar @CONTRIBUTORS;
+    $obj->{id} = $id;
+    $Test::FakeResultSet::ITEMS{$id} = $obj;
+    return $obj;
+}
+sub contributorRoles { return qw(ARTIST COMPOSER CONDUCTOR BAND); }
+sub extIds {
+    my $self = shift;
+    return [ split(',', $self->{extid} || '') ];
+}
+sub extid { return $_[0]->{extid}; }
+sub name { return $_[0]->{artist} || $_[0]->{name}; }
+$INC{'Slim/Schema.pm'} = 1;
+
+# ---- simple sync http ----
+package Slim::Networking::SimpleSyncHTTP;
+our @RESPONSES;
+our @POST_LOG;
+sub new { my ($class, $opts) = @_; return bless { opts => $opts }, $class; }
+sub post {
+    my ($self, $url, @args) = @_;
+    my $body = pop @args if scalar(@args) % 2 == 1;
+    my %headers = @args;
+    push @POST_LOG, { url => $url, headers => \%headers, body => $body };
+    my $resp = shift(@RESPONSES) || { code => 200, content => '{"data":{}}' };
+    $self->{code} = $resp->{code} || 200;
+    $self->{content} = $resp->{content};
+    $self->{error} = $resp->{error};
+    return $self;
+}
+sub code { return $_[0]->{code}; }
+sub content { return $_[0]->{content}; }
+sub error { return $_[0]->{error}; }
+sub is_success { return ($_[0]->{code} && $_[0]->{code} =~ /^2/) ? 1 : 0; }
+$INC{'Slim/Networking/SimpleSyncHTTP.pm'} = 1;
+
 
 # ---- timers ----
 # Real semantics (Slim/Utils/Timers.pm:66-95): $when is an ABSOLUTE epoch
