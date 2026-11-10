@@ -71,6 +71,25 @@ Implement LMS InfoProviders (`Slim::Menu::TrackInfo`, `Slim::Menu::AlbumInfo`, `
   * Read from source account using token A via `userCollection`/`paginatedCollection`.
   * Batch-write to destination account using token B via `addCollectionItems` mutation (tracks, albums, artists) and playlist mutations (`createPlaylistV1` + `addItemsToPlaylist`).
 
+### 11. Personal Wave (Моя волна) — Verification & Genre Expansion [PENDING, planned 2026-10+]
+> User request (2026-10-29): "Необходима дополнительная проверка функционала моей волны". Not to be executed immediately — future task.
+
+#### 11.1. Web UI Verification: Genre Assignment & Display (Classic Web + Material Skin)
+* Verify in **both** the classic LMS web UI (`HTML/EN/plugins/zvuk/waveSliders.html`) and **Material Skin** that genre selection works correctly:
+  * Selected genres are **assigned/persisted** correctly (check `WaveSettings.pm` save/clean-up logic, lines ~47–66).
+  * Assigned genres are **displayed back** correctly when the settings page / wave menu is reopened (no stale or template-variable leftovers like `${genre.name}`).
+  * Compare Classic Web vs Material rendering — same genres shown, same state after save/reload.
+
+#### 11.2. Expand the Known Genres List to the Full Zvuk Catalog
+* Current list: 13 genres in `WaveSettings.pm` `GENRES` constant (`easy_listening_ambient`, `electronic`, `classical`, `folk_world_country`, `hip_hop`, `indie`, `instrumental_acoustic`, `jazz`, `latin`, `metal`, `pop`, `rock`, `soundtrack`).
+* Research the **full list of genre IDs** supported by the Zvuk wave/tuner API (sources: `/home/chernysh/Projects/zvuk-music/zvuk_music/`, `/home/chernysh/Projects/android_zvuk/`, `/home/chernysh/Projects/sberzvuk-api/src/`, `/home/chernysh/Projects/lms-zvuk-guides/docs/zvuk_api.md`) and add **all known genres** with proper `strings.txt` labels (`PLUGIN_ZVUK_GENRE_*`) for ru/en.
+
+#### 11.3. Logging Verification: What Is Actually Sent When Starting the Wave
+* Add temporary (or debug-level) logging at the wave launch request site to capture the **real parameters** sent to the Zvuk API when "Моя волна" starts (genres, energy, fun/popular tuner values, seed track if any).
+* Compare logged request parameters against what the UI shows. **User suspicion**: selected tracks don't always match the displayed settings — possibly the UI displays one thing but the request sends something else (e.g., defaults `DEFAULT_ENERGY/DEFAULT_FUN = 0.5` instead of slider values, empty/stale genres list, or params not propagated from web/Material forms to the request).
+* Check the parameter path end-to-end: web form / Material → `UI/Wave.pm` sliders → `WaveSettings.pm` → API request builder. Identify where values can diverge from what is displayed.
+* Relevant files: `WaveSettings.pm`, `UI/Wave.pm`, `HTML/EN/plugins/zvuk/waveSliders.html`, API request code (see `API/`), `strings.txt`.
+
 ---
 
 ## 3. Deep Dive: Clickstream Telemetry (Analytics v4 Architecture)
