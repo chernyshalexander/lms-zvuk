@@ -95,10 +95,10 @@ An authorization token is required to access your personal library. Available lo
 3. **Guest (Anonymous) Mode:** click "Get Anonymous Token" for quick trial listening without entering credentials.
 
 ##### Installation
-The plugin is available in the official plugin directory of Lyrion Music Server. Go to the server settings, click **Manage Plugins**, search for **Yandex Music** and install it. Restart Lyrion Music Server after installation.
+The plugin is available in the official plugin directory of Lyrion Music Server. Go to the server settings, click **Manage Plugins**, search for **Zvuk** and install it. Restart Lyrion Music Server after installation.
 
 To add the plugin repository manually:  
-In LMS settings (Plugins → Additional Repositories) add:  
+In LMS settings (Settings → Plugins → Additional Repositories) add:  
 Stable: `https://chernyshalexander.github.io/lms-zvuk/public.xml`  
 Dev: `https://chernyshalexander.github.io/lms-zvuk/public.xml`
 
