@@ -44,7 +44,9 @@
 
 Чтобы добавить репозиторий вручную:
 В настройках LMS (Plugins → Additional Repositories) добавьте ссылку:
+
 Стабильная версия: `https://chernyshalexander.github.io/lms-zvuk/public.xml`
+
 Версия в разработке: `https://chernyshalexander.github.io/lms-zvuk/dev.xml`
 
 В настройках LMS (**Настройки** → **Подключаемые модули** → **Дополнительные репозитории**) добавьте ссылку на репозиторий со стабильной версией или с версией в разработке
