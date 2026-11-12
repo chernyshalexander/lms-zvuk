@@ -36,15 +36,20 @@
 3. **Гостевой (анонимный) режим:** нажмите кнопку «Получить анонимный токен» для быстрого ознакомления без ввода учетных данных.
 
 ##### Установка
-###### Вариант 1. Через репозиторий LMS (Additional Repositories)
-В настройках LMS (**Настройки** → **Подключаемые модули** → **Дополнительные репозитории**) добавьте ссылку на репозиторий со стабильной версией:
-```text
-https://chernyshalexander.github.io/lms-zvuk/public.xml
-```
-или на репозиторий с dev версией:
-```text
-https://chernyshalexander.github.io/lms-zvuk/dev.xml
-```
+Стабильная версия плагина доступна в стандартном списке плагинов Lyrion Music Server - 
+
+`https://lyrion.org/lms-plugin-repository/extensions.xml`
+
+Перейдите в настройки сервера → Управление плагинами (Manage Plugins), найдите Zvuk и установите его. После установки перезапустите Lyrion Music Server.
+
+Чтобы добавить репозиторий вручную:
+В настройках LMS (Plugins → Additional Repositories) добавьте ссылку:
+
+Стабильная версия: `https://chernyshalexander.github.io/lms-zvuk/public.xml`
+
+Версия в разработке: `https://chernyshalexander.github.io/lms-zvuk/dev.xml`
+
+В настройках LMS (**Настройки** → **Подключаемые модули** → **Дополнительные репозитории**) добавьте ссылку на репозиторий со стабильной версией или с версией в разработке
 Примените настройки, найдите **Zvuk** в списке доступных сторонних плагинов, установите его и перезапустите сервер.
 
 ##### Лицензия
@@ -90,15 +95,13 @@ An authorization token is required to access your personal library. Available lo
 3. **Guest (Anonymous) Mode:** click "Get Anonymous Token" for quick trial listening without entering credentials.
 
 ##### Installation
-###### Method 1: Via LMS Additional Repositories
-In LMS settings (**Settings** → **Plugins** → **Additional Repositories**), add the link for the stable version:
-```text
-https://chernyshalexander.github.io/lms-zvuk/public.xml
-```
-or the development version:
-```text
-https://chernyshalexander.github.io/lms-zvuk/dev.xml
-```
+The plugin is available in the official plugin directory of Lyrion Music Server. Go to the server settings, click **Manage Plugins**, search for **Zvuk** and install it. Restart Lyrion Music Server after installation.
+
+To add the plugin repository manually:  
+In LMS settings (Settings → Plugins → Additional Repositories) add:  
+Stable: `https://chernyshalexander.github.io/lms-zvuk/public.xml`  
+Dev: `https://chernyshalexander.github.io/lms-zvuk/public.xml`
+
 Apply settings, find **Zvuk** in the list of available 3rd-party plugins, install it, and restart the server.
 
 ##### License
