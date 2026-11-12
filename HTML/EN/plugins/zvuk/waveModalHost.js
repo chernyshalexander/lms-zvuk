@@ -17,6 +17,38 @@
 	var frame = null;
 	var lastFocused = null;
 
+	function getScreenWidth() {
+		var w = 0;
+		try {
+			if (window.top && window.top.innerWidth) {
+				w = window.top.innerWidth;
+			} else if (window.top && window.top.document && window.top.document.documentElement) {
+				w = window.top.document.documentElement.clientWidth;
+			}
+		} catch (e) {}
+		if (!w) {
+			w = window.innerWidth || (document.documentElement && document.documentElement.clientWidth) || 0;
+		}
+		if (!w && window.screen) {
+			w = window.screen.availWidth || window.screen.width || 0;
+		}
+		return w || 1000;
+	}
+
+	function calcDialogWidth() {
+		return Math.min(Math.floor(getScreenWidth() * 0.96), 1000);
+	}
+
+	function applyDialogWidth() {
+		if (!overlay) {
+			return;
+		}
+		var dialog = overlay.querySelector('.zvuk-modal-dialog');
+		if (dialog) {
+			dialog.style.maxWidth = calcDialogWidth() + 'px';
+		}
+	}
+
 	function buildStyles() {
 		var css = ''
 			+ '.zvuk-modal-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);'
@@ -48,6 +80,7 @@
 		frame = null;
 		document.body.classList.remove('zvuk-modal-open');
 		document.removeEventListener('keydown', onKeydown, true);
+		window.removeEventListener('resize', applyDialogWidth);
 		if (lastFocused && lastFocused.focus) {
 			lastFocused.focus();
 		}
@@ -86,7 +119,7 @@
 		dialog.className = 'zvuk-modal-dialog';
 		dialog.setAttribute('role', 'dialog');
 		dialog.setAttribute('aria-modal', 'true');
-	dialog.setAttribute('aria-label', DIALOG_LABEL);
+		dialog.setAttribute('aria-label', DIALOG_LABEL);
 
 		var closeBtn = document.createElement('button');
 		closeBtn.type = 'button';
@@ -106,6 +139,8 @@
 		overlay.appendChild(dialog);
 		document.body.appendChild(overlay);
 		document.body.classList.add('zvuk-modal-open');
+		applyDialogWidth();
+		window.addEventListener('resize', applyDialogWidth);
 		document.addEventListener('keydown', onKeydown, true);
 		closeBtn.focus();
 	}

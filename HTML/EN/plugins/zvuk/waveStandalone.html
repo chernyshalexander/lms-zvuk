@@ -23,8 +23,8 @@
 	transform: translate(-50%,-50%);
 	background: white;
 	border-radius: 8px;
-	max-width: 600px;
-	width: 90%;
+	max-width: min(96vw, 1000px);
+	width: 96%;
 	max-height: 90vh;
 	overflow-y: auto;
 	box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -63,30 +63,26 @@ html.zvuk-dark-theme .wave-modal-header h2 { color: #eee; }
 html.zvuk-dark-theme .wave-modal-close { color: #aaa; }
 html.zvuk-dark-theme .wave-modal-close:hover { color: #eee; }
 
-/* Embedded in the classic-web modal host: the host draws the backdrop and the
-   close button, so this page only contributes the card itself. */
-[% IF embed %]
-html, body { background: transparent !important; margin: 0; }
-/* Wide host window: use the extra width instead of one long column.
-   Only in embed mode, so the settings page and Material keep their layout. */
+/* Wide host window: use the extra width instead of one long column
+   across classic-web embed, Material dialog, and standalone tab. */
 @media (min-width: 900px) {
-	body.zvuk-embed .wave-settings-container {
+	.wave-settings-container {
 		display: grid;
 		grid-template-columns: repeat(6, minmax(0, 1fr));
 		gap: 16px;
 	}
-	body.zvuk-embed .wave-settings-container .wave-setting-group { margin-bottom: 0; }
+	.wave-settings-container .wave-setting-group { margin-bottom: 0; }
 
 	/* the pad and the genre list need the full width */
-	body.zvuk-embed .wave-setting-group.mood-group,
-	body.zvuk-embed .wave-setting-group.genres-group { grid-column: 1 / -1; }
-	body.zvuk-embed .button-group { grid-column: 1 / -1; }
+	.wave-setting-group.mood-group,
+	.wave-setting-group.genres-group { grid-column: 1 / -1; }
+	.button-group { grid-column: 1 / -1; }
 
 	/* popularity, vocal and language each take a third of one row: the slider
 	   simply gets a tighter step, and the two pill rows already leave room */
-	body.zvuk-embed .wave-setting-group.popularity-group,
-	body.zvuk-embed .wave-setting-group.vocal-group,
-	body.zvuk-embed .wave-setting-group.language-group {
+	.wave-setting-group.popularity-group,
+	.wave-setting-group.vocal-group,
+	.wave-setting-group.language-group {
 		grid-column: span 2;
 		/* equal heights across the row, content pinned to the edges */
 		display: flex;
@@ -95,19 +91,24 @@ html, body { background: transparent !important; margin: 0; }
 	}
 
 	/* keep eleven steps legible in the narrower track */
-	body.zvuk-embed .step-input-dot { width: 9px; height: 9px; }
+	.step-input-dot { width: 9px; height: 9px; }
 
 	/* a third of the row is tight for pill labels: trim the side padding so
 	   three language pills still share one line */
-	body.zvuk-embed .pill-btn { padding: 6px 10px; }
+	.pill-btn { padding: 6px 10px; }
 
 	/* instrumental mode hides the language card: the two remaining cards take
 	   the free space instead of leaving a hole */
-	body.zvuk-embed.zvuk-no-language .wave-setting-group.popularity-group,
-	body.zvuk-embed.zvuk-no-language .wave-setting-group.vocal-group {
+	body.zvuk-no-language .wave-setting-group.popularity-group,
+	body.zvuk-no-language .wave-setting-group.vocal-group {
 		grid-column: span 3;
 	}
 }
+
+/* Embedded in the classic-web modal host: the host draws the backdrop and the
+   close button, so this page only contributes the card itself. */
+[% IF embed %]
+html, body { background: transparent !important; margin: 0; }
 .wave-modal-overlay {
 	display: block !important;
 	position: static;
@@ -172,11 +173,113 @@ html, body { background: transparent !important; margin: 0; }
 		document.documentElement.classList.toggle('zvuk-dark-theme', zvukDetectDarkTheme());
 	}
 
+	var IS_EMBED = [% IF embed %]true[% ELSE %]false[% END %];
+
+	function getHostWindow() {
+		try {
+			if (window.top && window.top.document) {
+				return window.top;
+			}
+		} catch (e) {}
+		try {
+			if (window.parent && window.parent.document) {
+				return window.parent;
+			}
+		} catch (e) {}
+		return window;
+	}
+
+	function getHostScreenWidth() {
+		var hostWin = getHostWindow();
+		var w = 0;
+		try {
+			w = hostWin.innerWidth || (hostWin.document && hostWin.document.documentElement && hostWin.document.documentElement.clientWidth) || 0;
+		} catch (e) {}
+		if (!w) {
+			w = window.innerWidth || (document.documentElement && document.documentElement.clientWidth) || 0;
+		}
+		if (!w && window.screen) {
+			w = window.screen.availWidth || window.screen.width || 0;
+		}
+		return w || 1000;
+	}
+
+	function calcModalWidth(screenWidth) {
+		return Math.min(Math.floor(screenWidth * 0.96), 1000);
+	}
+
+	function findParentDialog() {
+		if (!window.parent || window.parent === window) {
+			return null;
+		}
+		try {
+			var parentDoc = window.parent.document;
+			if (window.frameElement) {
+				var el = window.frameElement.parentNode;
+				while (el && el !== parentDoc.body && el !== parentDoc.documentElement) {
+					if (el.classList && (el.classList.contains('v-dialog') || el.getAttribute('role') === 'dialog')) {
+						return el;
+					}
+					el = el.parentNode;
+				}
+			}
+			var dialogs = parentDoc.querySelectorAll('.v-dialog--active, .v-dialog, [role="dialog"], .dialog, .modal');
+			for (var i = 0; i < dialogs.length; i++) {
+				var d = dialogs[i];
+				if (d.classList && d.classList.contains('v-dialog__content')) {
+					continue;
+				}
+				if (d.offsetWidth > 0 || d.offsetHeight > 0) {
+					return d;
+				}
+			}
+		} catch (e) {}
+		return null;
+	}
+
+	function applyResponsiveWidth() {
+		if (IS_EMBED) {
+			return;
+		}
+		var targetWidth = calcModalWidth(getHostScreenWidth());
+		var modalBox = document.getElementById('waveSliderBox');
+		var inMaterialFrame = false;
+
+		if (window.parent && window.parent !== window) {
+			try {
+				if (typeof window.parent.zvukCloseWaveModal !== 'function') {
+					inMaterialFrame = true;
+					var parentDialog = findParentDialog();
+					if (parentDialog && !(parentDialog.classList && parentDialog.classList.contains('v-dialog--fullscreen'))) {
+						parentDialog.style.width = targetWidth + 'px';
+						parentDialog.style.maxWidth = '96vw';
+					}
+				}
+			} catch (e) {}
+		}
+
+		if (modalBox) {
+			modalBox.style.width = inMaterialFrame ? '100%' : '96%';
+			modalBox.style.maxWidth = targetWidth + 'px';
+		}
+	}
+
 	// ================================================================
 	// INITIALIZATION (same as settings page)
 	// ================================================================
 	function initializeStandalone() {
 		zvukApplyTheme();
+		applyResponsiveWidth();
+
+		var hostWin = getHostWindow();
+		if (!IS_EMBED && hostWin && hostWin.addEventListener) {
+			hostWin.addEventListener('resize', applyResponsiveWidth);
+			var cleanupResize = function() {
+				try { hostWin.removeEventListener('resize', applyResponsiveWidth); } catch (e) {}
+			};
+			window.addEventListener('pagehide', cleanupResize);
+			window.addEventListener('unload', cleanupResize);
+		}
 
 		// Initialize modal event handlers
 		var modal = document.getElementById('waveSliderModal');
