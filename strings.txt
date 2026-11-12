@@ -1084,6 +1084,10 @@ PLUGIN_ZVUK_GIGAMIX_ADD_MORE
 	EN	Add More Tracks
 	RU	Подобрать ещё
 
+PLUGIN_ZVUK_GIGAMIX_ADDED_TRACKS
+	EN	Added %d tracks to playlist
+	RU	Добавлено треков в плейлист: %d
+
 PLUGIN_ZVUK_GIGAMIX_AUTOPLAY
 	EN	Auto-extend GigaMix
 	RU	Автопродолжение GigaMix

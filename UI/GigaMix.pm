@@ -62,8 +62,9 @@ sub handleGigaMixAddMore {
 	my ($client, $cb, $args, $params) = @_;
 	my $api = Plugins::Zvuk::Plugin::_get_api_client($client);
 
-	my $cursor = $params->{cursor};
-	my $prompt = $params->{prompt};
+	my $cursor        = $params->{cursor};
+	my $prompt        = $params->{prompt};
+	my $initialTracks = $params->{initialTracks} || [];
 
 	$log->info("GigaMix: adding more tracks for: $prompt");
 
@@ -113,10 +114,29 @@ sub handleGigaMixAddMore {
 
 		$log->info("GigaMix: successfully added " . scalar(@$newTracks) . " tracks to playlist");
 
-		# Return confirmation message
-		$cb->({ items => [
-			{ name => "Added " . scalar(@$newTracks) . " tracks to playlist", type => 'text' },
-		]});
+		my @allTracks = (@$initialTracks, @$newTracks);
+		my $addedMsg  = sprintf(cstring($client, 'PLUGIN_ZVUK_GIGAMIX_ADDED_TRACKS'), scalar(@$newTracks));
+
+		if ($client && $client->can('showBriefly')) {
+			$client->showBriefly({
+				line     => [ cstring($client, 'PLUGIN_ZVUK_GIGAMIX'), $addedMsg ],
+				duration => 1,
+			});
+		}
+
+		# Transition to the updated track list (old + new tracks) after 1 second
+		require Slim::Utils::Timers;
+		require Time::HiRes;
+		Slim::Utils::Timers::setTimer(
+			undef,
+			Time::HiRes::time() + 1,
+			sub {
+				_renderGigaMixPlaylist($client, $cb, {
+					tracks => \@allTracks,
+					cursor => $newCursor,
+				}, $prompt);
+			},
+		);
 	}, { cursor => $cursor, limit => 5 });
 }
 
@@ -181,7 +201,7 @@ sub _renderGigaMixPlaylist {
 	my $playlistName = $result->{playlistName};
 	my $tracks       = $result->{tracks} || [];
 	my $cursor       = $result->{cursor};
-	my $genId        = $result->{genId};
+	my $genId        = $result->{genId} // 'n/a';
 
 	$log->info("GigaMix: playlist generated - genId=$genId, tracks=" . scalar(@$tracks));
 
@@ -190,6 +210,14 @@ sub _renderGigaMixPlaylist {
 			{ name => cstring($client, 'PLUGIN_ZVUK_GIGAMIX_NO_RESULTS'), type => 'text' },
 		]});
 		return;
+	}
+
+	if ($client) {
+		$client->pluginData(zvuk_gigamix_prepared => {
+			prompt => $prompt,
+			tracks => $tracks,
+			cursor => $cursor,
+		});
 	}
 
 	my @items;
@@ -201,6 +229,7 @@ sub _renderGigaMixPlaylist {
 		type  => 'audio',
 		url   => "zvuk://gigamix:$escaped_prompt",
 		play  => "zvuk://gigamix:$escaped_prompt",
+		image => 'plugins/zvuk/html/images/gigamix_svg.png',
 	};
 
 	push @items, map { Plugins::Zvuk::Plugin::_renderTrack($_, 1) } @$tracks;
@@ -210,6 +239,7 @@ sub _renderGigaMixPlaylist {
 		type        => 'link',
 		url         => \&handleGigaMixRemake,
 		passthrough => [{ prompt => $prompt }],
+		image       => 'plugins/zvuk/html/images/remake_svg.png',
 	};
 
 	# Add "More Tracks" button if cursor exists (pagination available)
@@ -219,6 +249,7 @@ sub _renderGigaMixPlaylist {
 			type        => 'link',
 			url         => \&handleGigaMixAddMore,
 			passthrough => [{ cursor => $cursor, prompt => $prompt, initialTracks => $tracks }],
+			image       => 'plugins/zvuk/html/images/add_more_svg.png',
 		};
 	}
 
