@@ -334,21 +334,6 @@ sub handleSaveOAuthToken {
 	);
 }
 
-sub handleOAuthCallback {
-	my ($httpClient, $response) = @_;
-
-	$log->info("OAuth Callback: Serving browser-side fetch page");
-
-	my $template = 'plugins/zvuk/oauthCallback.html';
-	my $output_ref = Slim::Web::HTTP::filltemplatefile($template, {});
-	my $output_bytes = $output_ref ? encode_utf8($$output_ref) : '';
-
-	$response->code(200);
-	$response->content_type('text/html; charset=utf-8');
-	$response->content_length(length($output_bytes));
-	Slim::Web::HTTP::addHTTPResponse($httpClient, $response, \$output_bytes);
-}
-
 sub handleGetAnonymousToken {
 	my ($httpClient, $response) = @_;
 
