@@ -146,11 +146,6 @@ sub initPlugin {
 			);
 
 			Slim::Web::Pages->addRawFunction(
-				'plugins/zvuk/oauthCallback',
-				\&Plugins::Zvuk::WebHandlers::handleOAuthCallback
-			);
-
-			Slim::Web::Pages->addRawFunction(
 				'plugins/zvuk/getAnonymousToken',
 				\&Plugins::Zvuk::WebHandlers::handleGetAnonymousToken
 			);
