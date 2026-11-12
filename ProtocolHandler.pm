@@ -537,6 +537,28 @@ sub _explodeGigaMix {
 
 	$log->info("Starting GigaMix Stream for prompt: $prompt");
 
+	my $prepared = $client ? $client->pluginData('zvuk_gigamix_prepared') : undef;
+	if ($prepared && ref $prepared eq 'HASH'
+		&& defined $prepared->{prompt} && $prepared->{prompt} eq ($prompt // '')
+		&& $prepared->{tracks} && ref $prepared->{tracks} eq 'ARRAY' && @{$prepared->{tracks}})
+	{
+		my $tracks = $prepared->{tracks};
+		my $cursor = $prepared->{cursor};
+
+		Plugins::Zvuk::StreamManager->startStream($client, 'gigamix', {
+			prompt    => $prompt,
+			cursor    => $cursor,
+			is_stream => 1,
+		});
+		$client->pluginData(zvuk_gigamix_cursor => $cursor);
+
+		$log->info("Using prepared GigaMix list: " . scalar(@$tracks) . " tracks, cursor: " . ($cursor // 'none'));
+		Plugins::Zvuk::API->cacheTrackMetadata($tracks);
+
+		my @urls = map { 'zvuk://' . $_->{id} } @$tracks;
+		return $cb->(\@urls);
+	}
+
 	Plugins::Zvuk::StreamManager->startStream($client, 'gigamix', {
 		prompt    => $prompt,
 		cursor    => undef,
