@@ -373,6 +373,7 @@ sub _getWaveMenuItems {
 		url       => $is_buttons ? \&handleStartWave : 'zvuk://wave',
 		play      => 'zvuk://wave',
 		on_select => 'play',
+		image     => 'plugins/zvuk/html/images/radio.png',
 	};
 
 	my $useWebUI = ($kind eq 'classic_web' || $kind eq 'weblink_capable') ? 1 : 0;
@@ -397,7 +398,7 @@ sub _getWaveMenuItems {
 			name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 			type    => 'link',
 			weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
-			image   => 'plugins/zvuk/html/images/playlists.png',
+			image   => 'plugins/zvuk/html/images/settings.png',
 		};
 	} else {
 		# For Jive/SqueezePlay: link to router that shows native UI
@@ -405,6 +406,7 @@ sub _getWaveMenuItems {
 			name  => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 			type  => 'link',
 			url   => \&handleWaveSettingsRouter,
+			image => 'plugins/zvuk/html/images/settings.png',
 		};
 	}
 
@@ -437,7 +439,7 @@ sub handleWaveSettingsRouter {
 			name    => cstring($client, 'PLUGIN_ZVUK_MENU_WAVE_SETTINGS'),
 			type    => 'link',
 			weblink => '/plugins/zvuk/waveStandalone' . $ext . '?player=' . ($client ? $client->id : ''),
-			image   => 'plugins/zvuk/html/images/playlists.png',
+			image   => 'plugins/zvuk/html/images/settings.png',
 		}]);
 	} else {
 		# For Jive/SqueezePlay: show standard list settings

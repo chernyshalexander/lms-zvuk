@@ -372,13 +372,13 @@ sub _buildRootMenu {
 		{
 			name  => cstring($client, 'PLUGIN_ZVUK_ATLAS'),
 			type  => 'outline',
-			image => 'plugins/zvuk/html/images/playlists.png',
+			image => 'plugins/zvuk/html/images/atlas_svg.png',
 			url   => \&Plugins::Zvuk::UI::Atlas::handleAtlasMenu,
 		},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS'),
 				type  => 'outline',
-				image => 'plugins/zvuk/html/images/playlists.png',
+				image => 'plugins/zvuk/html/images/recommendations_svg.png',
 				items => [
 					{
 						name  => cstring($client, 'PLUGIN_ZVUK_PERSONALIZED_PLAYLISTS'),
@@ -389,7 +389,7 @@ sub _buildRootMenu {
 					{
 						name  => cstring($client, 'PLUGIN_ZVUK_RECOMMENDATIONS_MIXED'),
 						type  => 'link',
-						image => 'plugins/zvuk/html/images/playlists.png',
+						image => 'plugins/zvuk/html/images/recommendations_svg.png',
 						url   => \&handleRecommendations,
 					},
 				],
@@ -397,13 +397,13 @@ sub _buildRootMenu {
 				{
 					name  => cstring($client, 'PLUGIN_ZVUK_EDITORIAL_PLAYLISTS'),
 					type  => 'link',
-					image => 'plugins/zvuk/html/images/playlists.png',
+					image => 'plugins/zvuk/html/images/editorial_svg.png',
 					url   => \&handleEditorialPlaylists,
 				},
 			{
 				name  => cstring($client, 'PLUGIN_ZVUK_GIGAMIX'),
 				type  => 'link',
-				image => 'plugins/zvuk/html/images/playlists.png',
+				image => 'plugins/zvuk/html/images/gigamix_svg.png',
 				url   => \&Plugins::Zvuk::UI::GigaMix::handleGigaMix,
 			},
 		{
