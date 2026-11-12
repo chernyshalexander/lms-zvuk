@@ -7,6 +7,7 @@ use utf8;
 use base qw(Slim::Plugin::OPMLBased);
 
 use Encode qw(decode_utf8 encode_utf8);
+use HTML::Entities ();
 use JSON::XS;
 use JSON::XS::VersionOneAndTwo;
 use URI::QueryParam;
@@ -1183,12 +1184,27 @@ sub _renderArtist {
 	};
 }
 
+sub _clean_description {
+	my ($text) = @_;
+	return "" unless defined $text && $text ne "";
+
+	# Separate block/break tags before stripping so adjacent paragraphs don't run together
+	$text =~ s{<(?:br\s*/?|/(?:p|div|li|h[1-6]))>}{ }gi;
+	$text =~ s/<[^>]*>//g;
+	$text =~ s/<[^>]*$//;
+	HTML::Entities::decode_entities($text);
+	$text =~ s/[\s\x{00a0}]+/ /g;
+	$text =~ s/^\s+|\s+$//g;
+
+	return $text;
+}
+
 sub _renderPlaylist {
 	my ($playlist) = @_;
 	return {
 		name        => $playlist->{title},
 		line1       => $playlist->{title},
-		line2       => $playlist->{description} || "",
+		line2       => _clean_description($playlist->{description}),
 		type        => 'link',
 		url         => \&handlePlaylist,
 		passthrough => [{ id => $playlist->{id} }],
@@ -1205,7 +1221,7 @@ sub _renderPodcast {
 	return {
 		name        => $podcast->{title},
 		line1       => $podcast->{title},
-		line2       => $podcast->{description} || "",
+		line2       => _clean_description($podcast->{description}),
 		type        => 'link',
 		url         => \&handlePodcast,
 		passthrough => [{ id => $podcast->{id} }],
