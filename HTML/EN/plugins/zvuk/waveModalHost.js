@@ -11,8 +11,8 @@
 	if (!ENABLED) {
 		return;
 	}
-	var CLOSE_LABEL = '[% "PLUGIN_ZVUK_CANCEL" | string %]';
-	var DIALOG_LABEL = '[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string %]';
+	var CLOSE_LABEL = '[% "PLUGIN_ZVUK_CANCEL" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]';
+	var DIALOG_LABEL = '[% "PLUGIN_ZVUK_WAVE_SLIDERS" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]';
 	var overlay = null;
 	var frame = null;
 	var lastFocused = null;
