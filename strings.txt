@@ -1029,6 +1029,9 @@ PLUGIN_ZVUK_OAUTH_INVALID_FORMAT
 	RU	Токен имеет неправильный формат
 
 PLUGIN_ZVUK_OAUTH_NOT_FOUND
+	EN	Token not found
+	RU	Токен не найден
+
 PLUGIN_ZVUK_CLIPBOARD_NOT_FOUND
 	EN	No token found in the clipboard
 	RU	Токен не найден в буфере обмена
@@ -1040,9 +1043,6 @@ PLUGIN_ZVUK_CLIPBOARD_READ_ERROR
 PLUGIN_ZVUK_PASTE_HINT
 	EN	Press Ctrl+V to paste
 	RU	Нажмите Ctrl+V для вставки
-
-	EN	Token not found
-	RU	Токен не найден
 
 PLUGIN_ZVUK_OAUTH_PASTE_PLACEHOLDER
 	EN	Paste JSON here

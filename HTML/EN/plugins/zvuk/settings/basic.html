@@ -211,7 +211,7 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 						<input type="submit" name="delete_[% acc.userId | html %]"
 							value="[% 'PLUGIN_ZVUK_DELETE_ACCOUNT' | string %]"
 							class="stdbutton"
-							onclick="return confirm('[% 'PLUGIN_ZVUK_DELETE_CONFIRM' | string %]');">
+							onclick="return confirm('[% 'PLUGIN_ZVUK_DELETE_CONFIRM' | string | replace("'", "\\'") | replace("[\r\n]+", " ") | html %]');">
 					</td>
 				</tr>
 			[% END %]
@@ -274,23 +274,23 @@ var zvukOAuthInProgress = false;
 var zvukProfilePopup = null;
 
 var zvukStrings = {
-	openingWindow: '[% "PLUGIN_ZVUK_OAUTH_OPENING_WINDOW" | string %]',
-	popupError: '[% "PLUGIN_ZVUK_OAUTH_POPUP_ERROR" | string %]',
-	gettingProfile: '[% "PLUGIN_ZVUK_OAUTH_GETTING_PROFILE" | string %]',
-	saving: '[% "PLUGIN_ZVUK_OAUTH_SAVING" | string %]',
-	saved: '[% "PLUGIN_ZVUK_OAUTH_SAVED" | string %]',
-	invalidFormat: '[% "PLUGIN_ZVUK_OAUTH_INVALID_FORMAT" | string %]',
-	notFound: '[% "PLUGIN_ZVUK_OAUTH_NOT_FOUND" | string %]',
-	clipboardNotFound: '[% "PLUGIN_ZVUK_CLIPBOARD_NOT_FOUND" | string %]',
-	clipboardReadError: '[% "PLUGIN_ZVUK_CLIPBOARD_READ_ERROR" | string %]',
-	pasteHint: '[% "PLUGIN_ZVUK_PASTE_HINT" | string %]',
-	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string %]',
-	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string %]',
-	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string %]',
-	tokenDetected: '[% "PLUGIN_ZVUK_OAUTH_TOKEN_DETECTED" | string %]',
-	anonLoading: '[% "PLUGIN_ZVUK_ANONYMOUS_LOADING" | string %]',
-	anonSuccess: '[% "PLUGIN_ZVUK_ANONYMOUS_SUCCESS" | string %]',
-	anonError: '[% "PLUGIN_ZVUK_ANONYMOUS_ERROR" | string %]'
+	openingWindow: '[% "PLUGIN_ZVUK_OAUTH_OPENING_WINDOW" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	popupError: '[% "PLUGIN_ZVUK_OAUTH_POPUP_ERROR" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	gettingProfile: '[% "PLUGIN_ZVUK_OAUTH_GETTING_PROFILE" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	saving: '[% "PLUGIN_ZVUK_OAUTH_SAVING" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	saved: '[% "PLUGIN_ZVUK_OAUTH_SAVED" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	invalidFormat: '[% "PLUGIN_ZVUK_OAUTH_INVALID_FORMAT" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	notFound: '[% "PLUGIN_ZVUK_OAUTH_NOT_FOUND" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	clipboardNotFound: '[% "PLUGIN_ZVUK_CLIPBOARD_NOT_FOUND" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	clipboardReadError: '[% "PLUGIN_ZVUK_CLIPBOARD_READ_ERROR" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	pasteHint: '[% "PLUGIN_ZVUK_PASTE_HINT" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	networkError: '[% "PLUGIN_ZVUK_NETWORK_ERROR" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	accountAdded: '[% "PLUGIN_ZVUK_OAUTH_ACCOUNT_ADDED" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	copyJsonInstruction: '[% "PLUGIN_ZVUK_OAUTH_COPY_JSON_INSTRUCTION" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	tokenDetected: '[% "PLUGIN_ZVUK_OAUTH_TOKEN_DETECTED" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	anonLoading: '[% "PLUGIN_ZVUK_ANONYMOUS_LOADING" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	anonSuccess: '[% "PLUGIN_ZVUK_ANONYMOUS_SUCCESS" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]',
+	anonError: '[% "PLUGIN_ZVUK_ANONYMOUS_ERROR" | string | replace("'", "\\'") | replace("[\r\n]+", " ") %]'
 };
 
 function setDivStatus(div, text, type) {
